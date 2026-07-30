@@ -1,0 +1,359 @@
+import { useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronUp, Menu, X, Search } from "lucide-react";
+import { FaSignOutAlt } from "react-icons/fa";
+import "./DashboardLayout_clean.css";
+import logo from "../../assets/images/logo.webp";
+import { theme } from "../../theme/theme";
+
+const DashboardLayout = ({ user, handleLogout }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [bookingsExpanded, setBookingsExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleLogoutClick = () => {
+    handleLogout();
+    navigate("/");
+  };
+
+  const menuItems = [
+    { path: "/dashboard", label: "Dashboard", exact: true },
+    { path: "/dashboard/all-groups", label: "All Groups", disabled: false },
+    {
+      label: "My Bookings",
+      hasSubMenu: true,
+      menuKey: "bookings",
+      subItems: [
+        { path: "/dashboard/my-bookings?status=on hold", label: "On Hold" },
+        { path: "/dashboard/my-bookings?status=confirmed", label: "Confirmed" },
+        { path: "/dashboard/my-bookings?status=cancelled", label: "Cancelled" },
+        { path: "/dashboard/my-bookings", label: "All Bookings" },
+      ],
+    },
+    { path: "/dashboard/banks", label: "Bank" },
+    { path: "/dashboard/payment", label: "Payment" },
+    { path: "/dashboard/ledger", label: "Ledger" },
+    { path: "/dashboard/profile", label: "My Profile" },
+    { path: "/dashboard/change-password", label: "Change Password" },
+  ];
+
+  const isActive = (path, exact) => {
+    if (exact) {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  // Styles using new professional blue theme
+  const styles = {
+    container: {
+      background: theme.colors.background,
+    },
+
+    sidebar: {
+      background: `linear-gradient(180deg, ${theme.colors.sidebarBg} 0%, #1e2937 100%)`,
+      color: theme.colors.sidebarText,
+      boxShadow: "0 10px 30px rgba(0, 0, 0, 0.4)",
+      borderRight: `1px solid ${theme.colors.sidebarBorder}`,
+    },
+
+    sidebarHeader: {
+      borderBottom: `1px solid rgba(30, 41, 59, 0.6)`,
+      background: "rgba(15, 23, 42, 0.6)",
+    },
+
+    sidebarLogo: {
+      background: `linear-gradient(135deg, rgba(30, 64, 175, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%)`,
+      boxShadow: `0 0 25px rgba(30, 64, 175, 0.4)`,
+      border: `2px solid rgba(30, 64, 175, 0.3)`,
+      borderRadius: "16px",
+      padding: "12px",
+      transition: theme.transitions.smooth,
+    },
+
+    // ✅ Added this (Close Button)
+    closeBtn: (isHovered) => ({
+      background: isHovered
+        ? "rgba(30, 64, 175, 0.2)"
+        : "rgba(30, 64, 175, 0.1)",
+      color: isHovered ? "#ffffff" : "#94a3b8",
+      border: `1px solid rgba(30, 64, 175, 0.3)`,
+      transition: theme.transitions.smooth,
+    }),
+
+    // ✅ Added this (Overlay)
+    overlay: {
+      background: "rgba(15, 23, 42, 0.75)",
+      backdropFilter: "blur(8px)",
+    },
+
+    menuItem: (isActiveItem, isHovered) => ({
+      background: isActiveItem
+        ? theme.colors.sidebarActive
+        : isHovered
+          ? "rgba(30, 64, 175, 0.15)"
+          : "transparent",
+      color: isActiveItem
+        ? "#ffffff"
+        : isHovered
+          ? "#e0f2fe"
+          : theme.colors.sidebarText,
+      borderRadius: "12px",
+      transition: theme.transitions.smooth,
+    }),
+
+    subMenu: {
+      background: "rgba(15, 23, 42, 0.6)",
+      borderLeft: `3px solid ${theme.colors.primary}`,
+    },
+
+    subMenuItem: (isActiveItem, isHovered) => ({
+      background: isActiveItem
+        ? "rgba(30, 64, 175, 0.25)"
+        : isHovered
+          ? "rgba(30, 64, 175, 0.15)"
+          : "transparent",
+      color: isActiveItem || isHovered ? "#bae6fd" : theme.colors.sidebarText,
+    }),
+
+    footer: {
+      borderTop: `1px solid rgba(30, 41, 59, 0.8)`,
+      background: "rgba(15, 23, 42, 0.9)",
+    },
+
+    logoutBtn: (isHovered) => ({
+      background: isHovered
+        ? "rgba(225, 29, 72, 0.15)"
+        : "rgba(225, 29, 72, 0.08)",
+      border: `1.5px solid ${isHovered ? theme.colors.danger : "rgba(225, 29, 72, 0.3)"}`,
+      color: isHovered ? "#fda4af" : "#fca5a5",
+      transition: theme.transitions.smooth,
+    }),
+
+    header: {
+      background: theme.colors.card,
+      boxShadow: theme.shadows.md,
+      borderBottom: `1px solid ${theme.colors.border}`,
+    },
+
+    toggleBtn: (isHovered) => ({
+      background: isHovered ? theme.colors.primary : "rgba(30, 64, 175, 0.1)",
+      color: isHovered ? "#ffffff" : theme.colors.primary,
+      border: `2px solid rgba(30, 64, 175, 0.2)`,
+      transition: theme.transitions.smooth,
+    }),
+
+    // ✅ Added this (Header User)
+    headerUser: (isHovered) => ({
+      background: isHovered
+        ? "rgba(30, 64, 175, 0.1)"
+        : "rgba(30, 64, 175, 0.05)",
+      border: `1.5px solid rgba(30, 64, 175, ${isHovered ? "0.3" : "0.15"})`,
+      color: theme.colors.textSecondary,
+      transition: theme.transitions.smooth,
+    }),
+  };
+
+  return (
+    <div className="dashboard-container" style={styles.container}>
+      {/* Sidebar */}
+      <aside
+        className={`dashboard-sidebar ${sidebarOpen ? "open" : "closed"}`}
+        style={styles.sidebar}
+      >
+        <div className="sidebar-header" style={styles.sidebarHeader}>
+          <Link to="/" className="sidebar-logo" style={styles.sidebarLogo}>
+            <img
+              src={logo}
+              alt="Logo"
+              style={{ width: "80px", height: "auto" }}
+              onError={(e) => (e.target.style.display = "none")}
+            />
+          </Link>
+          <button
+            className="sidebar-close-btn"
+            onClick={toggleSidebar}
+            aria-label="Close sidebar"
+            style={styles.closeBtn(hoveredItem === "closeBtn")}
+            onMouseEnter={() => setHoveredItem("closeBtn")}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          <ul>
+            {menuItems.map((item) => {
+              const itemActive = isActive(item.path, item.exact);
+              const itemKey = item.path;
+              const isHovered = hoveredItem === itemKey;
+
+              return (
+                <li key={item.path}>
+                  {item.hasSubMenu ? (
+                    <>
+                      <div
+                        onClick={() => setBookingsExpanded(!bookingsExpanded)}
+                        className={`menu-item-parent ${itemActive ? "active" : ""}`}
+                        title={item.label}
+                        style={styles.menuItem(itemActive, isHovered)}
+                        onMouseEnter={() => setHoveredItem(itemKey)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                      >
+                        <div className="menu-item-content">
+                          <span className="menu-icon">{item.icon}</span>
+                          {sidebarOpen && (
+                            <span className="menu-label">{item.label}</span>
+                          )}
+                        </div>
+                        {sidebarOpen && (
+                          <span
+                            className="expand-icon"
+                            style={{
+                              color: itemActive
+                                ? theme.colors.sidebarTextLight
+                                : isHovered
+                                  ? theme.colors.primaryLight
+                                  : theme.colors.textTertiary,
+                              transition: theme.transitions.smooth,
+                            }}
+                          >
+                            {bookingsExpanded ? (
+                              <ChevronDown className="w-4 h-4 expand-icon" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 expand-icon" />
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {bookingsExpanded && sidebarOpen && (
+                        <ul className="sub-menu" style={styles.subMenu}>
+                          {item.subItems.map((subItem) => {
+                            const currentPath = location.pathname;
+                            const currentStatus =
+                              new URLSearchParams(location.search).get(
+                                "status",
+                              ) || "";
+                            const subItemStatus = subItem.path.includes(
+                              "?status=",
+                            )
+                              ? subItem.path.split("status=")[1]
+                              : "";
+                            const isSubActive =
+                              currentPath === "/dashboard/my-bookings" &&
+                              currentStatus === subItemStatus;
+                            const subKey = subItem.path;
+                            const isSubHovered = hoveredSubItem === subKey;
+
+                            return (
+                              <li key={subItem.path}>
+                                <Link
+                                  to={subItem.path}
+                                  className={`sub-menu-item ${isSubActive ? "active" : ""}`}
+                                  style={styles.subMenuItem(
+                                    isSubActive,
+                                    isSubHovered,
+                                  )}
+                                  onMouseEnter={() => setHoveredSubItem(subKey)}
+                                  onMouseLeave={() => setHoveredSubItem(null)}
+                                >
+                                  {subItem.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <Link
+                      to={item.path}
+                      className={itemActive ? "active" : ""}
+                      title={item.label}
+                      style={styles.menuItem(itemActive, isHovered)}
+                      onMouseEnter={() => setHoveredItem(itemKey)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                    >
+                      <span className="menu-icon">{item.icon}</span>
+                      {sidebarOpen && (
+                        <span className="menu-label">{item.label}</span>
+                      )}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="sidebar-footer" style={styles.footer}>
+          <button
+            onClick={handleLogoutClick}
+            className="logout-btn"
+            title="Logout"
+            style={styles.logoutBtn(hoveredItem === "logout")}
+            onMouseEnter={() => setHoveredItem("logout")}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <span className="menu-icon">
+              <FaSignOutAlt />
+            </span>
+            {sidebarOpen && <span className="menu-label">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={toggleSidebar}
+          style={styles.overlay}
+        />
+      )}
+
+      {/* Main Content */}
+      <div
+        className={`dashboard-main ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}`}
+      >
+        {/* Header */}
+        <header className="dashboard-header" style={styles.header}>
+          <button
+            onClick={toggleSidebar}
+            className="toggle-sidebar-btn"
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            style={styles.toggleBtn(hoveredItem === "toggle")}
+            onMouseEnter={() => setHoveredItem("toggle")}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            {sidebarOpen ? <FaTimes /> : <FaBars />}
+          </button>
+          {/* <div className="header-title">
+            <h1>Dashboard - Abid Air </h1> 
+          </div> */}
+          <div
+            className="header-user"
+            style={styles.headerUser(hoveredItem === "user")}
+            onMouseEnter={() => setHoveredItem("user")}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <span>Howdy!, {user?.name || "User"}</span>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <main className="dashboard-content">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardLayout;

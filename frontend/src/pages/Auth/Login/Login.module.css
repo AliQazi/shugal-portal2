@@ -1,0 +1,306 @@
+.loginPage {
+  min-height: 100vh;
+  background: #f0f2f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.loginCard {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  min-height: 540px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* LEFT PANEL */
+.leftPanel {
+  background: #029cb2;
+  flex: 1.1;
+  padding: 36px 32px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: white;
+}
+
+.leftPanel h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.companyCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.companyCard {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.companyCard .companyName {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.companyCard .companyDetail {
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1.5;
+}
+
+.infoSection {
+  display: flex;
+  gap: 32px;
+  font-size: 13px;
+}
+
+.infoBlock h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.infoBlock p {
+  font-size: 12px;
+  opacity: 0.92;
+  line-height: 1.8;
+}
+
+.addressSection {
+  font-size: 13px;
+}
+
+.addressSection h4 {
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.addressSection p {
+  font-size: 12px;
+  opacity: 0.92;
+}
+
+.directorCard {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.directorCard .directorName {
+  font-size: 15px;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.directorCard .directorTitle {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.signupLink {
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.9;
+  margin-top: auto;
+}
+
+.signupLink a {
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.signupLink a:hover {
+  text-decoration: underline;
+}
+
+/* RIGHT PANEL */
+.rightPanel {
+  background: white;
+  flex: 0.9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 40px;
+}
+
+.lockIconWrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #029cb2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.lockIconWrap svg {
+  width: 30px;
+  height: 30px;
+  fill: white;
+}
+
+.rightPanel h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 28px;
+}
+
+.formGroup {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.formGroup label span {
+  color: #e74c3c;
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #d0e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f0f8fc;
+  color: #222;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.formGroup input:focus {
+  border-color: #029cb2;
+  box-shadow: 0 0 0 3px rgba(2, 156, 178, 0.12);
+  background: white;
+}
+
+.forgotLink {
+  text-align: right;
+  width: 100%;
+  margin-bottom: 18px;
+  margin-top: -6px;
+}
+
+.forgotLink button {
+  background: none;
+  border: none;
+  color: #029cb2;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.signinBtn {
+  width: 100%;
+  padding: 13px;
+  background: #029cb2;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.signinBtn:hover:not(:disabled) {
+  background: #0287a0;
+}
+
+.signinBtn:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+
+/* FORGOT MODAL */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modalBox {
+  background: white;
+  border-radius: 14px;
+  padding: 28px 32px;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 10;
+}
+
+.modalBox h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+.modalClose {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #888;
+  cursor: pointer;
+}
+
+.modalClose:hover {
+  color: #333;
+}
+
+@media (max-width: 700px) {
+  .loginCard {
+    flex-direction: column;
+  }
+  .companyCards {
+    grid-template-columns: 1fr;
+  }
+  .infoSection {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

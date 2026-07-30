@@ -1,0 +1,255 @@
+.ledger-statement-shell {
+  background: #e8edf2;
+  padding: 28px 10px;
+}
+
+.ledger-statement {
+  position: relative;
+  width: 100%;
+  min-height: 560px;
+  margin: 0 auto;
+  padding: 48px 46px 24px;
+  background: #ffffff;
+  color: #17213a;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.ledger-fetching {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.ledger-print-date {
+  margin-bottom: 50px;
+  text-align: right;
+  color: #5b6575;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ledger-company-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 438px;
+  gap: 40px;
+  align-items: start;
+}
+
+.ledger-company {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.ledger-company img {
+  width: 132px;
+  height: 116px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.ledger-company h1 {
+  margin: 0 0 6px;
+  color: #17213a;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.ledger-company p {
+  margin: 2px 0;
+  color: #17213a;
+  font-size: 14px;
+  line-height: 1.28;
+}
+
+.ledger-opening-box {
+  margin-top: 10px;
+  border: 1px solid #454545;
+  text-align: center;
+  color: #17213a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ledger-opening-box div,
+.ledger-opening-box strong {
+  display: block;
+  min-height: 32px;
+  padding: 7px 12px;
+}
+
+.ledger-opening-box strong {
+  border-top: 1px solid #454545;
+}
+
+.ledger-divider {
+  height: 1px;
+  margin: 20px 0 16px;
+  background: #2365b6;
+}
+
+.ledger-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 50px;
+  margin-bottom: 8px;
+  border: 1px solid #111827;
+  background: #5bb3e9;
+  padding: 8px 8px;
+  color: #050910;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.ledger-title-bar span {
+  flex: 0 0 auto;
+}
+
+.ledger-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ledger-report-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #17213a;
+  font-size: 14px;
+}
+
+.ledger-report-table th,
+.ledger-report-table td {
+  border: 1px solid #454545;
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.ledger-report-table th {
+  background: #cfcfcf;
+  text-align: center;
+  font-weight: 800;
+}
+
+.ledger-report-table th:nth-child(1) {
+  width: 150px;
+}
+
+.ledger-report-table th:nth-child(2) {
+  width: 100px;
+}
+
+.ledger-report-table th:nth-child(4),
+.ledger-report-table th:nth-child(5) {
+  width: 130px;
+}
+
+.ledger-report-table th:nth-child(6) {
+  width: 150px;
+}
+
+.ledger-report-table tbody td {
+  min-height: 36px;
+  font-weight: 600;
+}
+
+.ledger-report-table tfoot td {
+  font-weight: 800;
+  text-align: center;
+}
+
+.ledger-number {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ledger-closing-row {
+  position: relative;
+  height: 36px;
+  font-weight: 800 !important;
+}
+
+.ledger-closing-row strong {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+}
+
+.ledger-notes {
+  margin-top: 64px;
+  color: #050910;
+}
+
+.ledger-notes strong {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.ledger-notes p {
+  min-height: 18px;
+  margin: 0;
+  color: #25304a;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .ledger-statement {
+    padding: 28px 18px 22px;
+  }
+
+  .ledger-print-date {
+    margin-bottom: 26px;
+  }
+
+  .ledger-company-row {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .ledger-opening-box {
+    max-width: 438px;
+  }
+
+  .ledger-title-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ledger-statement-shell {
+    padding: 16px 0;
+  }
+
+  .ledger-statement {
+    padding: 20px 12px;
+  }
+
+  .ledger-company {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ledger-company img {
+    width: 116px;
+    height: 92px;
+  }
+
+  .ledger-company h1 {
+    font-size: 21px;
+  }
+}

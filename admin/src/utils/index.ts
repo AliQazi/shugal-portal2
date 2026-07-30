@@ -1,0 +1,1 @@
+export { generateBookingPDF } from './pdfGenerator'

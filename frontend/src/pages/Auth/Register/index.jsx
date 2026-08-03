@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import { toast } from "react-toastify";
-import countryCodes from "../../../data/countryCodes.json"; // adjust path
+import countryCodes from "../../../data/countryCodes.json";
 import Select from "react-select";
 import Header from "../../../components/Header";
-import CommonSections from "../../../components/CommonSections";
 import bg from "../../../assets/images/bahrain.webp";
 import { theme } from "../../../theme/theme";
 
@@ -129,7 +128,7 @@ const Register = () => {
       <Header />
 
       {/* Structural Minimalist Split-Screen Framework */}
-      <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans pt-20">
+      <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans">
         {/* --- LEFT SIDE: Sticky Brand Info & Fixed Image Scrim Panel --- */}
         <div className="w-full lg:w-5/12 relative min-h-80 lg:min-h-0 overflow-hidden flex flex-col justify-between p-8 md:p-16 text-white">
           <div
@@ -139,7 +138,7 @@ const Register = () => {
           <div className="absolute inset-0 bg-neutral-900/70" />
 
           <div className="relative z-10 space-y-3">
-            <span className="text-[10px] uppercase tracking-widest text-orange-400 font-bold bg-white/10 px-2.5 py-1 rounded">
+            <span className="text-[10px] uppercase tracking-widest text-[#09B0FF] font-bold bg-white/10 px-2.5 py-1 rounded">
               B2B Portal Access
             </span>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight pt-2">
@@ -165,8 +164,7 @@ const Register = () => {
           <div className="w-full max-w-xl bg-white rounded-xl border border-neutral-100 shadow-sm p-6 md:p-10 flex flex-col gap-6">
             <div className="space-y-1">
               <h1
-                className="text-2xl font-black tracking-tight"
-                style={{ color: theme?.colors?.primary || "#1a417a" }}
+                className="text-3xl font-black tracking-tight mb-3"
               >
                 Create Agent Account
               </h1>
@@ -307,7 +305,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-lg text-sm font-bold tracking-wide transition-all duration-150 text-white shadow-sm mt-4 disabled:bg-neutral-300 disabled:text-neutral-500 disabled:cursor-not-allowed"
+                className="w-full py-3! rounded-lg text-sm font-bold tracking-wide transition-all duration-150 text-white shadow-sm mt-4 disabled:bg-neutral-300 disabled:text-neutral-500 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: loading
                     ? undefined
@@ -320,8 +318,6 @@ const Register = () => {
           </div>
         </div>
       </div>
-
-      <CommonSections />
     </>
   );
 };

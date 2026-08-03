@@ -140,7 +140,7 @@ function extractIATA(terminal: string): string {
 // Abid Air Travel & Tours
 // Mobile: +923197298467
 // Address: Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 30 255/56.New Civil lines Faisalabad.
-// Website: https://abidairtravels.com/`;
+// Website: https://flyingzone.nexagensolution.com/`;
 
 //     return [header, ...lines, "=======================", footer].join("\n");
 // }
@@ -287,7 +287,7 @@ function buildCopyText(groups: UnifiedGroup[]): string {
 Abid Air Travel & Tours
 Mobile: +923197298467
 Address: Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 30 255/56.
-Website: https://abidairtravels.com/`;
+Website: https://flyingzone.nexagensolution.com/`;
 
     return [header, ...lines, "=======================", footer].join("\n");
 }

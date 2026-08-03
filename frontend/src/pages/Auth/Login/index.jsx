@@ -5,10 +5,11 @@ import { toast } from "react-toastify";
 import logo from "../../../assets/images/logo.png";
 import br from "../../../assets/images/br.png";
 import iata from "../../../assets/images/iata.png";
+import { FiLogIn } from 'react-icons/fi'
 
 // react-lottie aur apni downloaded json file import karein
 import Lottie from "react-lottie";
-import animationData from "../../../assets/animations/login.json";
+// import animationData from "../../../assets/animations/login.json";
 import { theme } from "../../../theme/theme";
 
 const Login = ({ onLogin }) => {
@@ -20,14 +21,14 @@ const Login = ({ onLogin }) => {
   const [forgotLoading, setForgotLoading] = useState(false);
 
   // react-lottie ki configurations
-  const lottieOptions = {
-    loop: true,
-    autoplay: true,
-    animationData: animationData,
-    rendererSettings: {
-      preserveAspectRatio: "xMidYMid slice",
-    },
-  };
+  // const lottieOptions = {
+  //   loop: true,
+  //   autoplay: true,
+  //   animationData: animationData,
+  //   rendererSettings: {
+  //     preserveAspectRatio: "xMidYMid slice",
+  //   },
+  // };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -141,19 +142,19 @@ const Login = ({ onLogin }) => {
           </div>
 
           {/* Centered React Lottie Component */}
-          <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-8">
-            <div className="w-full max-w-100 aspect-square drop-shadow-2xl pointer-events-none">
+          <div className="relative z-10 flex flex-col items-center justify-center gap-12 flex-1 my-8">
+            <div className="w-full max-w-100 drop-shadow-2xl pointer-events-none">
               {/* <Lottie options={lottieOptions} height={380} width={380} /> */}
               <img src={br} alt="" srcset="" />
             </div>
 
-            <div className="text-center mt-4">
-              <h1 className="text-[2.5vw] font-bold tracking-tight"
+            {/* <div className="text-center">
+              <h1 className="text-4xl lg:text-5xl font-bold! tracking-tight uppercase"
                 style={{ color: theme.colors.primary }}
                 >
                 Abid Air Travel & Tours
               </h1>
-            </div>
+            </div> */}
           </div>
 
           {/* Footer Text */}
@@ -189,7 +190,7 @@ const Login = ({ onLogin }) => {
                   Email Address
                 </label>
                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2CA3B4] transition-colors">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#09B0FF] transition-colors">
                     <svg
                       className="w-5 h-5"
                       viewBox="0 0 24 24"
@@ -205,7 +206,7 @@ const Login = ({ onLogin }) => {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-slate-50/50 focus:bg-white focus:border-[#2CA3B4] focus:ring-4 focus:ring-[#2CA3B4]/10 outline-none transition-all duration-200"
+                    className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-slate-50/50 focus:bg-white focus:border-[#09B0FF] focus:ring-4 focus:ring-[#09B0FF]/10 outline-none transition-all duration-200"
                   />
                 </div>
               </div>
@@ -216,7 +217,7 @@ const Login = ({ onLogin }) => {
                   Password
                 </label>
                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2CA3B4] transition-colors">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#09B0FF] transition-colors">
                     <svg
                       className="w-5 h-5"
                       viewBox="0 0 24 24"
@@ -232,7 +233,7 @@ const Login = ({ onLogin }) => {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-slate-50/50 focus:bg-white focus:border-[#2CA3B4] focus:ring-4 focus:ring-[#2CA3B4]/10 outline-none transition-all duration-200"
+                    className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-slate-50/50 focus:bg-white focus:border-[#09B0FF] focus:ring-4 focus:ring-[#09B0FF]/10 outline-none transition-all duration-200"
                   />
                 </div>
               </div>
@@ -249,7 +250,7 @@ const Login = ({ onLogin }) => {
                 <button
                   type="button"
                   onClick={() => setShowForgot(true)}
-                  className="font-semibold text-[#2CA3B4] hover:text-[#21397C] hover:underline underline-offset-4 transition-all"
+                  className="font-semibold text-[#09B0FF] hover:text-[#21397C] hover:underline underline-offset-4 transition-all"
                 >
                   Forgot password?
                 </button>
@@ -259,7 +260,7 @@ const Login = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 rounded-xl text-white font-semibold text-sm tracking-wide transition-all duration-200 hover:shadow-xl hover:shadow-[#2CA3B4]/10 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center"
+                className="w-full py-4! rounded-xl text-white font-bold text-sm tracking-wide transition-all duration-200 hover:shadow-xl hover:shadow-[#09B0FF]/10 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center"
                 style={{
                   background: theme.colors.primary,
                 }}
@@ -268,7 +269,7 @@ const Login = ({ onLogin }) => {
                   <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <span className="flex items-center gap-2">
-                    Sign In <span className="text-base">→</span>
+                    Sign In <FiLogIn />
                   </span>
                 )}
               </button>
@@ -279,7 +280,7 @@ const Login = ({ onLogin }) => {
               Don't have an account?{" "}
               <Link
                 to="/auth/register"
-                className="font-bold text-[#2CA3B4] hover:text-[#21397C] hover:underline underline-offset-4 transition-all"
+                className="font-bold text-[#09B0FF] hover:text-[#21397C] hover:underline underline-offset-4 transition-all"
               >
                 Create account
               </Link>
@@ -309,7 +310,7 @@ const Login = ({ onLogin }) => {
             </button>
 
             <div className="text-center mb-6">
-              <div className="w-12 h-12 rounded-xl bg-[#2CA3B4]/10 flex items-center justify-center mx-auto mb-4 text-[#2CA3B4]">
+              <div className="w-12 h-12 rounded-xl bg-[#09B0FF]/10 flex items-center justify-center mx-auto mb-4 text-[#09B0FF]">
                 <svg
                   className="w-6 h-6"
                   viewBox="0 0 24 24"
@@ -333,7 +334,7 @@ const Login = ({ onLogin }) => {
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:border-[#2CA3B4] outline-none transition-all"
+                className="w-full px-4 py-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:border-[#09B0FF] outline-none transition-all"
               />
               <button
                 type="submit"

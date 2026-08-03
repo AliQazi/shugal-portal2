@@ -237,11 +237,9 @@ const Dashboard = () => {
       `}</style>
 
       <div
-        className="w-full overflow-hidden relative flex items-center py-2.5"
+        className="w-full overflow-hidden relative flex items-center py-2.5 rounded-lg"
         style={{
-          background:
-            "linear-gradient(90deg,#0f172a 0%,#1d4ed8 48%,#0891b2 100%)",
-          boxShadow: "0 8px 24px rgba(15,23,42,0.2)",
+          background: "linear-gradient(90deg,#0064BC 0%,#0064BC 48%,#0891b2 100%)",
         }}
       >
         <span className="shrink-0 ml-4 mr-3 flex items-center gap-2">
@@ -263,69 +261,11 @@ const Dashboard = () => {
       </div>
 
       <div
-        className="w-full min-h-screen px-4 md:px-8 pb-12 pt-6"
-        style={{
-          background:
-            "linear-gradient(160deg,#f8fafc 0%,#eef6ff 52%,#f7f3ff 100%)",
-        }}
+        className="w-full min-h-screen pb-12 pt-2"
       >
         <TopBar liveTickets={true} title="Agent Dashboard" />
 
-        {/* <section
-          className="dashboard-rise relative overflow-hidden rounded-lg min-h-[250px] md:min-h-[300px] mb-6"
-          style={{
-            backgroundImage: `linear-gradient(90deg,rgba(15,23,42,0.9) 0%,rgba(15,23,42,0.72) 42%,rgba(15,23,42,0.24) 100%), url(${madinaImg})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            boxShadow: "0 22px 70px rgba(15,23,42,0.2)",
-          }}
-        >
-          <div className="relative z-10 grid gap-6 lg:grid-cols-[1fr_360px] items-end min-h-[250px] md:min-h-[300px] p-5 md:p-8">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/12 border border-white/20 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md uppercase tracking-widest">
-                <Sparkles size={14} />
-                Travel Command Center
-              </div>
-              <h1 className="mt-5 text-3xl md:text-5xl font-black text-white leading-tight">
-                Manage bookings with clarity and speed.
-              </h1>
-              <p className="mt-3 max-w-xl text-sm md:text-base text-white/78 leading-7">
-                Track ticket status, open destination groups, and keep special
-                offers visible for quick customer decisions.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg border border-white/15 bg-white/12 backdrop-blur-md p-4 text-white">
-                <TicketCheck size={22} />
-                <div className="mt-3 text-3xl font-black">{totalBookings}</div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/70">
-                  Total
-                </div>
-              </div>
-              <div className="rounded-lg border border-white/15 bg-white/12 backdrop-blur-md p-4 text-white">
-                <Gift size={22} />
-                <div className="mt-3 text-3xl font-black">
-                  {loadingCards ? "-" : indexCards.length}
-                </div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/70">
-                  Offers
-                </div>
-              </div>
-              <div className="rounded-lg border border-white/15 bg-white/12 backdrop-blur-md p-4 text-white">
-                <Plane size={22} />
-                <div className="mt-3 text-3xl font-black">
-                  {groupTypes.length}
-                </div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/70">
-                  Routes
-                </div>
-              </div>
-            </div>
-          </div>
-        </section> */}
-
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mb-8">
+        {/* <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mb-8">
           {statCards.map(({ label, value, Icon, gradient, shadow }, index) => {
             const progress =
               totalBookings === 0
@@ -366,13 +306,60 @@ const Dashboard = () => {
               </div>
             );
           })}
+        </section> */}
+
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mb-8">
+          {statCards.map(({ label, value, Icon, gradient, shadow }, index) => {
+            const progress =
+              totalBookings === 0
+                ? 0
+                : Math.min((value / totalBookings) * 100, 100);
+
+            // Define specific icon colors for each card
+            const iconColors = {
+              "Confirmed Bookings": "#059669",
+              "Hold Tickets": "#d97706",
+              "Cancelled": "#dc2626"
+            };
+
+            return (
+              <div
+                key={label}
+                className="dashboard-rise relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
+                style={{ animationDelay: `${index * 0.06}s` }}
+              >
+                <div className="relative z-10 flex items-start justify-between gap-4">
+                  <div className="mb-4">
+                    <div className="text-4xl font-black leading-none text-slate-900">
+                      {value}
+                    </div>
+                    <div className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                      {label}
+                    </div>
+                  </div>
+                  <div className="grid h-12 w-12 shrink-0 place-items-center">
+                    <Icon size={24} strokeWidth={2.2} color={iconColors[label]} />
+                  </div>
+                </div>
+                <div className="relative z-10 mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${progress}%`,
+                      background: gradient
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_390px] gap-8 items-start">
           <section>
             <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
               <div>
-                <div className="flex items-center gap-2 text-blue-700">
+                <div className="flex items-center gap-2 text-[#0064BC]">
                   <Compass size={18} />
                   <span className="text-xs font-black uppercase tracking-widest">
                     Explore
@@ -414,8 +401,8 @@ const Dashboard = () => {
                       {style.tag}
                     </div>
                     <div
-                      className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-lg text-white shadow-lg transition duration-300 group-hover:rotate-12"
-                      style={{ background: style.accent }}
+                      className="absolute right-6 top-6 grid place-items-center text-white transition duration-300 group-hover:-rotate-12"
+                    // style={{ background: style.accent }}
                     >
                       <ArrowRight size={19} />
                     </div>
@@ -423,10 +410,10 @@ const Dashboard = () => {
                       <h3 className="max-w-[82%] text-lg font-black leading-snug text-white drop-shadow">
                         {group.label}
                       </h3>
-                      <div className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/75">
+                      {/* <div className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/75">
                         View available seats
                         <span className="h-px flex-1 bg-white/25" />
-                      </div>
+                      </div> */}
                     </div>
                   </button>
                 );
@@ -437,7 +424,7 @@ const Dashboard = () => {
           <aside className="w-full xl:sticky xl:top-6">
             <div className="flex items-end justify-between gap-4 mb-5">
               <div>
-                <div className="flex items-center gap-2 text-amber-600">
+                <div className="flex items-center gap-2 text-[#0064BC]">
                   <Gift size={18} />
                   <span className="text-xs font-black uppercase tracking-widest">
                     Offers
@@ -517,13 +504,13 @@ const Dashboard = () => {
                     <CalendarDays size={16} />
                     {activeOffer?.createdAt
                       ? new Date(activeOffer.createdAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          },
-                        )
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )
                       : "Recently added"}
                   </div>
 

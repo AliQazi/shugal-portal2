@@ -2,7 +2,7 @@ import axios from "axios";
 
 const axiosInstance = axios.create({
   // baseURL: "http://localhost:8016/api", // backend ka port
-  baseURL: "https://groups.tfctours.com/api", // backend ka port
+  baseURL: "https://flyingzone.nexagensolution.com/api", // backend ka port
   withCredentials: true,
 });
 
@@ -70,10 +70,10 @@ export default axiosInstance;
 //       const currentHost = window.location.hostname;
 
 //       const isDashboardDomain =
-//         currentHost === "Abid Airtravel.com" || currentHost === "www.Abid Airtravel.com";
+//         currentHost === "Abid Air Travel & Tourstravel.com" || currentHost === "www.Abid Air Travel & Tourstravel.com";
 
 //       if (isDashboardDomain && !window.location.pathname.startsWith("/")) {
-//         window.location.href = "https://groups.tfctours.com/login";
+//         window.location.href = "https://flyingzone.nexagensolution.com/login";
 //       }
 //     }
 //     return Promise.reject(error);

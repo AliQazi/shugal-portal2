@@ -654,7 +654,7 @@ export const exchangeLoginCode = async (req, res) => {
   try {
     const { code } = req.body;
 
-    const DOMAIN_B = process.env.DOMAIN_B || "abidairtravels.com";
+    const DOMAIN_B = process.env.DOMAIN_B || "flyingzone.nexagensolution.com";
     const DASHBOARD_COOKIE_NAME =
       process.env.DASHBOARD_COOKIE_NAME || "dashboard_token";
 
@@ -1817,7 +1817,7 @@ export const sendUserCredentials = async (req, res) => {
 =========================== */
 export const logoutUser = async (req, res) => {
   try {
-    const DOMAIN_B = process.env.DOMAIN_B || "abidairtravels.com";
+    const DOMAIN_B = process.env.DOMAIN_B || "flyingzone.nexagensolution.com";
     const DASHBOARD_COOKIE_NAME =
       process.env.DASHBOARD_COOKIE_NAME || "dashboard_token";
 
@@ -1851,8 +1851,8 @@ export const ssoRedirect = async (req, res) => {
   try {
     const { code } = req.query;
 
-    const DOMAIN_A = process.env.DOMAIN_A || "abidairtravels.com"; // login domain
-    const DOMAIN_B = process.env.DOMAIN_B || "abidairtravels.com"; // dashboard domain
+    const DOMAIN_A = process.env.DOMAIN_A || "flyingzone.nexagensolution.com"; // login domain
+    const DOMAIN_B = process.env.DOMAIN_B || "flyingzone.nexagensolution.com"; // dashboard domain
     const DASHBOARD_COOKIE_NAME =
       process.env.DASHBOARD_COOKIE_NAME || "dashboard_token";
 
@@ -1903,7 +1903,7 @@ export const ssoRedirect = async (req, res) => {
 
     return res.redirect(`https://${DOMAIN_B}/dashboard`);
   } catch (error) {
-    const DOMAIN_A = process.env.DOMAIN_A || "abidairtravels.com";
+    const DOMAIN_A = process.env.DOMAIN_A || "flyingzone.nexagensolution.com";
     return res.redirect(`https://${DOMAIN_A}/login`);
   }
 };

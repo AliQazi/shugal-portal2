@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const base_url = "https://abidairtravels.com/admins/api";
+const base_url = "https://flyingzone.nexagensolution.com/admins/api";
 
 const token = "";
 

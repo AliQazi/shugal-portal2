@@ -148,11 +148,11 @@ export default function HeroSection() {
       {!isLoggedIn && (
         <header
           className={`fixed left-0 right-0 top-0 z-50 transition-all duration-500 ${scrolled
-              ? "bg-white/95 backdrop-blur-md shadow-lg"
-              : "bg-transparent"
+            ? "bg-white/95 backdrop-blur-md shadow-lg"
+            : "bg-transparent"
             }`}
         >
-          <div className="max-w-7xl mx-auto px-5 md:px-10 flex items-center justify-between h-20">
+          <div className="max-w-7xl mx-auto px-5 md:px-10 flex items-center justify-between py-4">
             {/* Logo */}
             <Link to="/" className="shrink-0">
               <img
@@ -166,13 +166,12 @@ export default function HeroSection() {
             </Link>
 
             {/* Desktop nav */}
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden md:flex items-center gap-10">
               {navLinks.map((l) => (
                 <Link
                   key={l.label}
                   to={l.href}
-                  className={`text-sm font-semibold tracking-wide transition-colors duration-200 hover:text-[#f15a24] ${scrolled ? "text-gray-800" : "text-white drop-shadow"
-                    }`}
+                  className={`text-sm font-semibold tracking-wide transition-colors duration-200 hover:text-[#09B0FF] ${scrolled ? "text-gray-800" : "text-white drop-shadow"}`}
                 >
                   {l.label}
                 </Link>
@@ -184,8 +183,8 @@ export default function HeroSection() {
               <Link
                 to="/auth/login"
                 className={`text-sm font-bold px-5 py-2.5 rounded-full border-2 transition-all duration-200 ${scrolled
-                    ? "border-[#1a417a] text-[#1a417a] hover:bg-[#1a417a] hover:text-white"
-                    : "border-white text-white hover:bg-white hover:text-[#1a417a]"
+                  ? "border-[#1a417a] text-[#1a417a] hover:bg-[#1a417a] hover:text-white"
+                  : "border-white text-white hover:bg-white hover:text-[#1a417a]"
                   }`}
               >
                 Login
@@ -247,7 +246,7 @@ export default function HeroSection() {
                 <Link
                   to="/auth/register"
                   onClick={() => setNavOpen(false)}
-                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-full bg-[#f15a24] text-white"
+                  className="flex-1 text-center text-sm font-bold py-2.5 rounded-full bg-[#09B0FF] text-white"
                 >
                   Register
                 </Link>
@@ -258,7 +257,7 @@ export default function HeroSection() {
       )}
 
       {/* ══════════ HERO SECTION ══════════ */}
-      <section className="relative min-h-[85vh] flex flex-col justify-center overflow-hidden">
+      <section className="relative min-h-[90vh] flex flex-col justify-center overflow-hidden">
         {/* ── Slideshow backgrounds ── */}
         {slides.map((s, i) => (
           <div
@@ -293,11 +292,11 @@ export default function HeroSection() {
           <div className="max-w-3xl">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 mb-6">
-              <span className="text-yellow-400 text-sm">✦</span>
+              <span className="text-[#09B0FF] text-sm">✦</span>
               <span className="text-white/90 text-xs font-semibold tracking-widest uppercase">
                 Trusted Travel Partner
               </span>
-              <span className="text-yellow-400 text-sm">✦</span>
+              <span className="text-[#09B0FF] text-sm">✦</span>
             </div>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-black text-white leading-tight drop-shadow-2xl">
@@ -365,15 +364,15 @@ export default function HeroSection() {
         </div>
 
         {/* ── Slide dots ── */}
-        <div className="relative z-20 flex justify-center gap-2 py-20">
+        <div className="relative z-20 flex justify-center gap-2 py-16">
           {slides.map((_, i) => (
             <button
               key={i}
               onClick={() => goTo(i)}
               aria-label={`Slide ${i + 1}`}
               className={`rounded-full transition-all duration-300 ${i === current
-                  ? "w-8 h-2.5 bg-[#09B0FF]"
-                  : "w-2.5 h-2.5 bg-white/40 hover:bg-white/70"
+                ? "w-8 h-2.5 bg-[#09B0FF]"
+                : "w-2.5 h-2.5 bg-white/40 hover:bg-white/70"
                 }`}
             />
           ))}

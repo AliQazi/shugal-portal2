@@ -218,7 +218,7 @@ export default function ServicesSection() {
       {/* --- RIGHT PANEL: Enhanced Carousel --- */}
       <div
         className="w-full lg:w-3/4 p-8 md:p-12 flex flex-col justify-between overflow-hidden relative"
-        style={{ backgroundColor: "#F5F5DC" }}
+        style={{ backgroundColor: "#f6f6f6" }}
       >
         {/* Background pattern */}
         <div

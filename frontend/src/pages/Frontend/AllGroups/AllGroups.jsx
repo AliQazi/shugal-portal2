@@ -487,7 +487,7 @@ export default function AllGroupsPackages({
     }
   };
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (signal) => {
     try {
       setLoading(true);
       setStreamingMore(true);
@@ -557,6 +557,7 @@ export default function AllGroupsPackages({
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           credentials: "include",
+          signal,
         },
       );
 
@@ -565,6 +566,8 @@ export default function AllGroupsPackages({
       }
 
       await streamNdjson(response, (msg) => {
+        if (signal?.aborted) return;
+
         if (msg.type === "chunk" && Array.isArray(msg.data)) {
           const standardizedChunk = standardize(filterByGroupType(msg.data));
           accumulatedGroups.push(...standardizedChunk);
@@ -605,20 +608,26 @@ export default function AllGroupsPackages({
         }
       });
 
+      if (signal?.aborted) return;
+
       if (!gotAnyChunk) {
         setAllGroups([]);
         setGroups([]);
         setUniqueGroupTypes([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
+
       console.error("Error fetching groups:", err);
       toast.error("Failed to load groups");
       setAllGroups([]);
       setGroups([]);
       setUniqueGroupTypes([]);
     } finally {
-      setLoading(false);
-      setStreamingMore(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+        setStreamingMore(false);
+      }
     }
   };
 
@@ -664,8 +673,8 @@ export default function AllGroupsPackages({
     const skypassTicketId =
       group.source === "skypass"
         ? String(group.id || "")
-            .replace(/^skypass_/, "")
-            .split("_")[0]
+          .replace(/^skypass_/, "")
+          .split("_")[0]
         : null;
 
     navigate("/dashboard/booking", {
@@ -681,9 +690,15 @@ export default function AllGroupsPackages({
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    fetchGroups();
+
+    const controller = new AbortController();
+    fetchGroups(controller.signal);
     fetchBookingVoucher();
     fetchBookedSeats();
+
+    return () => {
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -910,11 +925,10 @@ export default function AllGroupsPackages({
       <button
         type="button"
         onClick={() => handleFilterChange("groupType", "")}
-        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-          filters.groupTypes.length === 0
+        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filters.groupTypes.length === 0
             ? "bg-accent"
             : "bg-gray-200 hover:bg-gray-300"
-        }`}
+          }`}
         style={{
           background:
             filters.groupTypes.length === 0
@@ -931,11 +945,10 @@ export default function AllGroupsPackages({
           key={type}
           type="button"
           onClick={() => handleFilterChange("groupType", type)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-            filters.groupTypes.includes(type)
+          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filters.groupTypes.includes(type)
               ? "bg-accent"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
+            }`}
           style={{
             background: filters.groupTypes.includes(type)
               ? theme.colors.primary
@@ -1027,8 +1040,8 @@ export default function AllGroupsPackages({
         style={
           index > 0
             ? {
-                borderTop: `1px solid ${theme.colors.border}`,
-              }
+              borderTop: `1px solid ${theme.colors.border}`,
+            }
             : undefined
         }
       >
@@ -1095,15 +1108,15 @@ export default function AllGroupsPackages({
             style={
               flight?.meal && flight.meal !== "No"
                 ? {
-                    background: "#e6efe9",
-                    color: "#2f6b4f",
-                    borderRadius: theme.borderRadius.sm,
-                  }
+                  background: "#e6efe9",
+                  color: "#2f6b4f",
+                  borderRadius: theme.borderRadius.sm,
+                }
                 : {
-                    background: theme.colors.backgroundDark,
-                    color: theme.colors.textTertiary,
-                    borderRadius: theme.borderRadius.sm,
-                  }
+                  background: theme.colors.backgroundDark,
+                  color: theme.colors.textTertiary,
+                  borderRadius: theme.borderRadius.sm,
+                }
             }
           >
             Meal: {flight?.meal && flight.meal !== "No" ? "Yes" : "No"}
@@ -1188,9 +1201,8 @@ export default function AllGroupsPackages({
 
       <div className="w-full min-h-screen">
         <div
-          className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 py-2 ${
-            headerType === "dashboard" ? "rounded-t-2xl" : ""
-          }`}
+          className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 py-2 ${headerType === "dashboard" ? "rounded-t-2xl" : ""
+            }`}
         >
           <div className="w-full xl:w-auto">
             {/* {header} */}
@@ -1217,9 +1229,8 @@ export default function AllGroupsPackages({
                     }}
                   >
                     <div
-                      className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 transition-transform ${
-                        showAdvancedSearch ? "translate-x-3.5" : ""
-                      }`}
+                      className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 transition-transform ${showAdvancedSearch ? "translate-x-3.5" : ""
+                        }`}
                       style={{
                         background: theme.colors.card,
                         borderRadius: theme.borderRadius.full,
@@ -1849,21 +1860,21 @@ export default function AllGroupsPackages({
                                               style={
                                                 d.meal && d.meal !== "No"
                                                   ? {
-                                                      background: "#e6efe9",
-                                                      color: "#2f6b4f",
-                                                      borderRadius:
-                                                        theme.borderRadius.sm,
-                                                    }
+                                                    background: "#e6efe9",
+                                                    color: "#2f6b4f",
+                                                    borderRadius:
+                                                      theme.borderRadius.sm,
+                                                  }
                                                   : {
-                                                      background:
-                                                        theme.colors
-                                                          .backgroundDark,
-                                                      color:
-                                                        theme.colors
-                                                          .textTertiary,
-                                                      borderRadius:
-                                                        theme.borderRadius.sm,
-                                                    }
+                                                    background:
+                                                      theme.colors
+                                                        .backgroundDark,
+                                                    color:
+                                                      theme.colors
+                                                        .textTertiary,
+                                                    borderRadius:
+                                                      theme.borderRadius.sm,
+                                                  }
                                               }
                                             >
                                               {d.meal && d.meal !== "No"
@@ -1880,18 +1891,18 @@ export default function AllGroupsPackages({
                                       style={
                                         flight?.meal && flight.meal !== "No"
                                           ? {
-                                              background: "#e6efe9",
-                                              color: "#2f6b4f",
-                                              borderRadius:
-                                                theme.borderRadius.sm,
-                                            }
+                                            background: "#e6efe9",
+                                            color: "#2f6b4f",
+                                            borderRadius:
+                                              theme.borderRadius.sm,
+                                          }
                                           : {
-                                              background:
-                                                theme.colors.backgroundDark,
-                                              color: theme.colors.textTertiary,
-                                              borderRadius:
-                                                theme.borderRadius.sm,
-                                            }
+                                            background:
+                                              theme.colors.backgroundDark,
+                                            color: theme.colors.textTertiary,
+                                            borderRadius:
+                                              theme.borderRadius.sm,
+                                          }
                                       }
                                     >
                                       {flight?.meal && flight.meal !== "No"
@@ -1990,18 +2001,18 @@ export default function AllGroupsPackages({
                                         ? "pointer"
                                         : "not-allowed",
                                     }}
-                                    // onMouseEnter={(e) => {
-                                    //   if (user?.showHideButton) {
-                                    //     e.currentTarget.style.background =
-                                    //       theme.colors.accentDark;
-                                    //   }
-                                    // }}
-                                    // onMouseLeave={(e) => {
-                                    //   if (user?.showHideButton) {
-                                    //     e.currentTarget.style.background =
-                                    //       theme.colors.accent;
-                                    //   }
-                                    // }}
+                                  // onMouseEnter={(e) => {
+                                  //   if (user?.showHideButton) {
+                                  //     e.currentTarget.style.background =
+                                  //       theme.colors.accentDark;
+                                  //   }
+                                  // }}
+                                  // onMouseLeave={(e) => {
+                                  //   if (user?.showHideButton) {
+                                  //     e.currentTarget.style.background =
+                                  //       theme.colors.accent;
+                                  //   }
+                                  // }}
                                   >
                                     <Ticket size={13} />
                                     <span>Book Now</span>

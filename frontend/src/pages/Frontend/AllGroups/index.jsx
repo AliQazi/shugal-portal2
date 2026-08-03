@@ -71,7 +71,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
   //       return `${flight.flightNo} *${g.packageName}* ${flight.sectorFrom} → ${flight.sectorTo}..... *PKR ${price.toLocaleString()}*`;
   //     })
   //     .filter(Boolean);
-  //   const footer = `*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*\n=======================\nAbid Air`;
+  //   const footer = `*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*\n=======================\nAbid Air Travel & Tours`;
   //   return [headerText, ...lines, "=======================", footer].join("\n");
   // };
 
@@ -98,7 +98,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
   //     ...Object.values(group.rooms || {}).filter(Boolean),
   //   );
   //   const price = isFinite(minPrice) ? minPrice : 0;
-  //   const text = `${flight.flightNo} *${group.packageName}* ${flight.sectorFrom} → ${flight.sectorTo}..... *PKR ${price.toLocaleString()}*\n=======================\n*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*\n=======================\nAbid Air`;
+  //   const text = `${flight.flightNo} *${group.packageName}* ${flight.sectorFrom} → ${flight.sectorTo}..... *PKR ${price.toLocaleString()}*\n=======================\n*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*\n=======================\nAbid Air Travel & Tours`;
   //   try {
   //     await navigator.clipboard.writeText(text);
   //   } catch {

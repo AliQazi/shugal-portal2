@@ -48,7 +48,7 @@ const RippleButton = ({ children, style, onClick, className, to }) => {
         left: r.x,
         width: r.size,
         height: r.size,
-        background: "rgba(255,122,0,0.2)", // Orange subtle ripple
+        background: "rgba(92, 186, 230, 0.2)", // Orange subtle ripple
         borderRadius: "50%",
         pointerEvents: "none",
         transform: "scale(0)",
@@ -298,19 +298,19 @@ const DashboardLayout = ({ user, handleLogout }) => {
             border-left: 3px solid transparent !important;
           }
           .menu-link:hover { 
-            background: rgba(255, 122, 0, 0.05) !important; 
-            color: #FF7A00 !important;
-            border-left: 3px solid #FF7A00 !important;
+            background: rgba(92, 186, 230, 0.15) !important; 
+            color: #09B0FF !important;
+            border-left: 3px solid #09B0FF !important;
           }
           .menu-link:hover .icon-box {
-            color: #FF7A00 !important;
+            color: #09B0FF !important;
           }
 
           /* Shiny Active Link Look (Glossy Top Highlight) */
           .menu-link-active {
             background: ${theme.colors.primary} !important;
             color: #fff !important;
-            border-left: 3px solid #FF7A00 !important;
+            border-left: 3px solid #0064BC !important;
             box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.15);
             position: relative;
           }
@@ -775,7 +775,7 @@ const DashboardLayout = ({ user, handleLogout }) => {
                         borderRadius: "2px",
                         background: user?.logo
                           ? `url(${user.logo}) center/cover`
-                          : "linear-gradient(135deg, #1e293b 0%, #FF7A00 100%)" /* Premium dark to orange tint */,
+                          : "linear-gradient(135deg, #09B0FF 0%, #0064BC 100%)" /* Premium dark to orange tint */,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

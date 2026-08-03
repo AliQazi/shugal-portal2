@@ -115,7 +115,7 @@ export default function ManageSectors() {
 
     return (
         <>
-            <PageMeta title="All Sectors - Abid Air" description="View all sectors list" />
+            <PageMeta title="All Sectors - Abid Air Travel & Tours" description="View all sectors list" />
 
             <div className="mb-6">
                 <PageBreadCrumb pageTitle="All Sectors" />

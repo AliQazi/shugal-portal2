@@ -51,7 +51,7 @@ function OldHeader({ user, handleLogout }) {
                 <img
                   style={{ height: "60px" }}
                   src={logo}
-                  alt="Abid Air"
+                  alt="Abid Air Travel & Tours"
                   className="object-contain"
                 />
               </Link>
@@ -122,13 +122,12 @@ function OldHeader({ user, handleLogout }) {
 
                 {profileOpen && (
                   <div
-                    className="absolute right-0 top-14 w-56 rounded-xl shadow-lg py-2 z-50 animate-fadeIn"
+                    className="absolute right-0 top-14 w-56 rounded-xl shadow-lg py-2 border border-neutral-200 z-50 animate-fadeIn"
                     style={{
                       background: theme.colors.card,
-                      border: `1px solid ${theme.colors.border}`,
                     }}
                   >
-                    <div className="px-4 py-2 text-xs border-b" style={{ color: theme.colors.textTertiary }}>
+                    <div className="px-4 py-2 text-xs border-b border-neutral-200" style={{ color: theme.colors.primaryDark }}>
                       {user.email}
                     </div>
 
@@ -152,7 +151,7 @@ function OldHeader({ user, handleLogout }) {
 
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm font-semibold border-t hover:bg-rose-50 transition-colors mt-1"
+                      className="w-full text-left px-4 py-2 text-sm font-semibold border-t border-neutral-200 hover:bg-rose-50 transition-colors mt-1"
                       style={{ color: theme.colors.danger }}
                     >
                       Logout

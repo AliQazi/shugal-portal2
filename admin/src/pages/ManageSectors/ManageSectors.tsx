@@ -137,10 +137,10 @@ function extractIATA(terminal: string): string {
 //     const footer =
 //         `*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*
 // =======================
-// Abid Air
-// Mobile: +923041119786
+// Abid Air Travel & Tours
+// Mobile: +923197298467
 // Address: Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 30 255/56.New Civil lines Faisalabad.
-// Website: https://groups.tfctours.com/`;
+// Website: https://abidairtravels.com/`;
 
 //     return [header, ...lines, "=======================", footer].join("\n");
 // }
@@ -284,10 +284,10 @@ function buildCopyText(groups: UnifiedGroup[]): string {
     const footer =
         `*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*
 =======================
-Abid Air
-Mobile: +923041119786
+Abid Air Travel & Tours
+Mobile: +923197298467
 Address: Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 30 255/56.
-Website: https://groups.tfctours.com/`;
+Website: https://abidairtravels.com/`;
 
     return [header, ...lines, "=======================", footer].join("\n");
 }
@@ -445,7 +445,7 @@ export default function ManageSectors() {
 
     return (
         <>
-            <PageMeta title="All Sectors - Abid Air" description="View all sectors list" />
+            <PageMeta title="All Sectors - Abid Air Travel & Tours" description="View all sectors list" />
 
             <div className="mb-6">
                 <PageBreadCrumb pageTitle="All Sectors" />

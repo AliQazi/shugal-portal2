@@ -27,7 +27,7 @@ export default function TopBar({
     <div>
       {/* Main TopBar */}
       <div
-        className="relative overflow-hidden rounded-2xl shadow-2xl transition-all duration-300 hover:shadow-3xl"
+        className="relative overflow-hidden rounded-2xl transition-all duration-300"
         style={{
           background: primaryGradient,
           marginBottom: theme.spacing.lg || "24px",
@@ -122,7 +122,7 @@ export default function TopBar({
               <>
                 {/* Link Button */}
                 <a
-                  href="https://agent.tfctours.com/"
+                  href="https://abidairtravels.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white transition-all duration-300 hover:bg-white/30 hover:scale-105 hover:shadow-lg"

@@ -43,9 +43,9 @@ const features = [
 
 export default function ChooseUsSection() {
   return (
-    <section className="w-full flex flex-col lg:flex-row min-h-screen bg-white font-sans overflow-hidden">
+    <section className="w-full flex flex-col lg:flex-row min-h-[80vh] bg-white font-sans overflow-hidden">
       {/* --- LEFT SIDE: Sticky Parallax Background Panel --- */}
-      <div className="w-full lg:w-2/5 relative min-h-100 lg:min-h-screen overflow-hidden">
+      <div className="w-full lg:w-2/5 relative min-h-100 lg:min-h-[80vh] overflow-hidden">
         {/* Parallax Background Engine */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed"
@@ -85,12 +85,12 @@ export default function ChooseUsSection() {
         style={{ backgroundColor: theme?.colors?.lightBg || "#f8fafc" }}
       >
         {/* Simple & Decent Header */}
-        <div className="mb-12">
+        <div>
           <h3
             className="text-2xl md:text-3xl font-black tracking-tight uppercase"
             style={{ color: theme?.colors?.primary || "#1a417a" }}
           >
-            Abid Air Advantage
+            Abid Air Travel & Tours Advantage
           </h3>
           <p className="text-gray-400 text-xs tracking-wider uppercase font-semibold mt-1">
             Premium Travel Solutions & Infrastructure
@@ -98,7 +98,7 @@ export default function ChooseUsSection() {
         </div>
 
         {/* Clean, Non-flashy Features Matrix */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {features.map((item, i) => (
             <div
               key={i}

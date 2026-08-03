@@ -1,16 +1,16 @@
 export const theme = {
   colors: {
     // Red — theme identity (headers, highlights)
-    primary: "#B91C1C", // Red 700
-    primaryDark: "#7F1D1D", // Red 900
-    primaryLight: "#DC2626", // Red 600
-    intermediate: "#9B2C2C", // Rich red — table headers, toggle, checkboxes
-    intermediateLight: "#C05656", // header cell borders
+    primary: "#09B0FF", // Red 700
+    primaryDark: "#0064BC", // Red 900
+    primaryLight: "#2f9acc", // Red 600
+    intermediate: "#2f9acc", // Rich red — table headers, toggle, checkboxes
+    intermediateLight: "#288ebd", // header cell borders
 
     // Denim — buttons
-    accent: "#fdf0d5", // Denim blue — Book Now button
-    accentDark: "#2F4A6D", // Dark denim — hover
-    accentLight: "#6B8CB8", // Faded denim
+    accent: "#09B0FF", // Denim blue — Book Now button
+    accentDark: "#0064BC", // Dark denim — hover
+    accentLight: "#09B0FF", // Faded denim
 
     // Creamy backgrounds
     background: "#F8F8FF", // Warm cream
@@ -18,8 +18,8 @@ export const theme = {
     card: "#F8F8FF", // Off-white cream card
 
     // Warm borders
-    border: "#EADDC5", // Cream border
-    borderDark: "#D9C7A6", // Darker tan border
+    border: "#d7effa", // Cream border
+    borderDark: "#0064BC", // Darker tan border
 
     // Warm readable text
     textPrimary: "#4A2C2A", // Deep warm brown

@@ -20,7 +20,7 @@ const slides = [
     img: makkahImg,
     heading: "Journey to the",
     highlight: "Holy Land",
-    sub: "Abid Air & Tours (Pvt. Ltd.)",
+    sub: "Abid Air Travel & Tours & Tours (Pvt. Ltd.)",
   },
   {
     img: madinaImg,
@@ -147,23 +147,21 @@ export default function HeroSection() {
       {/* ══════════ HEADER (logged-out only) ══════════ */}
       {!isLoggedIn && (
         <header
-          className={`fixed left-0 right-0 top-0 z-50 transition-all duration-500 ${
-            scrolled
+          className={`fixed left-0 right-0 top-0 z-50 transition-all duration-500 ${scrolled
               ? "bg-white/95 backdrop-blur-md shadow-lg"
               : "bg-transparent"
-          }`}
+            }`}
         >
           <div className="max-w-7xl mx-auto px-5 md:px-10 flex items-center justify-between h-20">
             {/* Logo */}
             <Link to="/" className="shrink-0">
               <img
                 style={{ height: "60px" }}
-                aria-label="Abid Air & Tours"
+                aria-label="Abid Air Travel & Tours & Tours"
                 src={logo}
-                alt="Abid Air"
-                className={`h-12 w-auto object-contain transition-all duration-300 ${
-                  scrolled ? "" : "bg-white px-5 rounded-2xl"
-                }`}
+                alt="Abid Air Travel & Tours"
+                className={`h-12 w-auto object-contain transition-all duration-300 ${scrolled ? "" : "bg-white px-5 rounded-2xl"
+                  }`}
               />
             </Link>
 
@@ -173,9 +171,8 @@ export default function HeroSection() {
                 <Link
                   key={l.label}
                   to={l.href}
-                  className={`text-sm font-semibold tracking-wide transition-colors duration-200 hover:text-[#f15a24] ${
-                    scrolled ? "text-gray-800" : "text-white drop-shadow"
-                  }`}
+                  className={`text-sm font-semibold tracking-wide transition-colors duration-200 hover:text-[#f15a24] ${scrolled ? "text-gray-800" : "text-white drop-shadow"
+                    }`}
                 >
                   {l.label}
                 </Link>
@@ -186,11 +183,10 @@ export default function HeroSection() {
             <div className="hidden md:flex items-center gap-3">
               <Link
                 to="/auth/login"
-                className={`text-sm font-bold px-5 py-2.5 rounded-full border-2 transition-all duration-200 ${
-                  scrolled
+                className={`text-sm font-bold px-5 py-2.5 rounded-full border-2 transition-all duration-200 ${scrolled
                     ? "border-[#1a417a] text-[#1a417a] hover:bg-[#1a417a] hover:text-white"
                     : "border-white text-white hover:bg-white hover:text-[#1a417a]"
-                }`}
+                  }`}
               >
                 Login
               </Link>
@@ -199,7 +195,7 @@ export default function HeroSection() {
                   background: theme?.colors?.primary,
                 }}
                 to="/auth/register"
-                className="text-sm font-bold px-5 py-2.5 rounded-full text-white hover:bg-[#d94e1f] transition-all duration-200 shadow-lg shadow-red-500/30"
+                className="text-sm font-bold px-5 py-2.5 rounded-full text-white hover:bg-[#09B0FF] transition-all duration-200 shadow-lg shadow-blue-500/30"
               >
                 Register
               </Link>
@@ -208,9 +204,8 @@ export default function HeroSection() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setNavOpen((v) => !v)}
-              className={`md:hidden flex flex-col gap-1.5 p-2 ${
-                scrolled ? "text-gray-800" : "text-white"
-              }`}
+              className={`md:hidden flex flex-col gap-1.5 p-2 ${scrolled ? "text-gray-800" : "text-white"
+                }`}
               aria-label="Toggle menu"
             >
               <span
@@ -227,9 +222,8 @@ export default function HeroSection() {
 
           {/* Mobile menu drawer */}
           <div
-            className={`md:hidden overflow-hidden transition-all duration-300 bg-white/97 backdrop-blur-md ${
-              navOpen ? "max-h-80 shadow-xl" : "max-h-0"
-            }`}
+            className={`md:hidden overflow-hidden transition-all duration-300 bg-white/97 backdrop-blur-md ${navOpen ? "max-h-80 shadow-xl" : "max-h-0"
+              }`}
           >
             <div className="px-6 py-4 flex flex-col gap-4">
               {navLinks.map((l) => (
@@ -264,19 +258,18 @@ export default function HeroSection() {
       )}
 
       {/* ══════════ HERO SECTION ══════════ */}
-      <section className="relative min-h-screen flex flex-col justify-center overflow-hidden">
+      <section className="relative min-h-[85vh] flex flex-col justify-center overflow-hidden">
         {/* ── Slideshow backgrounds ── */}
         {slides.map((s, i) => (
           <div
             key={i}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              i === current ? "opacity-100" : "opacity-0"
-            }`}
+            className={`absolute inset-0 transition-opacity duration-1000 ${i === current ? "opacity-100" : "opacity-0"
+              }`}
           >
             <img
               src={s.img}
               alt=""
-              className="w-full h-full object-cover scale-105"
+              className="w-full h-full! object-cover scale-105"
               style={{
                 height: "100%",
                 animation:
@@ -310,7 +303,7 @@ export default function HeroSection() {
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-black text-white leading-tight drop-shadow-2xl">
               <span className="block">{slides[current].heading}</span>
               <span
-                style={{ color: theme.colors.accentDark }}
+                style={{ color: theme.colors.accent }}
                 className="block"
               >
                 {slides[current].highlight}
@@ -328,7 +321,7 @@ export default function HeroSection() {
                   background: theme.colors.primary,
                 }}
                 to={isLoggedIn ? "/dashboard/groups" : "/auth/register"}
-                className="inline-flex items-center gap-2 hover:bg-[#d94e1f] text-white font-bold text-sm px-7 py-3.5 rounded-full shadow-xl shadow-red-500/40 transition-all duration-200 hover:scale-105"
+                className="inline-flex items-center gap-2 hover:bg-[#09B0FF] text-white font-bold text-sm px-7 py-3.5 rounded-full shadow-xl shadow-blue-500/40 transition-all duration-200 hover:scale-105"
               >
                 <span>Book a Ticket</span>
                 <svg
@@ -354,7 +347,7 @@ export default function HeroSection() {
             </div>
 
             {/* Quick stats */}
-            <div className="mt-12 flex flex-wrap gap-6 md:gap-10">
+            {/* <div className="mt-12 flex flex-wrap gap-6 md:gap-10">
               {[
                 { num: "10,000+", label: "Happy Travellers" },
                 { num: "50+", label: "Group Destinations" },
@@ -367,22 +360,21 @@ export default function HeroSection() {
                   </p>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
 
         {/* ── Slide dots ── */}
-        <div className="relative z-20 flex justify-center gap-2 pb-40">
+        <div className="relative z-20 flex justify-center gap-2 py-20">
           {slides.map((_, i) => (
             <button
               key={i}
               onClick={() => goTo(i)}
               aria-label={`Slide ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === current
-                  ? "w-8 h-2.5 bg-[#f15a24]"
+              className={`rounded-full transition-all duration-300 ${i === current
+                  ? "w-8 h-2.5 bg-[#09B0FF]"
                   : "w-2.5 h-2.5 bg-white/40 hover:bg-white/70"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -396,7 +388,9 @@ export default function HeroSection() {
         <div className="max-w-7xl mx-auto px-5 md:px-10">
           {/* Section header */}
           <div className="text-center mb-10">
-            <p className="text-[#f15a24] text-sm font-bold tracking-widest uppercase mb-2">
+            <p className="text-sm font-bold tracking-widest uppercase mb-2"
+              style={{ color: theme.colors.primary }}
+            >
               ✦ Our Packages ✦
             </p>
             <h2 className="text-3xl md:text-4xl font-black text-gray-900">
@@ -427,7 +421,7 @@ export default function HeroSection() {
                 {/* overlay */}
                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/25 to-transparent" />
                 {/* hover shimmer */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-t from-[#f15a24]/40 to-transparent" />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-t from-[#09B0FF]/40 to-transparent" />
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
                   <div className="flex items-center gap-2">

@@ -103,7 +103,7 @@ export const generateBookingTicketPDF = async (
     const airlineName = (booking.airline?.name || "AIRLINE").toUpperCase();
     const { origin: sectorOrigin, destination: sectorDest } =
       parseSectorCodes(booking.sector);
-    const agencyName = user?.companyName || "Abid Air";
+    const agencyName = user?.companyName || "Abid Air Travel & Tours";
     const agentName = user?.name || "N/A";
     const agentContact = user?.phone || user?.mobile || "N/A";
 

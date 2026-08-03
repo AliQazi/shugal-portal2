@@ -56,7 +56,7 @@ const Login = ({ onLogin }) => {
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
-          "Server error. Please try again later.",
+        "Server error. Please try again later.",
       );
     } finally {
       setLoading(false);
@@ -120,7 +120,7 @@ const Login = ({ onLogin }) => {
         {/* ── LEFT PANEL (Full Screen Visuals & Local Lottie) ── */}
         <div
           style={{
-            background: theme.colors.primary,
+            background: theme.colors.card,
           }}
           className="hidden md:flex md:w-1/2 relative flex-col justify-between p-12 overflow-hidden"
         >
@@ -147,9 +147,11 @@ const Login = ({ onLogin }) => {
               <img src={br} alt="" srcset="" />
             </div>
 
-            <div className="text-center mt-4 max-w-sm">
-              <h1 className="text-4xl font-extrabold text-[#FFEDD5] tracking-tight">
-                Abid Air
+            <div className="text-center mt-4">
+              <h1 className="text-[2.5vw] font-bold tracking-tight"
+                style={{ color: theme.colors.primary }}
+                >
+                Abid Air Travel & Tours
               </h1>
             </div>
           </div>
@@ -165,7 +167,7 @@ const Login = ({ onLogin }) => {
               <img
                 src={logo}
                 alt="logo"
-                className="h-12 w-auto mb-8 object-contain transition-transform hover:scale-105"
+                className="block md:hidden h-20! w-auto mb-8 object-contain transition-transform hover:scale-105"
               />
               <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
                 Welcome Back

@@ -255,7 +255,7 @@ const Dashboard = () => {
         </span>
         <div className="flex-1 overflow-hidden">
           <span className="dashboard-marquee text-white text-sm font-medium tracking-wide">
-            Welcome to Abid Air - We book comfort for you - Latest
+            Welcome to Abid Air Travel & Tours - We book comfort for you - Latest
             Umrah, UAE, KSA and Kuwait seats are waiting - Book smarter and
             travel with confidence
           </span>

@@ -40,7 +40,7 @@ export default function BookingForm({ user }) {
       .then((res) => {
         if (res.data?.success) setDbMargin(res.data.data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const calculateB2BPrice = (groupPrice, group = {}) => {
@@ -130,7 +130,7 @@ export default function BookingForm({ user }) {
           }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [groupData?._skypassTicketId]);
 
   useEffect(() => {
@@ -824,8 +824,8 @@ export default function BookingForm({ user }) {
         source: groupData.source || "admin",
         ...(groupData.groupPriceDetailId !== undefined &&
           groupData.groupPriceDetailId !== null && {
-            groupPriceDetailId: groupData.groupPriceDetailId,
-          }),
+          groupPriceDetailId: groupData.groupPriceDetailId,
+        }),
         groupType: groupData.type,
         airline: {
           id: groupData.airline?.id || null,
@@ -973,17 +973,14 @@ export default function BookingForm({ user }) {
   }
 
   return (
-    <div className="w-full min-h-screen bg-linear-to-br from-slate-50 via-slate-100 to-indigo-50/30">
+    <div className="w-full min-h-screen">
       <TopBar title={isEditMode ? "Edit Booking" : "Add New Booking"} />
 
-      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="pb-6">
         {/* Flight Details Card - Redesigned */}
         {groupData && (
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden mb-6 hover:shadow-2xl transition-shadow duration-300">
-            <div
-              style={{ background: "#fdf0d5" }}
-              className="px-6 py-4 flex flex-wrap items-center justify-between gap-4"
-            >
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-3 sm:mb-4 transition-shadow duration-300">
+            <div className="px-6 py-4 bg-[#f1f1f1] flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 {groupData.airline?.logo_url && (
                   <div className="p-2 rounded-xl backdrop-blur-sm">
@@ -1057,7 +1054,7 @@ export default function BookingForm({ user }) {
                           groupData.available_no_of_pax || 0;
                         const currentBookingPassengers = isEditMode
                           ? (parseInt(formData.adults) || 0) +
-                            (parseInt(formData.children) || 0)
+                          (parseInt(formData.children) || 0)
                           : 0;
                         return baseAvailable + currentBookingPassengers;
                       })()}
@@ -1108,10 +1105,10 @@ export default function BookingForm({ user }) {
         )}
 
         {/* Form Content */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           {/* Passenger Count & Pricing Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden">
-            <div className="bg-linear-to-r from-indigo-50 to-slate-50 px-6 py-3 border-b border-slate-200/60">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-linear-to-r from-indigo-50 to-slate-50 px-6 py-3 border-b border-slate-200">
               <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 Passenger Summary
@@ -1156,7 +1153,7 @@ export default function BookingForm({ user }) {
                         onChange={handleChange}
                         onBlur={handlePassengerBlur}
                         min="1"
-                        className="w-20 px-3 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                        className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -1197,7 +1194,7 @@ export default function BookingForm({ user }) {
                         onChange={handleChange}
                         onBlur={handlePassengerBlur}
                         min="0"
-                        className="w-20 px-3 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                        className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -1235,7 +1232,7 @@ export default function BookingForm({ user }) {
                         onBlur={handlePassengerBlur}
                         min="0"
                         max={formData.adults}
-                        className="w-20 px-3 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                        className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-center text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -1255,7 +1252,7 @@ export default function BookingForm({ user }) {
                   </tr>
 
                   {/* Total Row */}
-                  <tr className="bg-linear-to-r from-indigo-50 to-slate-50">
+                  <tr className="bg-neutral-100">
                     <td
                       colSpan="2"
                       className="px-4 py-4 text-sm font-bold text-slate-800"
@@ -1283,8 +1280,8 @@ export default function BookingForm({ user }) {
           </div>
 
           {/* Passenger Details Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden">
-            <div className="bg-linear-to-r from-indigo-50 to-slate-50 px-6 py-3 border-b border-slate-200/60 flex justify-between items-center">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-linear-to-r from-indigo-50 to-slate-50 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
               <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Passenger Details
@@ -1296,7 +1293,7 @@ export default function BookingForm({ user }) {
             <div className="overflow-x-auto p-4">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ background: "#fdf0d5" }}>
+                  <tr style={{ background: "#ececec" }}>
                     <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider rounded-tl-lg">
                       #
                     </th>
@@ -1378,7 +1375,7 @@ export default function BookingForm({ user }) {
                               )
                             }
                             required
-                            className="w-full min-w-17.5 px-2.5 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            className="w-full min-w-17.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                           >
                             {passenger.type === "Adult" && (
                               <>
@@ -1407,7 +1404,7 @@ export default function BookingForm({ user }) {
                               )
                             }
                             required
-                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                             placeholder="Surname"
                           />
                         </td>
@@ -1423,7 +1420,7 @@ export default function BookingForm({ user }) {
                               )
                             }
                             required
-                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                             placeholder="Given Name"
                           />
                         </td>
@@ -1439,7 +1436,7 @@ export default function BookingForm({ user }) {
                               )
                             }
                             required
-                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                             placeholder="Passport No"
                           />
                         </td>
@@ -1486,7 +1483,7 @@ export default function BookingForm({ user }) {
                               handleNationalityBlur(index, e.target.value)
                             }
                             autoComplete="off"
-                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border-2 border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            className="w-full min-w-25 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                             placeholder="Nationality"
                           />
                         </td>
@@ -1496,7 +1493,7 @@ export default function BookingForm({ user }) {
                               <div className="flex items-center gap-2">
                                 {pendingDocs[index] ? (
                                   pendingDocs[index].type ===
-                                  "application/pdf" ? (
+                                    "application/pdf" ? (
                                     <span className="text-[10px] text-amber-700 font-semibold border border-amber-300 bg-amber-50 px-2 py-0.5 rounded">
                                       📄 PDF
                                     </span>
@@ -1506,12 +1503,12 @@ export default function BookingForm({ user }) {
                                         pendingDocs[index],
                                       )}
                                       alt="doc preview"
-                                      className="h-10 w-16 object-cover rounded-lg border-2 border-amber-300"
+                                      className="h-10 w-16 object-cover rounded-lg border border-amber-300"
                                     />
                                   )
                                 ) : passenger.documentUrl.match(
-                                    /\.(jpg|jpeg|png|webp)/i,
-                                  ) ? (
+                                  /\.(jpg|jpeg|png|webp)/i,
+                                ) ? (
                                   <a
                                     href={passenger.documentUrl}
                                     target="_blank"
@@ -1520,7 +1517,7 @@ export default function BookingForm({ user }) {
                                     <img
                                       src={passenger.documentUrl}
                                       alt="doc"
-                                      className="h-10 w-16 object-cover rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all"
+                                      className="h-10 w-16 object-cover rounded-lg border border-slate-200 hover:border-indigo-400 transition-all"
                                     />
                                   </a>
                                 ) : (
@@ -1543,7 +1540,7 @@ export default function BookingForm({ user }) {
                                 </button>
                               </div>
                             ) : null}
-                            <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer border-2 border-slate-200 rounded-lg transition-all bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-slate-700">
+                            <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer border border-slate-200 rounded-lg transition-all bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-slate-700">
                               <Upload className="w-3.5 h-3.5" />
                               {pendingDocs[index] || passenger.documentUrl
                                 ? "Replace"
@@ -1568,22 +1565,21 @@ export default function BookingForm({ user }) {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-2xl shadow-xl border border-slate-200/60 p-6">
+          <div className="flex flex-col sm:flex-row gap-3 justify-end bg-white rounded-2xl border border-slate-200 p-6">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="px-6 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 border-2 border-slate-200 rounded-xl hover:bg-slate-200 hover:border-slate-300 transition-all"
+              className="px-6 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 hover:border-slate-300 transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                isSubmitting
+              className={`px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isSubmitting
                   ? "bg-slate-400 text-white cursor-not-allowed"
                   : "bg-linear-to-r from-slate-700 to-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5"
-              }`}
+                }`}
             >
               {isSubmitting ? (
                 <>
@@ -1679,7 +1675,7 @@ export default function BookingForm({ user }) {
                   }}
                   placeholder={`P<PAKNAME<<GIVEN<NAME<<<<<<<<<<<<<<<<<<<<<\nAB1234567PAK8501011M2601014<<<<<<<<<<<<<<<6`}
                   rows={4}
-                  className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all resize-none bg-slate-50 placeholder-slate-300 leading-6"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all resize-none bg-slate-50 placeholder-slate-300 leading-6"
                 />
                 {mrzError && (
                   <p className="text-rose-600 text-xs flex items-center gap-1.5 mt-1.5">
@@ -1705,7 +1701,7 @@ export default function BookingForm({ user }) {
               <button
                 type="button"
                 onClick={() => setMrzModal({ open: false, index: null })}
-                className="px-5 py-2 text-sm font-medium text-slate-600 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
               >
                 Cancel
               </button>
@@ -1713,11 +1709,10 @@ export default function BookingForm({ user }) {
                 type="button"
                 onClick={handleMrzParse}
                 disabled={!mrzInput.trim()}
-                className={`px-6 py-2 text-sm font-semibold rounded-xl transition-all ${
-                  mrzInput.trim()
+                className={`px-6 py-2 text-sm font-semibold rounded-xl transition-all ${mrzInput.trim()
                     ? "bg-linear-to-r from-indigo-600 to-indigo-700 text-white hover:shadow-lg hover:-translate-y-0.5"
                     : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 Scan
               </button>
@@ -1753,7 +1748,7 @@ export default function BookingForm({ user }) {
             </div>
 
             <div className="overflow-y-auto p-6 flex-1">
-              <div className="border-2 border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-800 text-white">
@@ -1827,7 +1822,7 @@ export default function BookingForm({ user }) {
                               <img
                                 src={URL.createObjectURL(pendingDocs[i])}
                                 alt="doc"
-                                className="h-10 w-16 object-cover rounded-lg border-2 border-amber-300"
+                                className="h-10 w-16 object-cover rounded-lg border border-amber-300"
                               />
                             )
                           ) : p.documentUrl ? (
@@ -1840,7 +1835,7 @@ export default function BookingForm({ user }) {
                                 <img
                                   src={p.documentUrl}
                                   alt="doc"
-                                  className="h-10 w-16 object-cover rounded-lg border-2 border-slate-200 hover:border-indigo-400 transition-all"
+                                  className="h-10 w-16 object-cover rounded-lg border border-slate-200 hover:border-indigo-400 transition-all"
                                 />
                               </a>
                             ) : (
@@ -1865,13 +1860,13 @@ export default function BookingForm({ user }) {
             </div>
 
             <div className="bg-slate-50 border-t border-slate-200 px-6 py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <label className="flex items-start sm:items-center gap-3 cursor-pointer group bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-emerald-400 transition-all w-full sm:w-auto">
+              <label className="flex items-start sm:items-center gap-3 cursor-pointer group bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-emerald-400 transition-all w-full sm:w-auto">
                 <div className="relative flex items-center shrink-0 mt-0.5 sm:mt-0">
                   <input
                     type="checkbox"
                     checked={isReviewed}
                     onChange={(e) => setIsReviewed(e.target.checked)}
-                    className="peer w-5 h-5 cursor-pointer appearance-none border-2 border-slate-400 rounded-lg checked:border-emerald-600 checked:bg-emerald-600 transition-all"
+                    className="peer w-5 h-5 cursor-pointer appearance-none border border-slate-400 rounded-lg checked:border-emerald-600 checked:bg-emerald-600 transition-all"
                   />
                   <CheckCircle
                     size={14}
@@ -1887,7 +1882,7 @@ export default function BookingForm({ user }) {
                 <button
                   type="button"
                   onClick={() => setShowReviewModal(false)}
-                  className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-semibold text-slate-600 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
+                  className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
                   disabled={isSubmitting}
                 >
                   Edit
@@ -1896,11 +1891,10 @@ export default function BookingForm({ user }) {
                   type="button"
                   onClick={handleFinalSubmit}
                   disabled={!isReviewed || isSubmitting}
-                  className={`flex-1 sm:flex-none px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-                    isReviewed && !isSubmitting
+                  className={`flex-1 sm:flex-none px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isReviewed && !isSubmitting
                       ? "bg-linear-to-r from-emerald-600 to-emerald-700 text-white hover:shadow-lg hover:-translate-y-0.5"
                       : "bg-slate-300 text-slate-500 cursor-not-allowed"
-                  }`}
+                    }`}
                 >
                   {isSubmitting ? (
                     <>

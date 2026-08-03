@@ -69,6 +69,7 @@ interface GroupTicketing {
     _id: string;
     voucher_id: string;
     groupBookingId: string;
+    groupNo: string;
     user: { name: string; _id: string };
     evoucherAccount?: string;
     sector?: string;
@@ -411,6 +412,11 @@ const LocalGroupsByCategory = () => {
 
                                             {/* Group & Voucher Info */}
                                             <td className="px-4 py-4">
+                                                {booking.groupNo &&
+                                                    <p className="text-xs font-semibold dark:text-white mb-1">
+                                                        ({booking.groupNo || "-"})
+                                                    </p>
+                                                }
                                                 <div className="text-sm font-bold text-gray-800 dark:text-white">
                                                     {booking.groupName || "Unnamed Group"}
                                                 </div>

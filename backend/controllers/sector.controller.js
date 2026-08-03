@@ -730,22 +730,22 @@ const fetchAlHaiderGroupsNormalized = async () => {
    hold up or jump ahead of the other sources.
 =============================== */
 const EXTERNAL_PROVIDER_TASKS = [
-  { source: "mct", label: "MCT", run: fetchNormalisedMCTGroups },
-  { source: "alHaider", label: "Al-Haider", run: fetchAlHaiderGroupsNormalized },
-  {
-    source: "alSaboorGroups",
-    label: "Al Saboor",
-    run: fetchNormalisedALSABOORGroups,
-  },
-  {
-    source: "amaarShoaib",
-    label: "Amaar Shoaib",
-    run: fetchNormalisedAmaarShoaibGroups,
-  },
+  // { source: "mct", label: "MCT", run: fetchNormalisedMCTGroups },
+  // { source: "alHaider", label: "Al-Haider", run: fetchAlHaiderGroupsNormalized },
+  // {
+  //   source: "alSaboorGroups",
+  //   label: "Al Saboor",
+  //   run: fetchNormalisedALSABOORGroups,
+  // },
+  // {
+  //   source: "amaarShoaib",
+  //   label: "Amaar Shoaib",
+  //   run: fetchNormalisedAmaarShoaibGroups,
+  // },
 ];
 
 const LOW_PRIORITY_PROVIDER_TASKS = [
-  { source: "upsky", label: "Up Sky", run: fetchNormalisedUpSkyGroups },
+  // { source: "upsky", label: "Up Sky", run: fetchNormalisedUpSkyGroups },
 ];
 
 // Travel Network and SkyPass feeds are currently disabled —

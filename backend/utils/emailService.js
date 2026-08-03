@@ -70,13 +70,13 @@ const transporter = createTransporter();
 // account as EMAIL_USER, so it can be used as the "from" address while still
 // authenticating with EMAIL_USER/EMAIL_PASSWORD from .env. Only booking
 // creation emails should use this address.
-const TICKET_EMAIL = "ticket@tfctours.com";
+const TICKET_EMAIL = "abid_intl@msn.com";
 
 // Company bank account details shown in the payment box at the bottom of
 // the "with price" ticket voucher (it doubles as the booking invoice).
 // Update these if the receiving bank account changes.
 const INVOICE_BANK_NAME = "Allied Bank Ltd. (ABL)";
-const INVOICE_BANK_ACCOUNT_TITLE = "ABID AIR";
+const INVOICE_BANK_ACCOUNT_TITLE = "Abid Air Travel & Tours";
 const INVOICE_BANK_ACCOUNT_NO = "05660010007500420034";
 const INVOICE_BANK_IBAN = "PK22ABPA0010007500420034";
 const INVOICE_BANK_BRANCH = "0566 - Settlite Town Gujranwala";
@@ -183,10 +183,10 @@ const getPasswordResetEmailHTML = (resetLink, userName) => {
             </ul>
           </div>
           <p>If you have any questions or concerns, please contact our support team.</p>
-          <p>Best regards,<br><strong>Abid Air  Team</strong></p>
+          <p>Best regards,<br><strong>Abid Air Travel & Tours  Team</strong></p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Abid Air . All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Abid Air Travel & Tours . All rights reserved.</p>
           <p>This is an automated message, please do not reply to this email.</p>
         </div>
       </div>
@@ -207,18 +207,18 @@ export const sendPasswordResetEmail = async (
 
     // Construct reset link
     const frontendURL =
-      process.env.FRONTEND_URL || "https://groups.tfctours.com";
+      process.env.FRONTEND_URL || "https://abidairtravels.com";
     const resetLink = `${frontendURL}/auth/forgot-password?token=${resetToken}&userId=${userId}`;
 
     const mailOptions = {
       from: {
-        name: "Abid Air ",
+        name: "Abid Air Travel & Tours ",
         address: process.env.EMAIL_USER,
       },
       to: email,
-      subject: "Password Reset Request - Abid Air ",
+      subject: "Password Reset Request - Abid Air Travel & Tours ",
       html: getPasswordResetEmailHTML(resetLink, userName),
-      text: `Hello ${userName},\n\nWe received a request to reset your password.\n\nPlease click the following link to reset your password:\n${resetLink}\n\nThis link will expire in 1 hour.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\nAbid Air  Team`,
+      text: `Hello ${userName},\n\nWe received a request to reset your password.\n\nPlease click the following link to reset your password:\n${resetLink}\n\nThis link will expire in 1 hour.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\nAbid Air Travel & Tours  Team`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -340,11 +340,11 @@ const getCredentialsEmailHTML = (
     <body>
       <div class="container">
         <div class="header">
-          <h1>🎉 Welcome to Abid Air !</h1>
+          <h1>🎉 Welcome to Abid Air Travel & Tours !</h1>
         </div>
         <div class="content">
           <p>Hello <strong>${userName}</strong>,</p>
-          <p>Welcome to Abid Air ! Your agency account has been created successfully.</p>
+          <p>Welcome to Abid Air Travel & Tours ! Your agency account has been created successfully.</p>
           <p><strong>Company:</strong> ${companyName}</p>
           
           <div class="credentials-box">
@@ -367,7 +367,7 @@ const getCredentialsEmailHTML = (
           </div>
 
           <div style="text-align: center;">
-            <a href="${process.env.FRONTEND_URL || "https://groups.tfctours.com"}" class="button">Login to Your Account</a>
+            <a href="${process.env.FRONTEND_URL || "https://abidairtravels.com"}" class="button">Login to Your Account</a>
           </div>
 
           <div class="warning">
@@ -381,10 +381,10 @@ const getCredentialsEmailHTML = (
           </div>
 
           <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
-          <p>Best regards,<br><strong>Abid Air  Team</strong></p>
+          <p>Best regards,<br><strong>Abid Air Travel & Tours  Team</strong></p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Abid Air . All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Abid Air Travel & Tours . All rights reserved.</p>
           <p>This is an automated message, please do not reply to this email.</p>
         </div>
       </div>
@@ -422,11 +422,11 @@ export const sendCredentialsEmail = async (
 
     const mailOptions = {
       from: {
-        name: "Abid Air ",
+        name: "Abid Air Travel & Tours ",
         address: process.env.EMAIL_USER,
       },
       to: email,
-      subject: "Your Agent Credentials - Abid Air ",
+      subject: "Your Agent Credentials - Abid Air Travel & Tours ",
       html: getCredentialsEmailHTML(
         agentCode,
         email,
@@ -434,7 +434,7 @@ export const sendCredentialsEmail = async (
         userName,
         companyName,
       ),
-      text: `Hello ${userName},\n\nWelcome to Abid Air ! Your agency account has been created successfully.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nAgent Code: ${agentCode}\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${process.env.FRONTEND_URL || "https://groups.tfctours.com"}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air `,
+      text: `Hello ${userName},\n\nWelcome to Abid Air Travel & Tours ! Your agency account has been created successfully.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nAgent Code: ${agentCode}\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${process.env.FRONTEND_URL || "https://abidairtravels.com"}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air Travel & Tours `,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -468,7 +468,7 @@ const getAdminCredentialsLoginUrl = () => {
   }
 
   const frontendUrl = (
-    process.env.FRONTEND_URL || "https://groups.tfctours.com"
+    process.env.FRONTEND_URL || "https://abidairtravels.com"
   ).replace(/\/$/, "");
   return `${frontendUrl}/admin-portal/signin`;
 };
@@ -570,7 +570,7 @@ const getAdminCredentialsEmailHTML = (
     <body>
       <div class="container">
         <div class="header">
-          <h1>Welcome to Abid Air</h1>
+          <h1>Welcome to Abid Air Travel & Tours</h1>
         </div>
         <div class="content">
           <p>Hello <strong>${userName}</strong>,</p>
@@ -603,10 +603,10 @@ const getAdminCredentialsEmailHTML = (
             </ul>
           </div>
 
-          <p>Best regards,<br><strong>Abid Air Team</strong></p>
+          <p>Best regards,<br><strong>Abid Air Travel & Tours Team</strong></p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} Abid Air. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.</p>
           <p>This is an automated message, please do not reply to this email.</p>
         </div>
       </div>
@@ -638,18 +638,18 @@ export const sendAdminCredentialsEmail = async (
     const loginUrl = getAdminCredentialsLoginUrl();
     const mailOptions = {
       from: {
-        name: "Abid Air ",
+        name: "Abid Air Travel & Tours ",
         address: process.env.EMAIL_USER,
       },
       to: email,
-      subject: "Your Admin Portal Credentials - Abid Air",
+      subject: "Your Admin Portal Credentials - Abid Air Travel & Tours",
       html: getAdminCredentialsEmailHTML(
         email,
         password,
         userName,
         companyName,
       ),
-      text: `Hello ${userName},\n\nYour admin portal sub-user account credentials are ready.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${loginUrl}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air`,
+      text: `Hello ${userName},\n\nYour admin portal sub-user account credentials are ready.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${loginUrl}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air Travel & Tours`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -707,7 +707,7 @@ export const getAgentRegistrationEmailHTML = (name = "Agent") => {
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
                 <h1 style="color:#ffffff; margin:0; font-size:24px;">
-                  Abid Air
+                  Abid Air Travel & Tours
                 </h1>
               </td>
             </tr>
@@ -723,7 +723,7 @@ export const getAgentRegistrationEmailHTML = (name = "Agent") => {
                 </p>
 
                 <p style="font-size:16px; line-height:1.6;">
-                  Thank you for registering as an agent with Abid Air.
+                  Thank you for registering as an agent with Abid Air Travel & Tours.
                 </p>
 
                 <p style="font-size:16px; line-height:1.6;">
@@ -738,14 +738,14 @@ export const getAgentRegistrationEmailHTML = (name = "Agent") => {
 
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air Team</strong>
+                  <strong>Abid Air Travel & Tours Team</strong>
                 </p>
               </td>
             </tr>
 
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
 
@@ -763,7 +763,7 @@ export const sendAgentRegistrationEmail = async (email, name = "Agent") => {
 
     const mailOptions = {
       from: {
-        name: "Abid Air",
+        name: "Abid Air Travel & Tours",
         address: process.env.EMAIL_USER,
       },
       to: email,
@@ -771,14 +771,14 @@ export const sendAgentRegistrationEmail = async (email, name = "Agent") => {
       html: getAgentRegistrationEmailHTML(name),
       text: `Hello ${name},
 
-Thank you for registering as an agent with Abid Air.
+Thank you for registering as an agent with Abid Air Travel & Tours.
 
 Your account has been created successfully, but it is currently waiting for admin approval.
 
 Please wait for the admin to activate your account. Once your account is activated, you will be able to log in and use your agent portal.
 
 Best regards,
-Abid Air Team`,
+Abid Air Travel & Tours Team`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -848,7 +848,7 @@ export const getBookingStatusUpdateEmailHTML = ({
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
                 <h1 style="color:#ffffff; margin:0; font-size:24px;">
-                  Abid Air
+                  Abid Air Travel & Tours
                 </h1>
               </td>
             </tr>
@@ -910,14 +910,14 @@ export const getBookingStatusUpdateEmailHTML = ({
 
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air Team</strong>
+                  <strong>Abid Air Travel & Tours Team</strong>
                 </p>
               </td>
             </tr>
 
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
 
@@ -943,7 +943,7 @@ export const sendBookingStatusUpdateEmail = async ({
 
     const mailOptions = {
       from: {
-        name: "Abid Air",
+        name: "Abid Air Travel & Tours",
         address: process.env.EMAIL_USER,
       },
       to: email,
@@ -965,7 +965,7 @@ New Status: ${newStatus}
 ${notes ? `Notes: ${notes}` : ""}
 
 Best regards,
-Abid Air Team`,
+Abid Air Travel & Tours Team`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -1042,7 +1042,7 @@ export const getAgentStatusUpdateEmailHTML = ({
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
                 <h1 style="color:#ffffff; margin:0; font-size:24px;">
-                  Abid Air
+                  Abid Air Travel & Tours
                 </h1>
               </td>
             </tr>
@@ -1104,14 +1104,14 @@ export const getAgentStatusUpdateEmailHTML = ({
 
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air Team</strong>
+                  <strong>Abid Air Travel & Tours Team</strong>
                 </p>
               </td>
             </tr>
 
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
 
@@ -1142,7 +1142,7 @@ export const sendAgentStatusUpdateEmail = async ({
 
     const mailOptions = {
       from: {
-        name: "Abid Air",
+        name: "Abid Air Travel & Tours",
         address: process.env.EMAIL_USER,
       },
       to: email,
@@ -1170,7 +1170,7 @@ ${
 }
 
 Best regards,
-Abid Air Team`,
+Abid Air Travel & Tours Team`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -1219,7 +1219,7 @@ export const getAdminAgencyRegistrationEmailHTML = ({
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
                 <h1 style="color:#ffffff; margin:0; font-size:24px;">
-                  Abid Air
+                  Abid Air Travel & Tours
                 </h1>
               </td>
             </tr>
@@ -1316,14 +1316,14 @@ export const getAdminAgencyRegistrationEmailHTML = ({
 
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air System</strong>
+                  <strong>Abid Air Travel & Tours System</strong>
                 </p>
               </td>
             </tr>
 
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
 
@@ -1363,7 +1363,7 @@ export const sendAdminAgencyRegistrationEmail = async ({
 
     const mailOptions = {
       from: {
-        name: "Abid Air",
+        name: "Abid Air Travel & Tours",
         address: process.env.EMAIL_USER,
       },
       to: adminEmail,
@@ -1392,7 +1392,7 @@ Status: ${status || "Pending"}
 Please review this agency account and activate it if approved.
 
 Best regards,
-Abid Air System`,
+Abid Air Travel & Tours System`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -1452,7 +1452,7 @@ const getBookingCreatedCustomerEmailHTML = ({
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
-                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air</h1>
+                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air Travel & Tours</h1>
               </td>
             </tr>
             <tr>
@@ -1498,13 +1498,13 @@ const getBookingCreatedCustomerEmailHTML = ({
                 </table>
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air Team</strong>
+                  <strong>Abid Air Travel & Tours Team</strong>
                 </p>
               </td>
             </tr>
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
           </table>
@@ -1562,7 +1562,7 @@ const getBookingCreatedAdminEmailHTML = ({
           <table width="650" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
-                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air</h1>
+                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air Travel & Tours</h1>
               </td>
             </tr>
             <tr>
@@ -1628,13 +1628,13 @@ const getBookingCreatedAdminEmailHTML = ({
 
                 <p style="font-size:15px; line-height:1.6; margin-top:30px; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air System</strong>
+                  <strong>Abid Air Travel & Tours System</strong>
                 </p>
               </td>
             </tr>
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                © ${new Date().getFullYear()} Abid Air. All rights reserved.
+                © ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
           </table>
@@ -1655,7 +1655,7 @@ export const sendBookingCreatedEmails = async ({ booking, user }) => {
   const results = { admin: null, customer: null };
 
   const fromTicketing = {
-    name: "Abid Air Ticketing",
+    name: "Abid Air Travel & Tours Ticketing",
     address: TICKET_EMAIL,
   };
 
@@ -1814,7 +1814,7 @@ const getPaymentEmailHTML = ({
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:#012A36; padding:25px; text-align:center;">
-                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air</h1>
+                <h1 style="color:#ffffff; margin:0; font-size:24px;">Abid Air Travel & Tours</h1>
               </td>
             </tr>
             <tr>
@@ -1880,13 +1880,13 @@ const getPaymentEmailHTML = ({
 
                 <p style="font-size:16px; line-height:1.6; margin-bottom:0;">
                   Best regards,<br />
-                  <strong>Abid Air Team</strong>
+                  <strong>Abid Air Travel & Tours Team</strong>
                 </p>
               </td>
             </tr>
             <tr>
               <td style="background:#f1f1f1; padding:15px; text-align:center; color:#777777; font-size:13px;">
-                &copy; ${new Date().getFullYear()} Abid Air. All rights reserved.
+                &copy; ${new Date().getFullYear()} Abid Air Travel & Tours. All rights reserved.
               </td>
             </tr>
           </table>
@@ -1905,7 +1905,7 @@ export const sendPaymentCreatedEmails = async ({ payment }) => {
   const adminEmail = process.env.ADMIN_EMAIL;
 
   const from = {
-    name: "Abid Air",
+    name: "Abid Air Travel & Tours",
     address: process.env.EMAIL_USER,
   };
 
@@ -1934,7 +1934,7 @@ Status: ${payment.status || "N/A"}
 ${payment.remarks ? `Remarks: ${payment.remarks}` : ""}
 
 Best regards,
-Abid Air Team`,
+Abid Air Travel & Tours Team`,
       });
       console.log("Payment received email sent to agent!", info.messageId);
       results.agent = { success: true, messageId: info.messageId };
@@ -1971,7 +1971,7 @@ Status: ${payment.status || "N/A"}
 ${payment.remarks ? `Remarks: ${payment.remarks}` : ""}
 
 Best regards,
-Abid Air System`,
+Abid Air Travel & Tours System`,
       });
       console.log("New payment email sent to admin!", info.messageId);
       results.admin = { success: true, messageId: info.messageId };
@@ -2001,7 +2001,7 @@ export const sendPaymentStatusUpdateEmail = async ({
 
   const info = await transporter.sendMail({
     from: {
-      name: "Abid Air",
+      name: "Abid Air Travel & Tours",
       address: process.env.EMAIL_USER,
     },
     to: agentEmail,
@@ -2027,7 +2027,7 @@ Description: ${payment.description || "N/A"}
 ${payment.remarks ? `Remarks: ${payment.remarks}` : ""}
 
 Best regards,
-Abid Air Team`,
+Abid Air Travel & Tours Team`,
   });
 
   console.log("Payment status update email sent to agent!", info.messageId);

@@ -26,6 +26,11 @@ export const createGroupTicketing = async (req, res) => {
       groupBookingId,
       flights,
       totalSeatsAfterPartial,
+      postedBy: {
+        _id: req.user?._id?.toString() || "",
+        name: req.user?.name || req.user?.companyName || "",
+        email: req.user?.email || "",
+      },
     };
 
     const group = await GroupTicketing.create(groupData);

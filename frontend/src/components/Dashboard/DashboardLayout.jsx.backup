@@ -335,7 +335,7 @@ const DashboardLayout = ({ user, handleLogout }) => {
             {sidebarOpen ? <FaTimes /> : <FaBars />}
           </button>
           {/* <div className="header-title">
-            <h1>Dashboard - Abid Air </h1> 
+            <h1>Dashboard - Abid Air Travel & Tours </h1> 
           </div> */}
           <div
             className="header-user"

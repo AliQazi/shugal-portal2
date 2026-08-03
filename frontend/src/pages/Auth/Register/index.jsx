@@ -144,7 +144,7 @@ const Register = () => {
             </span>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight pt-2">
               Expand Your Agency <br />
-              With Abid Air.
+              With Abid Air Travel & Tours.
             </h2>
           </div>
 

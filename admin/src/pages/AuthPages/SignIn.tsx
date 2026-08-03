@@ -6,8 +6,8 @@ export default function SignIn() {
   return (
     <>
       <PageMeta
-        title="Abid Air SignIn Dashboard"
-        description="This is Admin SignIn Dashboard page for Abid Air"
+        title="Abid Air Travel & Tours SignIn Dashboard"
+        description="This is Admin SignIn Dashboard page for Abid Air Travel & Tours"
       />
       <AuthLayout>
         <SignInForm />

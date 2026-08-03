@@ -65,7 +65,9 @@ interface GroupTicketing {
   _id: string;
   voucher_id: string;
   groupBookingId: string;
+  groupNo: string;
   user: { name: string; _id: string };
+  postedBy?: { name?: string; email?: string; _id?: string };
   evoucherAccount?: string;
   sector?: string;
   type?: string;
@@ -440,16 +442,16 @@ const GroupTicketing = () => {
           prev.map((booking) =>
             booking._id === selectedTicketBooking._id
               ? {
-                  ...booking,
-                  ticketNumber:
-                    response.data.data?.ticketNumber ||
-                    response.data.data?.ticketNo ||
-                    cleanTicketNumber,
-                  ticketNo:
-                    response.data.data?.ticketNo ||
-                    response.data.data?.ticketNumber ||
-                    cleanTicketNumber,
-                }
+                ...booking,
+                ticketNumber:
+                  response.data.data?.ticketNumber ||
+                  response.data.data?.ticketNo ||
+                  cleanTicketNumber,
+                ticketNo:
+                  response.data.data?.ticketNo ||
+                  response.data.data?.ticketNumber ||
+                  cleanTicketNumber,
+              }
               : booking
           )
         );
@@ -471,6 +473,8 @@ const GroupTicketing = () => {
         booking.voucher_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         booking.groupBookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (booking.user?.name && booking.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (booking.postedBy?.name && booking.postedBy.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (booking.postedBy?.email && booking.postedBy.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (booking.groupName && booking.groupName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (booking.airline && booking.airline.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -689,6 +693,7 @@ const GroupTicketing = () => {
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Airline & PNR</th>
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Seats (Booked/Total)</th>
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Passengers (A/C/I)</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Posted By</th>
                     <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Public</th>
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Price</th>
                     <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Actions</th>
@@ -701,6 +706,7 @@ const GroupTicketing = () => {
                     const totalSeats = booking.totalSeats || 0;
                     const remainingSeats = totalSeats - bookedSeats;
                     const bookedPercentage = totalSeats > 0 ? (bookedSeats / totalSeats) * 100 : 0;
+                    const postedBy = booking.postedBy;
 
                     return (
                       <tr key={booking._id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -711,6 +717,11 @@ const GroupTicketing = () => {
 
                         {/* Group & Voucher Info */}
                         <td className="px-4 py-4">
+                          {booking.groupNo &&
+                            <p className="text-xs font-semibold dark:text-white mb-1">
+                              ({booking.groupNo || "-"})
+                            </p>
+                          }
                           <div className="text-sm font-bold text-gray-800 dark:text-white">
                             {booking.groupName || "Unnamed Group"}
                           </div>
@@ -851,6 +862,18 @@ const GroupTicketing = () => {
                             infants={bookedInfo?.totalInfants || 0}
                             bookings={bookedInfo?.totalBookings || 0}
                           />
+                        </td>
+
+                        {/* Posted By */}
+                        <td className="px-4 py-4">
+                          <div className="min-w-44">
+                            <div className="text-sm font-semibold text-gray-800 dark:text-white">
+                              {postedBy?.name || "-"}
+                            </div>
+                            <div className="mt-0.5 break-all text-xs text-gray-500 dark:text-gray-400">
+                              {postedBy?.email || "-"}
+                            </div>
+                          </div>
                         </td>
 
                         {/* Internal Status */}

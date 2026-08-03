@@ -49,10 +49,44 @@ interface Airline {
   logo: string;
 }
 
+interface BookingData {
+  user?: { name: string; _id: string };
+  evoucherAccount?: string;
+  sector?: string;
+  airline?: string;
+  groupCategory?: string;
+  groupName?: string;
+  groupNo?: string;
+  groupClass?: string;
+  dateOfPurchase?: string;
+  totalSeats?: number;
+  showSeat?: boolean;
+  hidePartial?: boolean;
+  partialSeats?: number;
+  groupType: string;
+  flights: Flight[];
+  passengers: { adults: number; children: number; infants: number };
+  price: {
+    buyingCurrency: string;
+    buyingAdultPrice: number;
+    buyingChildPrice: number;
+    buyingInfantPrice: number;
+    sellingCurrencyB2B: string;
+    sellingAdultPriceB2B: number;
+    sellingChildPriceB2B: number;
+    sellingInfantPriceB2B: number;
+  };
+  pnr?: string;
+  contactPersonPhone?: string;
+  contactPersonEmail?: string;
+  internalStatus?: string;
+  payments: Payment[];
+}
+
 const GroupTicketingForm = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id, copyId } = useParams();
   const canCreate = hasPermission(user, "create_group");
   const canManage = hasPermission(user, "group_ticketing_action_buttons");
   const canAccess = id ? canManage : canCreate;
@@ -71,6 +105,9 @@ const GroupTicketingForm = () => {
     airline: "",
     groupCategory: "",
     groupName: "",
+    groupNo: "",
+    groupClass: "",
+    dateOfPurchase: "",
     totalSeats: 0,
     showSeat: false,
     hidePartial: false,
@@ -121,6 +158,9 @@ const GroupTicketingForm = () => {
     if (id) {
       setEditMode(true);
       fetchBookingDetails(id);
+    } else if (copyId) {
+      // Populate the create form with an existing group's data without editing it.
+      fetchBookingDetails(copyId);
     }
 
     fetch("/admin-portal/data/cities.json")
@@ -133,7 +173,7 @@ const GroupTicketingForm = () => {
         setCityOptions(options);
       })
       .catch(() => setCityOptions([]));
-  }, [id, canAccess]);
+  }, [id, copyId, canAccess]);
 
   const fetchSectors = async () => {
     try {
@@ -157,6 +197,50 @@ const GroupTicketingForm = () => {
     }
   };
 
+  const mapBookingToFormData = (booking: BookingData) => ({
+    user: booking.user || { name: "", _id: "" },
+    evoucherAccount: booking.evoucherAccount || "",
+    sector: booking.sector || "",
+    airline: booking.airline || "",
+    groupCategory: booking.groupCategory || "",
+    groupName: booking.groupName || "",
+    groupNo: booking.groupNo || "",
+    groupClass: booking.groupClass || "",
+    dateOfPurchase: booking.dateOfPurchase ? booking.dateOfPurchase.slice(0, 10) : "",
+    totalSeats: booking.totalSeats || 0,
+    showSeat: booking.showSeat || false,
+    hidePartial: booking.hidePartial || false,
+    partialSeats: booking.partialSeats || 0,
+    groupType: booking.groupType,
+    flights: booking.flights.map((f: Flight) => ({
+      ...f,
+      airline: f.airline || booking.airline,
+      depDate: f.depDate.slice(0, 10),
+      arrDate: f.arrDate.slice(0, 10),
+      fromTerminal: f.fromTerminal || "",
+      toTerminal: f.toTerminal || "",
+      flightClass: f.flightClass || "",
+      baggage: f.baggage || "",
+      meal: f.meal || ""
+    })),
+    passengers: booking.passengers,
+    price: {
+      buyingCurrency: booking.price.buyingCurrency,
+      buyingAdultPrice: booking.price.buyingAdultPrice,
+      buyingChildPrice: booking.price.buyingChildPrice,
+      buyingInfantPrice: booking.price.buyingInfantPrice,
+      sellingCurrencyB2B: booking.price.sellingCurrencyB2B,
+      sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B,
+      sellingChildPriceB2B: booking.price.sellingChildPriceB2B,
+      sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B
+    },
+    pnr: booking.pnr || "",
+    contactPersonPhone: booking.contactPersonPhone || "",
+    contactPersonEmail: booking.contactPersonEmail || "",
+    internalStatus: booking.internalStatus || "Public",
+    payments: booking.payments
+  });
+
   const fetchBookingDetails = async (bookingId: string) => {
     try {
       setLoading(true);
@@ -165,47 +249,7 @@ const GroupTicketingForm = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.success) {
-        const booking = response.data.data;
-        setFormData({
-          user: booking.user || { name: "", _id: "" },
-          evoucherAccount: booking.evoucherAccount || "",
-          sector: booking.sector || "",
-          airline: booking.airline || "",
-          groupCategory: booking.groupCategory || "",
-          groupName: booking.groupName || "",
-          totalSeats: booking.totalSeats || 0,
-          showSeat: booking.showSeat || false,
-          hidePartial: booking.hidePartial || false,
-          partialSeats: booking.partialSeats || 0,
-          groupType: booking.groupType,
-          flights: booking.flights.map((f: Flight) => ({
-            ...f,
-            airline: f.airline || booking.airline,
-            depDate: f.depDate.slice(0, 10),
-            arrDate: f.arrDate.slice(0, 10),
-            fromTerminal: f.fromTerminal || "",
-            toTerminal: f.toTerminal || "",
-            flightClass: f.flightClass || "",
-            baggage: f.baggage || "",
-            meal: f.meal || ""
-          })),
-          passengers: booking.passengers,
-          price: {
-            buyingCurrency: booking.price.buyingCurrency,
-            buyingAdultPrice: booking.price.buyingAdultPrice,
-            buyingChildPrice: booking.price.buyingChildPrice,
-            buyingInfantPrice: booking.price.buyingInfantPrice,
-            sellingCurrencyB2B: booking.price.sellingCurrencyB2B,
-            sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B,
-            sellingChildPriceB2B: booking.price.sellingChildPriceB2B,
-            sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B
-          },
-          pnr: booking.pnr || "",
-          contactPersonPhone: booking.contactPersonPhone || "",
-          contactPersonEmail: booking.contactPersonEmail || "",
-          internalStatus: booking.internalStatus || "Public",
-          payments: booking.payments
-        });
+        setFormData(mapBookingToFormData(response.data.data));
       }
     } catch (error) {
       console.error("Error fetching booking details:", error);
@@ -310,6 +354,48 @@ const GroupTicketingForm = () => {
     }
   };
 
+  // Create mode: create the group, then open a new tab pre-filled with that group's
+  // data (via the /create/:copyId route) so the user can tweak it and create another one.
+  const handleCreateAndCopy = async () => {
+    if (!canCreate) {
+      window.alert("You don't have permission to create groups");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("admin_token");
+      const response = await axiosInstance.post("/group-ticketing", formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      if (response.data.success) {
+        window.alert("✅ Group created! Opening a copy in a new tab.");
+        window.open(
+          `${window.location.origin}/admin-portal/group-ticketing/create/${response.data.data._id}`,
+          "_blank"
+        );
+        navigate("/group-ticketing");
+      }
+    } catch (error: any) {
+      console.error("Error creating group:", error);
+      window.alert("❌ " + (error.response?.data?.message || "Failed to create booking"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Edit mode: open the create form in a new tab, pre-filled from this group's saved
+  // data (fetched fresh by id there). Nothing is created and this edit form is untouched.
+  const handleCreateCopy = () => {
+    if (!canCreate) {
+      window.alert("You don't have permission to create groups");
+      return;
+    }
+    if (!id) return;
+
+    window.open(`${window.location.origin}/admin-portal/group-ticketing/create/${id}`, "_blank");
+  };
+
   if (!canAccess) {
     return (
       <>
@@ -350,6 +436,19 @@ const GroupTicketingForm = () => {
     let x = value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,2})(\d{0,4})/);
     if (!x) return;
     let maskedValue = !x[2] ? x[1] : x[1] + '-' + x[2] + (x[3] ? '-' + x[3] : '');
+    const updatedFlights = [...formData.flights];
+    (updatedFlights[index] as any)[field] = maskedValue;
+    setFormData({ ...formData, flights: updatedFlights });
+  };
+
+  // 24-hour manual time entry (HH:MM), no AM/PM
+  const handleTimeMasking = (index: number, field: 'depTime' | 'arrTime', value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    let hh = digits.slice(0, 2);
+    let mm = digits.slice(2, 4);
+    if (hh.length === 2 && Number(hh) > 23) hh = '23';
+    if (mm.length === 2 && Number(mm) > 59) mm = '59';
+    const maskedValue = digits.length <= 2 ? hh : `${hh}:${mm}`;
     const updatedFlights = [...formData.flights];
     (updatedFlights[index] as any)[field] = maskedValue;
     setFormData({ ...formData, flights: updatedFlights });
@@ -465,11 +564,13 @@ const GroupTicketingForm = () => {
                 value={formData.sector}
                 onChange={(e) => {
                   const selectedSector = sectors.find(s => s.sectorTitle === e.target.value);
+                  const selectedAirline = airlines.find(a => a.airlineName === formData.airline);
                   setFormData({
                     ...formData,
                     sector: e.target.value,
                     groupCategory: selectedSector?.groupType || "",
-                    groupType: selectedSector?.groupType || ""
+                    groupType: selectedSector?.groupType || "",
+                    groupName: selectedAirline ? `${selectedAirline.airlineName}-${e.target.value || 'NULL'}` : formData.groupName
                   });
                 }}
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
@@ -548,6 +649,55 @@ const GroupTicketingForm = () => {
                 onChange={(e) => setFormData({ ...formData, totalSeats: Number(e.target.value.replace(/,/g, '')) || 0 })}
                 placeholder="Enter total seats"
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </div>
+          </div>
+
+          {/* Group No, Group Class, Date of Purchase */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Group No
+              </label>
+              <input
+                type="text"
+                value={formData.groupNo}
+                onChange={(e) => setFormData({ ...formData, groupNo: e.target.value })}
+                placeholder="Enter group no"
+                className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </div>
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Group Class
+              </label>
+              <input
+                type="text"
+                value={formData.groupClass}
+                onChange={(e) => setFormData({ ...formData, groupClass: e.target.value })}
+                placeholder="Enter group class"
+                className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              />
+            </div>
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Date of Purchase
+              </label>
+              <DatePicker
+                selected={parseISODate(formData.dateOfPurchase)}
+                onChange={(date: Date | null) => {
+                  setFormData({ ...formData, dateOfPurchase: date ? dateToISO(date) : "" });
+                }}
+                dateFormat="dd-MM-yyyy"
+                placeholderText="DD-MM-YYYY"
+                wrapperClassName="w-full"
+                customInput={
+                  <input
+                    type="text"
+                    placeholder="DD-MM-YYYY"
+                    className="w-full h-11 px-4 text-sm border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  />
+                }
               />
             </div>
           </div>
@@ -675,11 +825,12 @@ const GroupTicketingForm = () => {
                     </td>
                     <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <input
-                        type="time"
+                        type="text"
                         required
                         value={flight.depTime}
-                        onChange={(e) => updateFlight(index, { depTime: e.target.value })}
-                        onClick={(e) => e.currentTarget.showPicker?.()}
+                        onChange={(e) => handleTimeMasking(index, 'depTime', e.target.value)}
+                        placeholder="HH:MM"
+                        maxLength={5}
                         className="w-full min-w-30 h-9 px-2 text-xs border border-gray-300 rounded bg-white text-gray-900"
                       />
                     </td>
@@ -793,11 +944,12 @@ const GroupTicketingForm = () => {
                     </td>
                     <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <input
-                        type="time"
+                        type="text"
                         required
                         value={flight.arrTime}
-                        onChange={(e) => updateFlight(index, { arrTime: e.target.value })}
-                        onClick={(e) => e.currentTarget.showPicker?.()}
+                        onChange={(e) => handleTimeMasking(index, 'arrTime', e.target.value)}
+                        placeholder="HH:MM"
+                        maxLength={5}
                         className="w-full min-w-30 h-9 px-2 text-xs border border-gray-300 rounded bg-white text-gray-900"
                       />
                     </td>
@@ -996,6 +1148,28 @@ const GroupTicketingForm = () => {
             >
               Cancel
             </button>
+            {!editMode && canCreate && (
+              <button
+                type="button"
+                onClick={handleCreateAndCopy}
+                disabled={loading}
+                className="rounded bg-purple-600 px-8 py-3 text-sm font-medium text-white hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Create this group, then open a copy of it in a new tab to create another one like it"
+              >
+                {loading ? "Saving..." : "Create & Copy Group"}
+              </button>
+            )}
+            {editMode && canCreate && (
+              <button
+                type="button"
+                onClick={handleCreateCopy}
+                disabled={loading}
+                className="rounded bg-purple-600 px-8 py-3 text-sm font-medium text-white hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Open the create form pre-filled with this group's data, without changing the group being edited"
+              >
+                Create Copy
+              </button>
+            )}
             <button
               type="submit"
               disabled={loading || !canAccess}

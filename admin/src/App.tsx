@@ -93,6 +93,7 @@ export default function App() {
                 <Route path="/booking-detail/:id" element={<BookingDetail />} />
                 <Route path="/group-ticketing" element={<GroupTicketing />} />
                 <Route path="/group-ticketing/create" element={<GroupTicketingForm />} />
+                <Route path="/group-ticketing/create/:copyId" element={<GroupTicketingForm />} />
                 <Route path="/group-ticketing/edit/:id" element={<GroupTicketingForm />} />
                 <Route path="/local-groups" element={<LocalGroupsByCategory />} />
                 <Route path="/view-payment-voucher" element={<ViewPaymentVoucher />} />

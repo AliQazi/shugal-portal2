@@ -56,7 +56,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3000",
       "http://localhost:3001",
-      "https://groups.tfctours.com",
+      "https://abidairtravels.com",
     ],
     credentials: true,
   }),
@@ -137,7 +137,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Abid Air API is running");
+  res.send("Abid Air Travel & Tours API is running");
 });
 
 const PORT = process.env.PORT || 8016;

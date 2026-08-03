@@ -672,10 +672,10 @@ const Ledger = () => {
               />
               <div className="agent-ledger-print-company-text">
                 <strong>{accountName.toUpperCase()}</strong>
-                <div>Abid Air</div>
-                <div>Email: info@tfctours.com</div>
+                <div>Abid Air Travel & Tours</div>
+                <div>Email: abid_intl@msn.com</div>
                 <div>
-                  Account statement generated from Abid Air portal
+                  Account statement generated from Abid Air Travel & Tours portal
                 </div>
               </div>
             </div>
@@ -853,9 +853,9 @@ const Ledger = () => {
               <img src={logo} alt="Company logo" />
               <div>
                 <h1>{accountName.toUpperCase()}</h1>
-                <p>Abid Air</p>
-                <p>Email: info@tfc.com</p>
-                <p>Account statement generated from Abid Air portal</p>
+                <p>Abid Air Travel & Tours</p>
+                <p>Email: abid_intl@msn.com</p>
+                <p>Account statement generated from Abid Air Travel & Tours portal</p>
               </div>
             </div>
 

@@ -11,6 +11,7 @@ import {
   Award,
   CheckCircle,
 } from "lucide-react";
+import { theme } from "../../theme/theme";
 
 // Global image variables - change these URLs as needed
 const ABOUT_IMAGE_1 =
@@ -21,28 +22,28 @@ const ABOUT_IMAGE_3 =
   "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&q=80&w=800";
 
 export default function AboutSection() {
-  const features = [
-    {
-      icon: <Compass className="w-5 h-5" />,
-      title: "Curated Journeys",
-      desc: "Handpicked experiences designed just for you",
-    },
-    {
-      icon: <Users className="w-5 h-5" />,
-      title: "Expert Guides",
-      desc: "Local experts who know every hidden gem",
-    },
-    {
-      icon: <Shield className="w-5 h-5" />,
-      title: "Safe & Secure",
-      desc: "Your safety is our top priority at all times",
-    },
-    {
-      icon: <Clock className="w-5 h-5" />,
-      title: "24/7 Support",
-      desc: "Round-the-clock assistance wherever you are",
-    },
-  ];
+  // const features = [
+  //   {
+  //     icon: <Compass className="w-5 h-5" />,
+  //     title: "Curated Journeys",
+  //     desc: "Handpicked experiences designed just for you",
+  //   },
+  //   {
+  //     icon: <Users className="w-5 h-5" />,
+  //     title: "Expert Guides",
+  //     desc: "Local experts who know every hidden gem",
+  //   },
+  //   {
+  //     icon: <Shield className="w-5 h-5" />,
+  //     title: "Safe & Secure",
+  //     desc: "Your safety is our top priority at all times",
+  //   },
+  //   {
+  //     icon: <Clock className="w-5 h-5" />,
+  //     title: "24/7 Support",
+  //     desc: "Round-the-clock assistance wherever you are",
+  //   },
+  // ];
 
   const highlights = [
     "Premium travel experiences worldwide",
@@ -51,12 +52,12 @@ export default function AboutSection() {
     "24/7 customer support assistance",
   ];
 
-  const stats = [
-    { number: "12K+", label: "Happy Travelers" },
-    { number: "45+", label: "Countries Visited" },
-    { number: "98%", label: "Satisfaction Rate" },
-    { number: "15+", label: "Awards Won" },
-  ];
+  // const stats = [
+  //   { number: "12K+", label: "Happy Travelers" },
+  //   { number: "45+", label: "Countries Visited" },
+  //   { number: "98%", label: "Satisfaction Rate" },
+  //   { number: "15+", label: "Awards Won" },
+  // ];
 
   return (
     <section className="relative py-24 md:py-32 bg-linear-to-br from-slate-50 via-white to-orange-50/30 overflow-hidden">
@@ -78,7 +79,7 @@ export default function AboutSection() {
             <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-[#1a417a]/10">
               <img
                 src={ABOUT_IMAGE_1}
-                alt="About Abid Air"
+                alt="About Abid Air Travel & Tours"
                 className="w-full h-112.5 md:h-137.5 object-cover"
               />
               <div className="absolute inset-0 bg-linear-to-t from-[#1a417a]/40 via-transparent to-transparent"></div>
@@ -137,7 +138,7 @@ export default function AboutSection() {
           <div className="order-1 lg:order-2">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1a417a]/5 border border-[#1a417a]/10 mb-6">
-              <span className="w-1.5 h-1.5 bg-[#e95432] rounded-full"></span>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.colors.primary }}></span>
               <span className="text-[10px] font-bold text-[#1a417a] uppercase tracking-[0.2em]">
                 About Us
               </span>
@@ -146,7 +147,7 @@ export default function AboutSection() {
             {/* Heading */}
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a417a] leading-[1.1] mb-4">
               Best
-              <span className="block text-transparent bg-clip-text bg-linear-to-r from-[#e95432] to-[#f7931e]">
+              <span className="block text-transparent bg-clip-text bg-linear-to-r from-[#09B0FF] to-[#0064BC]">
                 Travel Agency
               </span>
             </h2>
@@ -166,7 +167,7 @@ export default function AboutSection() {
             <div className="space-y-2.5 mb-8">
               {highlights.map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-[#e95432] shrink-0 mt-0.5" />
+                  <CheckCircle className="w-5 h-5 text-[#09B0FF] shrink-0 mt-0.5" />
                   <span className="text-gray-700 text-sm md:text-base font-medium">
                     {item}
                   </span>
@@ -175,7 +176,7 @@ export default function AboutSection() {
             </div>
 
             {/* Stats Section */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 p-4 md:p-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/80 shadow-sm">
+            {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 p-4 md:p-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/80 shadow-sm">
               {stats.map((stat, idx) => (
                 <div key={idx} className="text-center">
                   <div className="text-xl md:text-2xl font-black text-[#1a417a]">
@@ -186,11 +187,11 @@ export default function AboutSection() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div> */}
 
             {/* CTA Buttons */}
             <div className="flex flex-wrap items-center gap-3 md:gap-4">
-              <button className="group relative bg-[#1a417a] text-white px-8 md:px-10 py-3.5 md:py-4 rounded-full font-bold text-sm md:text-base transition-all duration-300 hover:bg-[#e95432] hover:shadow-2xl hover:shadow-[#e95432]/30 overflow-hidden">
+              <button className="group relative bg-[#09B0FF] text-white px-8 md:px-10 py-3.5 md:py-4 rounded-full font-bold text-sm md:text-base transition-all duration-300 hover:bg-[#0064BC] hover:shadow-2xl hover:shadow-[#e95432]/30 overflow-hidden">
                 <span className="relative z-10 flex items-center gap-2">
                   Find Tours
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -198,7 +199,7 @@ export default function AboutSection() {
                 <div className="absolute inset-0 bg-linear-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               </button>
 
-              <button className="flex items-center gap-2 px-6 md:px-8 py-3.5 md:py-4 rounded-full border-2 border-[#1a417a]/20 text-[#1a417a] font-bold text-sm md:text-base hover:border-[#e95432] hover:text-[#e95432] transition-all duration-300">
+              <button className="flex items-center gap-2 px-6 md:px-8 py-3.5 md:py-4 rounded-full border-2 border-[#0064BC]/20 text-[#09B0FF] font-bold text-sm md:text-base hover:border-[#09B0FF] hover:text-[#09B0FF] transition-all duration-300">
                 <MapPin className="w-4 h-4" />
                 Find Your Best Destination
               </button>

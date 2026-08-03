@@ -102,12 +102,21 @@ const GroupTicketingSchema = new mongoose.Schema(
       _id: { type: String, required: true },
     },
 
+    postedBy: {
+      name: { type: String },
+      email: { type: String },
+      _id: { type: String },
+    },
+
     evoucherAccount: { type: String },
     sector: { type: String },
 
     airline: { type: String },
     groupCategory: { type: String },
     groupName: { type: String },
+    groupNo: { type: String },
+    groupClass: { type: String },
+    dateOfPurchase: { type: Date },
     totalSeats: { type: Number, default: 0 },
     showSeat: { type: Boolean, default: false },
     hidePartial: { type: Boolean, default: false },

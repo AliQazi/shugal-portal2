@@ -12,7 +12,7 @@ import Lottie from "react-lottie";
 import ctaAnimation from "../../assets/animations/cta.json";
 import iata from "../../assets/images/iata.avif";
 const WHATSAPP_URL =
-  "https://api.whatsapp.com/send/?phone=9223041119786&text&type=phone_number&app_absent=0";
+  "https://api.whatsapp.com/send/?phone=923197298467&text&type=phone_number&app_absent=0";
 const lottieOptions = {
   loop: true,
   autoplay: true,
@@ -28,7 +28,7 @@ export default function Footer({ user }) {
       {!user?._id && (
         <div
           /* FIXED: Linear gradient render karne ke liye background use kiya hai */
-          style={{ background: theme.colors.primary }}
+          style={{ background: theme.colors.primaryDark }}
           className="relative py-20 px-6 overflow-hidden"
         >
           {/* Subtle Graphic Grid Lines Layer */}
@@ -80,15 +80,15 @@ export default function Footer({ user }) {
               <div className="inline-block p-2.5 bg-white rounded-xl mb-4 shadow-md">
                 <img
                   src={logo}
-                  alt="Abid Air LOGO"
-                  className="h-10 w-auto object-contain"
+                  alt="Abid Air Travel & Tours LOGO"
+                  className="h-20! w-auto object-contain"
                 />
               </div>
               <h3
                 style={{ color: theme.colors.sidebarTextLight }}
                 className="text-lg font-bold tracking-tight uppercase"
               >
-                Abid Air
+                Abid Air Travel & Tours
               </h3>
               <p
                 style={{ color: theme.colors.sidebarText }}
@@ -173,12 +173,21 @@ export default function Footer({ user }) {
               </h4>
               <div className="flex flex-col space-y-4 text-xs">
                 <a
-                  href="tel:++923041119786"
+                  href="tel:++923197298467"
                   style={{ color: theme.colors.sidebarText }}
                   className="flex items-center gap-3 hover:text-white transition"
                 >
                   <FaPhoneAlt className="text-stone-500 shrink-0" />
-                  <span className="font-mono text-sm">+923041119786</span>
+                  <span className="font-mono text-sm">+92 319 7298467</span>
+                </a>
+
+                <a
+                  href="tel:++923197298467"
+                  style={{ color: theme.colors.sidebarText }}
+                  className="flex items-center gap-3 hover:text-white transition"
+                >
+                  <FaPhoneAlt className="text-stone-500 shrink-0" />
+                  <span className="font-mono text-sm">+92 300 7298467</span>
                 </a>
 
                 <a
@@ -187,19 +196,19 @@ export default function Footer({ user }) {
                   className="flex items-center gap-3 hover:text-white transition"
                 >
                   <FaPhoneAlt className="text-stone-500 shrink-0" />
-                  <span className="font-mono text-sm">UAN</span>
-                  <span className="font-mono text-sm">111-786-788</span>
+                  <span className="font-mono text-sm">LANDLINE</span>
+                  <span className="font-mono text-sm">041 3421501-4</span>
                 </a>
 
                 <a
-                  href="https://mail.google.com/mail/?view=cm&fs=1&to=info@tfctours.com"
+                  href="https://mail.google.com/mail/?view=cm&fs=1&to=abid_intl@msn.com"
                   target="_blank"
                   rel="noreferrer"
                   style={{ color: theme.colors.sidebarText }}
                   className="flex items-center gap-3 break-all hover:text-white transition"
                 >
                   <IoMail className="text-stone-500 shrink-0" />
-                  <span className="text-sm">info@tfctours.com</span>
+                  <span className="text-sm">abid_intl@msn.com</span>
                 </a>
 
                 <a
@@ -216,20 +225,6 @@ export default function Footer({ user }) {
                     30 255/56
                   </span>
                 </a>
-                <a
-                  href="https://www.google.com/maps?q=Plaza+18,+Neelum+Block+DC+Colony,+Gujranwala,+Pakistan"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-start gap-3 hover:text-white transition leading-normal"
-                  style={{ color: theme.colors.sidebarText }}
-                >
-                  <IoLocationSharp className="mt-0.5 text-base text-stone-500 shrink-0" />
-                  <span>Branch OFFICE</span>
-                  <span className="text-xs opacity-90">
-                    Plaza 18, Neelum Block DC Colony, Gujranwala, Pakistan +92
-                    55 3783054-55
-                  </span>
-                </a>
               </div>
             </div>
           </div>
@@ -241,11 +236,11 @@ export default function Footer({ user }) {
           className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t text-xs"
         >
           <a
-            href="https://groups.tfctours.com/"
+            href="https://abidairtravels.com/"
             style={{ color: theme.colors.sidebarText }}
             className="hover:text-white font-mono opacity-80"
           >
-            &copy; {dayjs().year()} Abid Air. All rights reserved.
+            &copy; {dayjs().year()} Abid Air Travel & Tours. All rights reserved.
           </a>
 
           {/* <span

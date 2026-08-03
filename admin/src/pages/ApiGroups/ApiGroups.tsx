@@ -325,10 +325,10 @@ const buildGroupCopyText = (group: ApiGroup): string => {
     const footer =
         `*ALL GROUPS ARE NON REFUNDABLE AND NON CHANGEABLE*
 =======================
-Abid Air
-Mobile: +923041119786
+Abid Air Travel & Tours
+Mobile: +923197298467
 Address: Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 30 255/56.
-Website: https://groups.tfctours.com/`;
+Website: https://abidairtravels.com/`;
 
     return [header, ...lines, "=======================", footer].join("\n");
 };

@@ -34,7 +34,7 @@ const setupAdmin = async () => {
       console.log("Creating admin user...".yellow);
 
       await Register.create({
-        name: "Abid Air Admin",
+        name: "Abid Air Travel & Tours Admin",
         email: adminEmail,
         phone: "0000000000",
         password: adminPassword,
@@ -45,7 +45,7 @@ const setupAdmin = async () => {
         address: "Faisalabad",
         country: "Pakistan",
         city: "Faisalabad",
-        companyName: "Abid Air",
+        companyName: "Abid Air Travel & Tours",
         consultant: "",
       });
 

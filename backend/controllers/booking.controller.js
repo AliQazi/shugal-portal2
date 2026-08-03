@@ -29,14 +29,14 @@ import {
 // Helper Functions
 // -------------------------
 
-// TFC is the registered agent with every third-party supplier — bookings made
-// through the portal must be submitted under TFC's own identity, never the
+// Abid Air Travel & Tours is the registered agent with every third-party supplier — bookings made
+// through the portal must be submitted under Abid Air Travel & Tours's own identity, never the
 // personal contact details of the portal agent who happened to create it.
-const TFC_AGENCY_INFO = {
-  agentName: "Abid Air",
-  agencyName: "Abid Air",
-  email: "tfctours@gmail.com",
-  mobile: "+923041119786",
+const ABID_AIR_AGENCY_INFO = {
+  agentName: "Abid Air Travel & Tours",
+  agencyName: "Abid Air Travel & Tours",
+  email: "abid_intl@msn.com",
+  mobile: "+923197298467",
 };
 
 const isLocalGroup = (groupId) => mongoose.Types.ObjectId.isValid(groupId);
@@ -317,7 +317,7 @@ export const createBooking = async (req, res) => {
         const alHaiderBookingData = formatBookingForAlHaider({
           groupId: groupIdNumber,
           agencyInfo: {
-            ...TFC_AGENCY_INFO,
+            ...ABID_AIR_AGENCY_INFO,
             adults: adultsCount,
             child: childrenCount,
             infant: infantsCount,
@@ -401,7 +401,7 @@ export const createBooking = async (req, res) => {
         const tntBookingData = formatBookingForTNT({
           groupId: groupIdNumber,
           agencyInfo: {
-            ...TFC_AGENCY_INFO,
+            ...ABID_AIR_AGENCY_INFO,
             adults: adultsCount,
             child: childrenCount,
             infant: infantsCount,
@@ -483,7 +483,7 @@ export const createBooking = async (req, res) => {
         const mctBookingData = formatBookingForMCT({
           groupId: groupIdNumber,
           agencyInfo: {
-            ...TFC_AGENCY_INFO,
+            ...ABID_AIR_AGENCY_INFO,
             adults: adultsCount,
             child: childrenCount > 0 ? childrenCount : null,
             infant: infantsCount > 0 ? infantsCount : null,
@@ -822,7 +822,7 @@ export const createBooking = async (req, res) => {
           groupId: groupIdNumber,
           roe: booking.bookingReference,
           pnr1: pnr || "",
-          agentName: TFC_AGENCY_INFO.agentName,
+          agentName: ABID_AIR_AGENCY_INFO.agentName,
           passengers: passengers.map((p) => ({
             type: p.type,
             surname: p.surName || p.surname || "",

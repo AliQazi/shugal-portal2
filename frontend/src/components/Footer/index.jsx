@@ -211,7 +211,7 @@ export default function Footer({ user }) {
                   <span className="text-sm">abid_intl@msn.com</span>
                 </a>
 
-                <a
+                {/* <a
                   href="https://www.google.com/maps?q=Office+36,+37+Jinnah+Stadium,+Gujranwala,+Pakistan"
                   target="_blank"
                   rel="noreferrer"
@@ -224,7 +224,7 @@ export default function Footer({ user }) {
                     Office 36, 37 Jinnah Stadium, Gujranwala, Pakistan +92 55 37
                     30 255/56
                   </span>
-                </a>
+                </a> */}
               </div>
             </div>
           </div>

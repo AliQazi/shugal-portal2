@@ -214,7 +214,7 @@ const GroupTicketingForm = () => {
     groupType: booking.groupType,
     flights: booking.flights.map((f: Flight) => ({
       ...f,
-      airline: f.airline || booking.airline,
+      airline: f.airline || booking.airline || "",
       depDate: f.depDate.slice(0, 10),
       arrDate: f.arrDate.slice(0, 10),
       fromTerminal: f.fromTerminal || "",

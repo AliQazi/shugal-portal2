@@ -37,6 +37,7 @@ interface Booking {
     status: string,
     expiresAt: string | null
     cancelledAt?: string | null
+    autoCancelled?: boolean
     sabaoonTransactionId?: number | null
     sabaoonBookingStatus?: 'pending' | 'success' | 'failed' | 'not_applicable' | null
     source?: 'admin' | 'al-haider' | 'travel-network' | "mct" | string
@@ -121,31 +122,30 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
         <table className="min-w-full border-collapse">
             <thead className="bg-linear-to-r from-[#1e3a5f] to-[#2d5a8f]">
                 <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
                         Booking Details
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
                         <div className="flex items-center gap-1">
                             <span>Group</span>
                             <span>✈</span>
                         </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
                         <div className="flex items-center gap-1">
                             <span>Passengers</span>
-                            <span>👥</span>
                         </div>
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
                         Price (PKR)
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
                         <span>Status</span>
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
                         Profit / Loss
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white border-r border-[#3d6fa8]">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
                         <span>Source</span>
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-white">
@@ -240,7 +240,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
 
                                             <tbody className="bg-white divide-y divide-slate-200">
                                                 {[
-                                                    { key: 'on hold', label: 'Requested', match: ['on hold', 'pending', 'cancelled'] },
+                                                    { key: 'on hold', label: 'Requested', match: ['on hold', 'pending', 'partially confirmed', 'cancelled'] },
                                                     { key: 'confirmed', label: 'Confirmed', match: ['confirmed'] },
                                                 ].map(({ key, label, match }) => {
                                                     const active = match.includes(booking.status)
@@ -311,7 +311,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                 {/* Status */}
                                 <td className="px-2 py-4 align-top border-r border-gray-300">
                                     <div className="flex flex-col gap-2 items-center">
-                                        {booking.status === 'cancelled' && booking.cancelledAt ? (
+                                        {booking.status === 'cancelled' && booking.autoCancelled && booking.cancelledAt ? (
                                             <span className="inline-block px-3 py-1.5 rounded-md text-xs shadow-sm bg-red-50 text-red-700 border border-red-300 text-center leading-relaxed">
                                                 Auto-cancelled on<br />
                                                 {dayjs(booking.cancelledAt).format('DD MMM YYYY, hh:mm A')}
@@ -321,7 +321,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                 {statusBadge.label}
                                             </span>
                                         )}
-                                        {(booking.status === 'on hold' || booking.status === 'pending') && (
+                                        {(booking.status === 'on hold' || booking.status === 'pending' || booking.status === 'partially confirmed') && (
                                             <div className="flex flex-col gap-2 items-center text-xs">
                                                 <div className="font-bold text-gray-800">Booking Expiry Time</div>
                                                 {/* <div className="flex items-center gap-1.5"> */}
@@ -579,6 +579,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                         {/* Second row: 2 buttons (Print, Download PDF) */}
                                         {(booking.status === "on hold" ||
                                             booking.status === "pending" ||
+                                            booking.status === "partially confirmed" ||
                                             booking.status === "confirmed") && (
                                                 <div className="flex flex-row justify-center items-center gap-2 w-full mt-2">
                                                     {/* 1. ORIGINAL FULL PDF DOWNLOAD */}
@@ -696,6 +697,7 @@ export default function AllBookings() {
         { value: 'on hold', label: 'On Hold', color: 'bg-yellow-50 text-yellow-700 border border-yellow-300' },
         { value: 'pending', label: 'On Hold', color: 'bg-yellow-50 text-yellow-700 border border-yellow-300' },
         { value: 'confirmed', label: 'Confirmed', color: 'bg-green-50 text-green-700 border border-green-300' },
+        { value: 'partially confirmed', label: 'Partially Confirmed', color: 'bg-indigo-50 text-indigo-700 border border-indigo-300' },
         { value: 'cancelled', label: 'Cancelled', color: 'bg-red-50 text-red-700 border border-red-300' }
     ]
 
@@ -735,7 +737,7 @@ export default function AllBookings() {
 
     useEffect(() => {
         const onHoldBookings = bookings.filter(
-            b => (b.status === 'on hold' || b.status === 'pending') && b.expiresAt
+            b => (b.status === 'on hold' || b.status === 'pending' || b.status === 'partially confirmed') && b.expiresAt
         )
 
         if (onHoldBookings.length === 0) return

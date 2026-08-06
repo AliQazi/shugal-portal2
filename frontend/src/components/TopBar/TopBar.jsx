@@ -82,7 +82,7 @@ export default function TopBar({
         />
 
         {/* Main Content */}
-        <div className="relative z-10 flex items-center justify-between px-6 py-5 md:px-8 md:py-6">
+        <div className="relative z-10 flex items-center justify-between px-4 py-3 md:px-5 md:py-4">
           {/* Left Section */}
           <div className="flex items-center gap-5 min-w-0">
             <div className="flex items-center justify-center w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg shrink-0 transition-all duration-300 hover:bg-white/20 hover:scale-105 hover:shadow-xl">

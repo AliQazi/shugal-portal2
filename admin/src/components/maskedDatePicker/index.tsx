@@ -29,6 +29,8 @@ export default function MaskedDatePicker({
       maxDate={maxDate}
       showYearDropdown
       dropdownMode="select"
+      portalId="masked-datepicker-portal"
+      popperClassName="z-99999!"
       onChange={(date: Date | null) => {
         onChange(date);
       }}

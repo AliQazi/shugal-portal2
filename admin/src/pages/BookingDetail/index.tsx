@@ -134,7 +134,7 @@ export default function BookingDetail() {
     }, [id, canView])
 
     useEffect(() => {
-        if (!booking?.expiresAt || !['on hold', 'pending'].includes(booking.status)) {
+        if (!booking?.expiresAt || !['on hold', 'pending', 'partially confirmed'].includes(booking.status)) {
             setHoldTimer({ hours: 0, minutes: 0, seconds: 0, expired: true })
             return
         }
@@ -280,6 +280,7 @@ export default function BookingDetail() {
             "on hold": 'border border-yellow-200 bg-yellow-50 text-yellow-700',
             pending: 'border border-yellow-200 bg-yellow-50 text-yellow-700',
             confirmed: 'border border-green-200 bg-green-50 text-green-700',
+            "partially confirmed": 'border border-indigo-200 bg-indigo-50 text-indigo-700',
             cancelled: 'border border-red-200 bg-red-50 text-red-700'
         }
         return colors[status] || 'bg-gray-100 text-gray-800'
@@ -342,6 +343,11 @@ export default function BookingDetail() {
         const bookingData = Array.isArray(booking) ? booking[0] : booking;
 
         if (!bookingData || selectedStatus === bookingData.status) {
+            return;
+        }
+
+        if (bookingData.status === 'cancelled') {
+            alert("This booking is cancelled and its status can no longer be changed");
             return;
         }
 
@@ -483,6 +489,7 @@ export default function BookingDetail() {
     }
 
     const safeBooking = booking as Booking
+    const isBookingCancelled = safeBooking.status === 'cancelled'
     const sourceBadge = getSourceBadge(safeBooking.source)
 
     const refundPassenger = refundPassengerIndex !== null ? safeBooking?.passengers?.[refundPassengerIndex] : null
@@ -538,24 +545,29 @@ export default function BookingDetail() {
                                 <select
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
-                                    disabled={!canUpdateStatus}
+                                    disabled={!canUpdateStatus || isBookingCancelled}
                                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={isBookingCancelled ? "This booking is cancelled and its status can no longer be changed" : ""}
                                 >
                                     <option value="on hold">On Hold</option>
+                                    <option value="partially confirmed">Partially Confirmed</option>
                                     <option value="confirmed">Confirmed</option>
                                     <option value="cancelled">Cancelled</option>
                                 </select>
                                 <button
                                     onClick={handleStatusChange}
-                                    disabled={selectedStatus === safeBooking.status || isUpdating || !canUpdateStatus}
+                                    disabled={selectedStatus === safeBooking.status || isUpdating || !canUpdateStatus || isBookingCancelled}
                                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    title={!canUpdateStatus ? "You don't have permission to update booking status" : ""}
+                                    title={isBookingCancelled ? "This booking is cancelled and its status can no longer be changed" : (!canUpdateStatus ? "You don't have permission to update booking status" : "")}
                                 >
                                     {isUpdating ? 'Updating...' : 'Update'}
                                 </button>
                             </div>
+                            {isBookingCancelled && (
+                                <p className="mt-2 text-sm font-medium text-red-600">This booking is cancelled and its status cannot be changed further.</p>
+                            )}
                             <p className="text-gray-600 mt-4 text-sm">Created: {formatDate(safeBooking.createdAt)}</p>
-                            {['on hold', 'pending'].includes(safeBooking.status) && (
+                            {['on hold', 'pending', 'partially confirmed'].includes(safeBooking.status) && (
                                 <div className="mt-5 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                                         <div>

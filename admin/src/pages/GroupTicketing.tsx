@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import axiosInstance from "../Api/axios";
 import PageMeta from "../components/common/PageMeta";
@@ -19,6 +19,8 @@ const GROUP_TYPE_OPTIONS = [
   "UK Groups",
   "Umrah Groups",
 ];
+
+const STATUS_TABS = ["All", "Draft", "Private", "Public", "Sold", "Closed"];
 
 interface Flight {
   airline: string;
@@ -199,6 +201,7 @@ const GroupTicketing = () => {
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [groupTypeFilter, setGroupTypeFilter] = useState<string>("All");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
   const [entriesPerPage, setEntriesPerPage] = useState(50);
 
   // Modal state for viewing bookings
@@ -480,7 +483,9 @@ const GroupTicketing = () => {
 
       const matchesGroupType = groupTypeFilter === "All" || booking.groupType === groupTypeFilter;
 
-      return matchesSearch && matchesGroupType;
+      const matchesStatus = statusFilter === "All" || booking.internalStatus === statusFilter;
+
+      return matchesSearch && matchesGroupType && matchesStatus;
     })
     .sort((a, b) => {
       const dateA = a.flights?.[0]?.depDate ? new Date(a.flights[0].depDate).getTime() : Number.MAX_SAFE_INTEGER;
@@ -488,6 +493,18 @@ const GroupTicketing = () => {
 
       return dateA - dateB;
     });
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: bookings.length };
+    STATUS_TABS.forEach((status) => {
+      if (status !== "All") counts[status] = 0;
+    });
+    bookings.forEach((booking) => {
+      const status = booking.internalStatus;
+      if (status && counts[status] !== undefined) counts[status] += 1;
+    });
+    return counts;
+  }, [bookings]);
 
   const formatCurrency = (amount?: number, currency = "PKR") => {
     if (amount === undefined || amount === null || Number.isNaN(Number(amount))) return "-";
@@ -622,6 +639,31 @@ const GroupTicketing = () => {
             >
               + Create New Group
             </button>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="mb-6 flex flex-wrap gap-2">
+            {STATUS_TABS.map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition ${statusFilter === status
+                  ? "border-blue-500 bg-blue-500 text-white shadow-sm"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
+              >
+                {status}
+                <span
+                  className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${statusFilter === status
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                    }`}
+                >
+                  {statusCounts[status] ?? 0}
+                </span>
+              </button>
+            ))}
           </div>
 
           {/* Filters */}
@@ -897,15 +939,8 @@ const GroupTicketing = () => {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-4 text-sm">
-                          <div className="flex justify-center items-center gap-2 flex-wrap">
-                            <button
-                              onClick={() => handleViewBookings(booking)}
-                              className="rounded-md bg-green-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
-                              title="View bookings for this group's departure date"
-                            >
-                              View Bookings
-                            </button>
+                        <td className="px-4 py-4 text-sm max-w-40">
+                          <div className="flex justify-center items-center gap-1.5 flex-wrap">
                             <button
                               onClick={() => handleEdit(booking._id)}
                               disabled={!canUseActions}
@@ -921,6 +956,13 @@ const GroupTicketing = () => {
                               title={!canUseActions ? "You don't have permission to manage groups" : ""}
                             >
                               Delete
+                            </button>
+                            <button
+                              onClick={() => handleViewBookings(booking)}
+                              className="rounded-md bg-green-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
+                              title="View bookings for this group's departure date"
+                            >
+                              View Bookings
                             </button>
                           </div>
                         </td>

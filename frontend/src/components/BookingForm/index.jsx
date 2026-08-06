@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import axiosInstance from "../../api/axios";
 import { toast } from "react-toastify";
-import { buildPassengers } from "../../utils/passengerBuilder";
+import { buildPassengers, mapPassengerIndices } from "../../utils/passengerBuilder";
 import MaskedDatePicker from "../MaskedDatePicker";
 import {
   X,
@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 import TopBar from "../TopBar/TopBar";
 import { parseMRZ } from "../../utils/parseMRZ";
+import { scanPassportImageForMrz } from "../../utils/passportImageOcr";
 import countryCodes from "../../data/countryCodes.json";
+import { theme } from "../../theme/theme";
 
 const nationalityOptions = countryCodes
   .map((item) => item.country)
@@ -98,6 +100,7 @@ export default function BookingForm({ user }) {
   const [mrzInput, setMrzInput] = useState("");
   const [mrzError, setMrzError] = useState("");
   const [pendingDocs, setPendingDocs] = useState({});
+  const [scanningDocIndex, setScanningDocIndex] = useState(null);
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [isReviewed, setIsReviewed] = useState(false);
@@ -293,6 +296,45 @@ export default function BookingForm({ user }) {
   };
 
   useEffect(() => {
+    const nextAdults = +formData.adults || 0;
+    const nextChildren = +formData.children || 0;
+    const nextInfants = +formData.infants || 0;
+
+    // Row-keyed state (uploaded docs, expiry errors, an in-flight OCR scan,
+    // an open MRZ-scan modal) must be remapped in lockstep with
+    // buildPassengers() below, or it silently attaches to the wrong
+    // passenger once counts change and the array is reshaped.
+    const indexMap = mapPassengerIndices({
+      existing: formData.passengers,
+      adults: nextAdults,
+      children: nextChildren,
+      infants: nextInfants,
+      allowChildren: true,
+      allowInfants: true,
+    });
+
+    const remapByIndex = (state) => {
+      const next = {};
+      Object.entries(state).forEach(([key, value]) => {
+        const newIndex = indexMap.get(Number(key));
+        if (newIndex !== undefined) next[newIndex] = value;
+      });
+      return next;
+    };
+
+    setPendingDocs((prev) => remapByIndex(prev));
+    setPassportExpiryErrors((prev) => remapByIndex(prev));
+    setScanningDocIndex((prev) =>
+      prev === null ? null : indexMap.get(prev) ?? null,
+    );
+    setMrzModal((prev) => {
+      if (!prev.open || prev.index === null) return prev;
+      const mapped = indexMap.get(prev.index);
+      return mapped === undefined
+        ? { open: false, index: null }
+        : { ...prev, index: mapped };
+    });
+
     setFormData((prev) => ({
       ...prev,
       passengers: buildPassengers({
@@ -573,6 +615,65 @@ export default function BookingForm({ user }) {
     }
     setPendingDocs((prev) => ({ ...prev, [index]: file }));
     handlePassengerChange(index, "documentUrl", "");
+
+    // PDFs have no MRZ to scan visually — only run OCR autofill for images.
+    if (file.type !== "application/pdf") {
+      autoFillPassengerFromPassportImage(index, file);
+    }
+  };
+
+  const autoFillPassengerFromPassportImage = async (index, file) => {
+    setScanningDocIndex(index);
+    try {
+      const scanResult = await scanPassportImageForMrz(file);
+      const parsed = scanResult?.mrz ? parseMRZ(scanResult.mrz) : null;
+
+      if (!parsed) {
+        toast.error(
+          "Couldn't read passport details from that image. You can fill the fields manually or use Scan MRZ.",
+          { toastId: `doc-ocr-fail-${index}` },
+        );
+        return;
+      }
+
+      setFormData((prev) => {
+        if (index >= prev.passengers.length) return prev;
+        const newPassengers = [...prev.passengers];
+        newPassengers[index] = {
+          ...newPassengers[index],
+          surName: parsed.surName || newPassengers[index].surName,
+          givenName: parsed.givenName || newPassengers[index].givenName,
+          passport: parsed.passport || newPassengers[index].passport,
+          nationality:
+            normalizeNationalityValue(parsed.nationality) ||
+            newPassengers[index].nationality,
+          dateOfBirth: parsed.dateOfBirth || newPassengers[index].dateOfBirth,
+          passportExpiry:
+            parsed.passportExpiry || newPassengers[index].passportExpiry,
+          title: parsed.title || newPassengers[index].title,
+        };
+        return { ...prev, passengers: newPassengers };
+      });
+
+      if (parsed.passportExpiry) {
+        validatePassportExpiry(index, parsed.passportExpiry);
+      }
+
+      toast.success(
+        scanResult.needsReview
+          ? "Passport scanned — please double-check the name before submitting."
+          : "Passport details filled from the image.",
+        { toastId: `doc-ocr-ok-${index}` },
+      );
+    } catch (err) {
+      console.error("Passport image OCR failed:", err);
+      toast.error(
+        "Couldn't read passport details from that image. You can fill the fields manually or use Scan MRZ.",
+        { toastId: `doc-ocr-fail-${index}` },
+      );
+    } finally {
+      setScanningDocIndex((prev) => (prev === index ? null : prev));
+    }
   };
 
   const handleDocRemove = (index) => {
@@ -1540,7 +1641,12 @@ export default function BookingForm({ user }) {
                                 </button>
                               </div>
                             ) : null}
-                            <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold cursor-pointer border border-slate-200 rounded-lg transition-all bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 text-slate-700">
+                            <label
+                              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border rounded-lg transition-all ${scanningDocIndex === index
+                                ? "cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400"
+                                : "cursor-pointer bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border-slate-200 text-slate-700"
+                                }`}
+                            >
                               <Upload className="w-3.5 h-3.5" />
                               {pendingDocs[index] || passenger.documentUrl
                                 ? "Replace"
@@ -1549,11 +1655,18 @@ export default function BookingForm({ user }) {
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp,application/pdf"
                                 className="hidden"
+                                disabled={scanningDocIndex === index}
                                 onChange={(e) =>
                                   handleDocSelect(index, e.target.files?.[0])
                                 }
                               />
                             </label>
+                            {scanningDocIndex === index && (
+                              <span className="text-[10px] text-indigo-600 font-medium flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></span>
+                                Reading passport...
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1577,8 +1690,8 @@ export default function BookingForm({ user }) {
               type="submit"
               disabled={isSubmitting}
               className={`px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isSubmitting
-                  ? "bg-slate-400 text-white cursor-not-allowed"
-                  : "bg-linear-to-r from-slate-700 to-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5"
+                ? "bg-slate-400 text-white cursor-not-allowed"
+                : "bg-linear-to-r from-slate-700 to-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5"
                 }`}
             >
               {isSubmitting ? (
@@ -1710,8 +1823,8 @@ export default function BookingForm({ user }) {
                 onClick={handleMrzParse}
                 disabled={!mrzInput.trim()}
                 className={`px-6 py-2 text-sm font-semibold rounded-xl transition-all ${mrzInput.trim()
-                    ? "bg-linear-to-r from-indigo-600 to-indigo-700 text-white hover:shadow-lg hover:-translate-y-0.5"
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  ? "bg-linear-to-r from-indigo-600 to-indigo-700 text-white hover:shadow-lg hover:-translate-y-0.5"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
                   }`}
               >
                 Scan
@@ -1723,9 +1836,11 @@ export default function BookingForm({ user }) {
 
       {/* Review Modal - Enhanced */}
       {showReviewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="bg-linear-to-r from-orange-900 to-orange-700 px-6 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 z-999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-4 duration-300">
+            <div className="px-6 py-4 flex justify-between items-center"
+              style={{ background: `linear-gradient(to right, ${theme.colors.primaryDark}, ${theme.colors.intermediate})` }}
+            >
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-xl">
                   <CheckCircle className="w-5 h-5 text-white" />
@@ -1741,7 +1856,7 @@ export default function BookingForm({ user }) {
               </div>
               <button
                 onClick={() => setShowReviewModal(false)}
-                className="text-white/60 hover:text-white hover:bg-white/10 p-2 rounded-xl transition-all"
+                className="text-white/80 bg-white/10 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all"
               >
                 <X size={20} />
               </button>
@@ -1892,8 +2007,8 @@ export default function BookingForm({ user }) {
                   onClick={handleFinalSubmit}
                   disabled={!isReviewed || isSubmitting}
                   className={`flex-1 sm:flex-none px-8 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${isReviewed && !isSubmitting
-                      ? "bg-linear-to-r from-emerald-600 to-emerald-700 text-white hover:shadow-lg hover:-translate-y-0.5"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed"
+                    ? "bg-linear-to-r from-emerald-600 to-emerald-700 text-white hover:shadow-lg hover:-translate-y-0.5"
+                    : "bg-slate-300 text-slate-500 cursor-not-allowed"
                     }`}
                 >
                   {isSubmitting ? (

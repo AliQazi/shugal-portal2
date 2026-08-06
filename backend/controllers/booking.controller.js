@@ -1598,6 +1598,12 @@ export const updateBookingStatus = async (req, res) => {
     const oldStatus = booking.status;
     const seats = booking.adultsCount + booking.childrenCount;
 
+    if (oldStatus === "cancelled") {
+      throw new Error(
+        "This booking is cancelled and its status can no longer be changed.",
+      );
+    }
+
     if (oldStatus !== "confirmed" && status === "confirmed") {
       const bookingData = Array.isArray(booking) ? booking[0] : booking;
 
@@ -1611,9 +1617,13 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
+    // "Partially Confirmed" behaves like "on hold" for accounting purposes:
+    // no ledger entry is created for it, and switching into it from a
+    // confirmed booking voids the previously created journal voucher.
     if (
       (oldStatus !== "cancelled" && status === "cancelled") ||
-      (oldStatus !== "on hold" && status === "on hold")
+      (oldStatus !== "on hold" && status === "on hold") ||
+      (oldStatus !== "partially confirmed" && status === "partially confirmed")
     ) {
       const zipVoucherId = booking.zipVoucherId;
 
@@ -1640,13 +1650,14 @@ export const updateBookingStatus = async (req, res) => {
     booking.status = status;
     booking.notes = notes ?? booking.notes;
     booking.cancelledAt = status === "cancelled" ? new Date() : null;
+    booking.autoCancelled = false;
 
     // Need to get the booking source to pass to calculateBookingExpiresAt
     const bookingSource =
       booking.source ||
       (booking.groupId && isLocalGroup(booking.groupId) ? "admin" : "sabaoon");
     booking.expiresAt =
-      status === "on hold"
+      status === "on hold" || status === "partially confirmed"
         ? await calculateBookingExpiresAt(new Date(), bookingSource)
         : null;
 
@@ -1760,7 +1771,7 @@ export const extendBookingHold = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) throw new Error("Booking not found");
-    if (!["on hold", "pending"].includes(booking.status)) {
+    if (!["on hold", "pending", "partially confirmed"].includes(booking.status)) {
       throw new Error("Only on-hold bookings can be extended");
     }
 
@@ -1866,6 +1877,8 @@ export const cancelBooking = async (req, res) => {
 
     booking.status = "cancelled";
     booking.expiresAt = null;
+    booking.cancelledAt = new Date();
+    booking.autoCancelled = false;
     await booking.save();
 
     await adjustSeatsIfLocalGroup(booking.groupId, seats);
@@ -1943,6 +1956,165 @@ export const getBookingStatistics = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch statistics" });
+  }
+};
+
+// -------------------------
+// XO REPORT — Confirmed Group Ticket Bookings
+// -------------------------
+// Reports against bookings made off local Group Ticketing groups (source: "admin")
+// since only those carry a supplier + buying/selling breakdown via attachGroupData().
+export const getXOReportData = async (req, res) => {
+  try {
+    const { fromDate, toDate, sector, airline, supplier, search } = req.query;
+
+    const query = {
+      status: "confirmed",
+      source: "admin",
+    };
+
+    if (sector) query.sector = sector;
+    if (airline) query["airline.name"] = airline;
+
+    if (fromDate || toDate) {
+      query.departureDate = {};
+      if (fromDate) query.departureDate.$gte = new Date(fromDate);
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        query.departureDate.$lte = end;
+      }
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { bookingReference: searchRegex },
+        { pnr: searchRegex },
+        { ticketNumber: searchRegex },
+        { contactPersonName: searchRegex },
+        { sector: searchRegex },
+        { "airline.name": searchRegex },
+        { "passengers.givenName": searchRegex },
+        { "passengers.surName": searchRegex },
+        { "passengers.passport": searchRegex },
+      ];
+    }
+
+    // Agents/sub-users only ever see their own bookings; admins see everything.
+    if (req.user.role !== "Super Admin" && req.user.role !== "Admin") {
+      query.userId = req.user._id;
+    }
+
+    let bookings = await Booking.find(query)
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email agencyCode companyName");
+
+    bookings = await attachGroupData(bookings);
+
+    let rows = bookings.map((b) => {
+      const bookingObj = b.toObject ? b.toObject() : b;
+      const gt = bookingObj.groupTicketData || {};
+
+      const adults = bookingObj.adultsCount || 0;
+      const children = bookingObj.childrenCount || 0;
+      const infants = bookingObj.infantsCount || 0;
+
+      const buyingAdult = gt.buyingAdultPrice || 0;
+      const buyingChild = gt.buyingChildPrice || 0;
+      const buyingInfant = gt.buyingInfantPrice || 0;
+
+      const sellingAdult = gt.sellingAdultPriceB2B || 0;
+      const sellingChild = gt.sellingChildPriceB2B || 0;
+      const sellingInfant = gt.sellingInfantPriceB2B || 0;
+
+      const totalBuying =
+        buyingAdult * adults + buyingChild * children + buyingInfant * infants;
+      const totalSelling =
+        sellingAdult * adults + sellingChild * children + sellingInfant * infants;
+
+      const totalDiscount = (bookingObj.passengers || []).reduce(
+        (sum, p) => sum + (Number(p.discount) || 0),
+        0,
+      );
+
+      const netSelling = totalSelling - totalDiscount;
+      const profit = netSelling - totalBuying;
+
+      const agencyName = bookingObj.userId
+        ? bookingObj.userId.companyName || bookingObj.userId.name
+        : bookingObj.contactPersonName;
+
+      return {
+        _id: bookingObj._id,
+        bookingReference: bookingObj.bookingReference,
+        pnr: bookingObj.pnr,
+        ticketNumber: bookingObj.ticketNumber,
+        supplierName: gt.supplierName || "N/A",
+        groupName: gt.groupName || "",
+        groupCategory: gt.groupCategory || "",
+        agencyName: agencyName || "N/A",
+        contactPersonName: bookingObj.contactPersonName,
+        airline: bookingObj.airline,
+        sector: bookingObj.sector,
+        flights: bookingObj.flights || [],
+        departureDate: bookingObj.departureDate,
+        arrivalDate: bookingObj.arrivalDate,
+        passengers: bookingObj.passengers || [],
+        adultsCount: adults,
+        childrenCount: children,
+        infantsCount: infants,
+        totalPassengers: bookingObj.totalPassengers,
+        buying: {
+          adult: buyingAdult,
+          child: buyingChild,
+          infant: buyingInfant,
+          currency: gt.buyingCurrency || "PKR",
+        },
+        selling: {
+          adult: sellingAdult,
+          child: sellingChild,
+          infant: sellingInfant,
+          currency: gt.sellingCurrencyB2B || "PKR",
+        },
+        totalBuying,
+        totalSelling,
+        totalDiscount,
+        netSelling,
+        profit,
+        createdAt: bookingObj.createdAt,
+      };
+    });
+
+    // Supplier is resolved from the group after attachGroupData, so it's filtered in-memory
+    if (supplier && supplier.trim()) {
+      rows = rows.filter((r) => r.supplierName === supplier.trim());
+    }
+
+    const summary = rows.reduce(
+      (acc, r) => {
+        acc.totalBookings += 1;
+        acc.totalPassengers += r.totalPassengers || 0;
+        acc.totalBuying += r.totalBuying || 0;
+        acc.totalSelling += r.netSelling || 0;
+        acc.totalProfit += r.profit || 0;
+        return acc;
+      },
+      {
+        totalBookings: 0,
+        totalPassengers: 0,
+        totalBuying: 0,
+        totalSelling: 0,
+        totalProfit: 0,
+      },
+    );
+
+    res.json({ success: true, data: rows, summary });
+  } catch (err) {
+    console.error("Error generating XO report:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to generate XO report" });
   }
 };
 

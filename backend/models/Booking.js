@@ -193,7 +193,7 @@ const bookingSchema = new mongoose.Schema(
     // Booking Status
     status: {
       type: String,
-      enum: ["on hold", "confirmed", "cancelled"],
+      enum: ["on hold", "confirmed", "partially confirmed", "cancelled"],
       default: "on hold",
     },
 
@@ -284,10 +284,15 @@ const bookingSchema = new mongoose.Schema(
       default: [],
     },
 
-    // Auto-cancellation tracking
+    // Cancellation tracking
     cancelledAt: {
       type: Date,
       default: null,
+    },
+    // True only when the booking was cancelled automatically by the expiry job
+    autoCancelled: {
+      type: Boolean,
+      default: false,
     },
 
     // ZIP Accounts journal voucher ID (created on confirmation)

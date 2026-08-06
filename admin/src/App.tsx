@@ -63,6 +63,7 @@ import UmrahRecords from "./pages/UmrahCalculator/UmrahCalculator";
 import ManageUmrahQueries from "./pages/manageUmrahPackagesQueries/UmrahPackageQuery";
 import ManageUmrahQueriesN from "./pages/manageUmrahPackagesQueries/UmrahPackageQueryN";
 import UmrahBookingDetail from "./pages/UmrahBookingDetail/UmrahBookingDetail";
+import XOReport from "./pages/XOReport";
 
 export default function App() {
   return (
@@ -91,6 +92,7 @@ export default function App() {
                 <Route path="/airline" element={<Airline />} />
                 <Route path="/all-bookings" element={<AllBookings />} />
                 <Route path="/booking-detail/:id" element={<BookingDetail />} />
+                <Route path="/xo-report" element={<XOReport />} />
                 <Route path="/group-ticketing" element={<GroupTicketing />} />
                 <Route path="/group-ticketing/create" element={<GroupTicketingForm />} />
                 <Route path="/group-ticketing/create/:copyId" element={<GroupTicketingForm />} />

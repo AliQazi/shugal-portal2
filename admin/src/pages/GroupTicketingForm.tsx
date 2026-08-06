@@ -146,7 +146,7 @@ const GroupTicketingForm = () => {
     pnr: "",
     contactPersonPhone: "",
     contactPersonEmail: "",
-    internalStatus: "Public",
+    internalStatus: "Draft",
     payments: [] as Payment[]
   });
 
@@ -1133,8 +1133,11 @@ const GroupTicketingForm = () => {
                 onChange={(e) => setFormData({ ...formData, internalStatus: e.target.value })}
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               >
-                <option value="Public">Public</option>
+                <option value="Draft">Draft</option>
                 <option value="Private">Private</option>
+                <option value="Public">Public</option>
+                <option value="Sold">Sold</option>
+                <option value="Closed">Closed</option>
               </select>
             </div>
           </div>

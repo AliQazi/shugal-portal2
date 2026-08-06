@@ -11,6 +11,7 @@ import {
   cancelBooking,
   deleteBooking,
   getBookingStatistics,
+  getXOReportData,
   bulkTogglePriceOnCall,
   uploadPassengerDocument,
   refundBookingVoucher,
@@ -31,6 +32,9 @@ router.get("/", getAllBookings);
 
 // Get booking statistics (manage_bookings permission)
 router.get("/statistics", getBookingStatistics);
+
+// XO Report — confirmed Group Ticket bookings (view_bookings permission)
+router.get("/reports/xo", getXOReportData);
 
 // Get booking by reference number (view_bookings permission)
 router.get("/reference/:reference", getBookingByReference);

@@ -7,7 +7,7 @@ export const startBookingExpiryJob = () => {
   setInterval(async () => {
     try {
       const expiredBookings = await Booking.find({
-        status: { $in: ["on hold", "pending"] },
+        status: { $in: ["on hold", "pending", "partially confirmed"] },
         expiresAt: { $lte: new Date() },
       });
 
@@ -16,6 +16,7 @@ export const startBookingExpiryJob = () => {
         booking.status = "cancelled";
         booking.expiresAt = null;
         booking.cancelledAt = new Date();
+        booking.autoCancelled = true;
         await booking.save();
 
         // const seatsToReturn = booking.adultsCount + booking.childrenCount;

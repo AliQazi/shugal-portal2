@@ -36,6 +36,28 @@ export const getRecentBookings = async (limit: number = 5) => {
   }
 };
 
+// Get XO Report data (confirmed Group Ticket bookings)
+export const getXOReport = async (
+  params: {
+    fromDate?: string;
+    toDate?: string;
+    sector?: string;
+    airline?: string;
+    supplier?: string;
+    search?: string;
+  } = {},
+) => {
+  try {
+    const response = await axiosInstance.get("/bookings/reports/xo", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching XO report:", error);
+    throw error;
+  }
+};
+
 // Get booking by ID
 export const getBookingById = async (id: string) => {
   try {

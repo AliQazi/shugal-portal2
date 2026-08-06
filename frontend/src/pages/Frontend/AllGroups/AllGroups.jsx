@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DashboardUIContext } from "../../../components/Dashboard/DashboardLayout";
 import { Ticket, Menu, X, ArrowRight } from "lucide-react";
 import { FaSuitcase, FaSearch, FaPlaneDeparture } from "react-icons/fa";
@@ -153,19 +153,19 @@ const isUmrahSeatsGroup = (group = {}) => {
 
 export default function AllGroupsPackages({
   headerType,
-  header,
+  // header,
   searchParams,
   user,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const dashboardUI = useContext(DashboardUIContext);
+  // const dashboardUI = useContext(DashboardUIContext);
 
   const [groups, setGroups] = useState([]);
   const [allGroups, setAllGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streamingMore, setStreamingMore] = useState(false);
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  // const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   const [dbMargin, setDbMargin] = useState(null);
   const [groupMargins, setGroupMargins] = useState({});
@@ -180,16 +180,16 @@ export default function AllGroupsPackages({
     groupTypes: [], // Added groupTypes filter
   });
 
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(true);
+  // const [showAdvancedSearch, setShowAdvancedSearch] = useState(true);
   const [airlines, setAirlines] = useState([]);
   const [sectors, setSectors] = useState([]);
   const [uniqueGroupTypes, setUniqueGroupTypes] = useState([]); // Added state for unique group types
 
-  useEffect(() => {
-    if (dashboardUI) {
-      setShowAdvancedSearch(true);
-    }
-  }, [dashboardUI]);
+  // useEffect(() => {
+  //   if (dashboardUI) {
+  //     setShowAdvancedSearch(true);
+  //   }
+  // }, [dashboardUI]);
 
   const formatDate = (value) => {
     if (!value) return "—";
@@ -926,8 +926,8 @@ export default function AllGroupsPackages({
         type="button"
         onClick={() => handleFilterChange("groupType", "")}
         className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filters.groupTypes.length === 0
-            ? "bg-accent"
-            : "bg-gray-200 hover:bg-gray-300"
+          ? "bg-accent"
+          : "bg-gray-200 hover:bg-gray-300"
           }`}
         style={{
           background:
@@ -946,8 +946,8 @@ export default function AllGroupsPackages({
           type="button"
           onClick={() => handleFilterChange("groupType", type)}
           className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filters.groupTypes.includes(type)
-              ? "bg-accent"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            ? "bg-accent"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           style={{
             background: filters.groupTypes.includes(type)
@@ -1040,7 +1040,7 @@ export default function AllGroupsPackages({
         style={
           index > 0
             ? {
-              borderTop: `1px solid ${theme.colors.border}`,
+              borderTop: `1px solid #ececec`,
             }
             : undefined
         }
@@ -1211,7 +1211,7 @@ export default function AllGroupsPackages({
 
           <div className="flex flex-col lg:flex-row items-center gap-2 w-full xl:w-auto">
             <div className="flex items-center justify-between w-full lg:w-auto gap-3">
-              <label className="flex items-center cursor-pointer">
+              {/* <label className="flex items-center cursor-pointer">
                 <div className="relative">
                   <input
                     type="checkbox"
@@ -1246,9 +1246,9 @@ export default function AllGroupsPackages({
                 >
                   Advanced Search
                 </span>
-              </label>
+              </label> */}
 
-              {showAdvancedSearch && (
+              {/* {showAdvancedSearch && (
                 <button
                   type="button"
                   onClick={() => setIsMobileFilterOpen(true)}
@@ -1261,7 +1261,7 @@ export default function AllGroupsPackages({
                 >
                   <Menu size={16} />
                 </button>
-              )}
+              )} */}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
@@ -1309,7 +1309,7 @@ export default function AllGroupsPackages({
           </div>
         </div>
 
-        {isMobileFilterOpen && (
+        {/* {isMobileFilterOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div
               className="absolute inset-0"
@@ -1342,10 +1342,10 @@ export default function AllGroupsPackages({
               <FilterContent />
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="flex flex-col lg:flex-row gap-4 pt-3 pb-6">
-          {showAdvancedSearch && (
+          {/* {showAdvancedSearch && (
             <div className="hidden lg:block w-48 xl:w-56 shrink-0">
               <div
                 className="sticky top-6"
@@ -1360,7 +1360,7 @@ export default function AllGroupsPackages({
                 <FilterContent />
               </div>
             </div>
-          )}
+          )} */}
 
           <div className="flex-1 space-y-3 overflow-hidden min-w-0">
             {!loading && streamingMore && (
@@ -1475,7 +1475,7 @@ export default function AllGroupsPackages({
                         />
 
                         <span
-                          className="font-semibold text-sm truncate"
+                          className="font-bold text-base truncate"
                           style={{ color: theme.colors.textPrimary }}
                         >
                           {data.airline}
@@ -1483,14 +1483,8 @@ export default function AllGroupsPackages({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <FaPlaneDeparture
-                          size={11}
-                          style={{ color: theme.colors.textTertiary }}
-                        />
-                        <span
-                          className="font-semibold text-xs tracking-wide"
-                          style={{ color: theme.colors.textSecondary }}
-                        >
+                        <FaPlaneDeparture size={11} className="text-[#333]" />
+                        <span className="font-bold text-base tracking-wide text-[#333]">
                           {data.sector}
                         </span>
                       </div>
@@ -1515,7 +1509,7 @@ export default function AllGroupsPackages({
                           <tr
                             className="text-xs font-semibold"
                             style={{
-                              background: theme.colors.intermediate,
+                              background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.accentDark}, ${theme.colors.intermediate})`,
                               color: "#ffffff",
                             }}
                           >
@@ -1523,7 +1517,6 @@ export default function AllGroupsPackages({
                               className="text-left whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Date
@@ -1532,7 +1525,6 @@ export default function AllGroupsPackages({
                               className="text-left whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Flight
@@ -1541,7 +1533,6 @@ export default function AllGroupsPackages({
                               className="text-center whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Sector
@@ -1550,7 +1541,6 @@ export default function AllGroupsPackages({
                               className="text-center whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Bag
@@ -1559,7 +1549,6 @@ export default function AllGroupsPackages({
                               className="text-center whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Meal
@@ -1569,7 +1558,6 @@ export default function AllGroupsPackages({
                                 className="text-center whitespace-nowrap"
                                 style={{
                                   padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                  borderRight: `1px solid ${theme.colors.intermediateLight}`,
                                 }}
                               >
                                 Days
@@ -1579,7 +1567,6 @@ export default function AllGroupsPackages({
                               className="text-center whitespace-nowrap"
                               style={{
                                 padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                borderRight: `1px solid ${theme.colors.intermediateLight}`,
                               }}
                             >
                               Fare
@@ -1606,7 +1593,7 @@ export default function AllGroupsPackages({
                                 key={group.id || group._id}
                                 className="transition-colors"
                                 style={{
-                                  borderBottom: `1px solid ${theme.colors.border}`,
+                                  borderBottom: `1px solid #ececec`,
                                   background:
                                     rowIdx % 2 === 0
                                       ? theme.colors.card
@@ -1628,7 +1615,7 @@ export default function AllGroupsPackages({
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                                     color: theme.colors.textSecondary,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {isMultiLeg ? (
@@ -1671,7 +1658,7 @@ export default function AllGroupsPackages({
                                   className="align-top"
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {isMultiLeg ? (
@@ -1733,7 +1720,7 @@ export default function AllGroupsPackages({
                                   className="align-top min-w-55 xl:min-w-70"
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {isMultiLeg ? (
@@ -1773,7 +1760,7 @@ export default function AllGroupsPackages({
                                   className="text-center align-top"
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {isMultiLeg ? (
@@ -1847,7 +1834,7 @@ export default function AllGroupsPackages({
                                   className="text-center align-top"
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {isMultiLeg ? (
@@ -1917,7 +1904,7 @@ export default function AllGroupsPackages({
                                     className="text-center align-middle"
                                     style={{
                                       padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                      borderRight: `1px solid ${theme.colors.border}`,
+                                      borderRight: `1px solid #ececec`,
                                     }}
                                   >
                                     {isMultiLeg && getDays(group) > 0 ? (
@@ -1950,7 +1937,7 @@ export default function AllGroupsPackages({
                                   className="text-center whitespace-nowrap align-middle"
                                   style={{
                                     padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                                    borderRight: `1px solid ${theme.colors.border}`,
+                                    borderRight: `1px solid #ececec`,
                                   }}
                                 >
                                   {user?.priceOnCall ? (
@@ -1992,7 +1979,7 @@ export default function AllGroupsPackages({
                                     style={{
                                       borderRadius: theme.borderRadius.md,
                                       background: user?.showHideButton
-                                        ? theme.colors.primary
+                                        ? `linear-gradient(to right, ${theme.colors.primaryDark}, ${theme.colors.primary})`
                                         : theme.colors.border,
                                       color: user?.showHideButton
                                         ? "#fff"

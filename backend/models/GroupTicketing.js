@@ -148,7 +148,7 @@ const GroupTicketingSchema = new mongoose.Schema(
     pnr: { type: String },
     contactPersonPhone: { type: String },
     contactPersonEmail: { type: String },
-    internalStatus: { type: String, default: "Public" },
+    internalStatus: { type: String, default: "Draft" },
   },
   { timestamps: true },
 );

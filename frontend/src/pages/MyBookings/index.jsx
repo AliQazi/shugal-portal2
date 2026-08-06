@@ -11,6 +11,7 @@ import { Check } from "lucide-react";
 import TopBar from "../../components/TopBar/TopBar";
 import FlipClockCountdown from "@leenguyen/react-flip-clock-countdown";
 import "@leenguyen/react-flip-clock-countdown/dist/index.css";
+import { theme } from "../../theme/theme";
 
 export default function MyBookings() {
   const navigate = useNavigate();
@@ -51,6 +52,11 @@ export default function MyBookings() {
       value: "confirmed",
       label: "Confirmed",
       color: "bg-emerald-50 text-emerald-800 border border-emerald-300",
+    },
+    {
+      value: "partially confirmed",
+      label: "Partially Confirmed",
+      color: "bg-indigo-50 text-indigo-800 border border-indigo-300",
     },
     {
       value: "cancelled",
@@ -206,11 +212,11 @@ export default function MyBookings() {
   }
 
   return (
-    <div className="w-full min-h-screen mx-auto px-4 bg-orange-50">
+    <div className="w-full min-h-screen">
       <TopBar title={" My Bookings"} />
 
       {/* Search and Filters */}
-      <div className="mb-4 bg-white border border-slate-200">
+      <div className="mb-2.5 bg-white border border-slate-200">
         <div className="flex flex-wrap items-center gap-3 p-3 sm:p-4">
           {/* Search Input */}
           <div className="flex-1 min-w-50">
@@ -268,7 +274,7 @@ export default function MyBookings() {
           {/* Reset Button */}
           <button
             onClick={resetFilters}
-            className="px-4 py-2 text-sm text-slate-600 font-medium border border-slate-300 hover:bg-orange-100 transition-colors"
+            className="px-4 py-2 text-sm text-slate-600 font-medium border border-slate-300 hover:transition-colors"
           >
             Reset
           </button>
@@ -284,21 +290,21 @@ export default function MyBookings() {
         )}
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">
-            <thead className="bg-orange-800">
+            <thead style={{ background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.primaryDark})` }}>
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase border-r border-slate-700">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                   Booking Details
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase border-r border-slate-700">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                   Group
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase border-r border-slate-700">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                   Passengers
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase border-r border-slate-700">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                   Price (PKR)
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase border-r border-slate-700">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                   Status
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
@@ -324,13 +330,15 @@ export default function MyBookings() {
                   return (
                     <tr
                       key={booking._id}
-                      className="border-b border-slate-200 hover:bg-orange-50 transition-colors"
+                      className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
                     >
                       {/* Booking Details */}
                       <td className="px-4 py-4 align-middle border-r border-slate-200">
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="inline-block bg-orange-700 text-white px-3 py-1.5 text-xs font-semibold">
+                            <span className="inline-block text-white px-3 py-1.5 text-xs font-semibold"
+                              style={{ background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.primaryDark})`, borderRadius: "4px" }}
+                            >
                               Airline PNR #: {booking.pnr || "N/A"}
                             </span>
                           </div>
@@ -376,7 +384,7 @@ export default function MyBookings() {
                       <td className="px-4 py-4 align-middle border-r border-slate-200">
                         <div className="inline-block w-full">
                           <table className="w-full text-xs border border-slate-300">
-                            <thead className="bg-orange-100 text-slate-600">
+                            <thead className="bg-slate-100 text-slate-600">
                               <tr>
                                 <th className="px-3 py-2 text-left font-semibold border-r border-slate-300">
                                   Status
@@ -401,7 +409,12 @@ export default function MyBookings() {
                                 {
                                   key: "on hold",
                                   label: "Requested",
-                                  match: ["on hold", "pending", "cancelled"],
+                                  match: [
+                                    "on hold",
+                                    "pending",
+                                    "partially confirmed",
+                                    "cancelled",
+                                  ],
                                 },
                                 {
                                   key: "confirmed",
@@ -424,7 +437,7 @@ export default function MyBookings() {
 
                                 return (
                                   <tr key={key}>
-                                    <td className="px-3 py-2 font-medium text-slate-600 bg-orange-50 border-r border-slate-200">
+                                    <td className="px-3 py-2 font-medium text-slate-600 bg-slate-50 border-r border-slate-200">
                                       {label}
                                     </td>
                                     <td className="px-3 py-2 text-center font-semibold text-slate-700 border-r border-slate-200">
@@ -453,7 +466,7 @@ export default function MyBookings() {
                       >
                         <div className="font-semibold text-base text-slate-800">
                           {booking.status === "on hold" ||
-                          booking.status === "pending" ? (
+                            booking.status === "pending" ? (
                             <div className="text-xs text-amber-800 font-semibold bg-amber-50 px-2.5 py-1.5 border border-amber-300">
                               Admin Review
                               <br />
@@ -474,46 +487,47 @@ export default function MyBookings() {
                             {statusBadge.label}
                           </span>
                           {(booking.status === "on hold" ||
-                            booking.status === "pending") && (
-                            <div className="pt-1.5 flex flex-col items-center gap-1">
-                              <div className="text-[10px] font-semibold text-slate-500 tracking-wide uppercase">
-                                Booking Expiry
+                            booking.status === "pending" ||
+                            booking.status === "partially confirmed") && (
+                              <div className="pt-1.5 flex flex-col items-center gap-1">
+                                <div className="text-[10px] font-semibold text-slate-500 tracking-wide uppercase">
+                                  Booking Expiry
+                                </div>
+                                <FlipClockCountdown
+                                  to={
+                                    booking.expiresAt
+                                      ? new Date(booking.expiresAt).getTime()
+                                      : 0
+                                  }
+                                  hideOnComplete={false}
+                                  labels={["DAYS", "HRS", "MIN", "SEC"]}
+                                  renderMap={[false, true, true, true]}
+                                  labelStyle={{
+                                    fontSize: 9,
+                                    fontWeight: 600,
+                                    color: "#64748b",
+                                    textTransform: "uppercase",
+                                  }}
+                                  digitBlockStyle={{
+                                    width: 22,
+                                    height: 30,
+                                    fontSize: 15,
+                                    color: "#e2e8f0",
+                                    background: "#334155",
+                                  }}
+                                  dividerStyle={{ color: "#1e293b", height: 1 }}
+                                  separatorStyle={{
+                                    color: "#94a3b8",
+                                    size: "4px",
+                                  }}
+                                  duration={0.4}
+                                >
+                                  <span className="text-xs font-semibold text-rose-700">
+                                    EXPIRED
+                                  </span>
+                                </FlipClockCountdown>
                               </div>
-                              <FlipClockCountdown
-                                to={
-                                  booking.expiresAt
-                                    ? new Date(booking.expiresAt).getTime()
-                                    : 0
-                                }
-                                hideOnComplete={false}
-                                labels={["DAYS", "HRS", "MIN", "SEC"]}
-                                renderMap={[false, true, true, true]}
-                                labelStyle={{
-                                  fontSize: 9,
-                                  fontWeight: 600,
-                                  color: "#64748b",
-                                  textTransform: "uppercase",
-                                }}
-                                digitBlockStyle={{
-                                  width: 22,
-                                  height: 30,
-                                  fontSize: 15,
-                                  color: "#e2e8f0",
-                                  background: "#334155",
-                                }}
-                                dividerStyle={{ color: "#1e293b", height: 1 }}
-                                separatorStyle={{
-                                  color: "#94a3b8",
-                                  size: "4px",
-                                }}
-                                duration={0.4}
-                              >
-                                <span className="text-xs font-semibold text-rose-700">
-                                  EXPIRED
-                                </span>
-                              </FlipClockCountdown>
-                            </div>
-                          )}
+                            )}
                         </div>
                       </td>
 
@@ -529,7 +543,7 @@ export default function MyBookings() {
                                   `/dashboard/booking-detail/${booking._id}`,
                                 )
                               }
-                              className="p-2.5 text-slate-600 bg-orange-100 hover:bg-orange-200 border border-slate-300 transition-colors"
+                              className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
                               title="View Details"
                             >
                               <svg
@@ -555,108 +569,109 @@ export default function MyBookings() {
                             {/* Edit and Delete only for on hold/pending */}
                             {(booking.status === "on hold" ||
                               booking.status === "pending") && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    navigate(
-                                      `/dashboard/edit-booking/${booking._id}`,
-                                    )
-                                  }
-                                  className="p-2.5 text-slate-600 bg-orange-100 hover:bg-orange-200 border border-slate-300 transition-colors"
-                                  title="Edit Booking"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    const confirmDelete = window.confirm(
-                                      "Are you sure you want to delete this booking? This action cannot be undone.",
-                                    );
-                                    if (!confirmDelete) return;
-
-                                    try {
-                                      setDeletingId(booking._id);
-
-                                      await axiosInstance.delete(
-                                        `/bookings/${booking._id}`,
-                                      );
-
-                                      toast.success(
-                                        "Booking deleted successfully",
-                                      );
-                                      setBookings((prev) =>
-                                        prev.filter(
-                                          (b) => b._id !== booking._id,
-                                        ),
-                                      );
-                                    } catch (err) {
-                                      toast.error(
-                                        err.response?.data?.message ||
-                                          "Failed to delete booking",
-                                      );
-                                    } finally {
-                                      setDeletingId(null);
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      navigate(
+                                        `/dashboard/edit-booking/${booking._id}`,
+                                      )
                                     }
-                                  }}
-                                  disabled={deletingId === booking._id}
-                                  className="p-2.5 text-slate-600 bg-orange-100 hover:bg-orange-200 border border-slate-300 transition-colors disabled:opacity-50"
-                                  title="Delete Booking"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
+                                    className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
+                                    title="Edit Booking"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      const confirmDelete = window.confirm(
+                                        "Are you sure you want to delete this booking? This action cannot be undone.",
+                                      );
+                                      if (!confirmDelete) return;
+
+                                      try {
+                                        setDeletingId(booking._id);
+
+                                        await axiosInstance.delete(
+                                          `/bookings/${booking._id}`,
+                                        );
+
+                                        toast.success(
+                                          "Booking deleted successfully",
+                                        );
+                                        setBookings((prev) =>
+                                          prev.filter(
+                                            (b) => b._id !== booking._id,
+                                          ),
+                                        );
+                                      } catch (err) {
+                                        toast.error(
+                                          err.response?.data?.message ||
+                                          "Failed to delete booking",
+                                        );
+                                      } finally {
+                                        setDeletingId(null);
+                                      }
+                                    }}
+                                    disabled={deletingId === booking._id}
+                                    className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors disabled:opacity-50"
+                                    title="Delete Booking"
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      />
+                                    </svg>
+                                  </button>
+                                </>
+                              )}
                           </div>
                           {/* Second row: Print */}
                           {(booking.status === "on hold" ||
                             booking.status === "pending" ||
+                            booking.status === "partially confirmed" ||
                             booking.status === "confirmed") && (
-                            <div className="flex flex-row justify-center items-center gap-2 w-full mt-2">
-                              <button
-                                onClick={() => printGDSBooking(booking)}
-                                className="p-2.5 text-slate-600 bg-orange-100 hover:bg-orange-200 border border-slate-300 transition-colors cursor-pointer"
-                                title="Print Ticket"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                              <div className="flex flex-row justify-center items-center gap-2 w-full mt-2">
+                                <button
+                                  onClick={() => printGDSBooking(booking)}
+                                  className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors cursor-pointer"
+                                  title="Print Ticket"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
                         </div>
                       </td>
                     </tr>
@@ -699,13 +714,15 @@ export default function MyBookings() {
 
             <button
               onClick={() => setSuccessModalData(null)}
-              className="px-10 py-2.5 bg-orange-800 hover:bg-orange-900 text-white text-sm font-medium tracking-wide transition-colors w-full sm:w-auto"
+              className="px-10 py-2 text-white text-sm font-medium tracking-wide transition-colors w-full sm:w-auto"
+              style={{ backgroundColor: theme.colors.primary }}
             >
               OK
             </button>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 }

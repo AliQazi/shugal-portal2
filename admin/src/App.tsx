@@ -87,6 +87,7 @@ export default function App() {
                 <Route path="/add-bank" element={<AddBank />} />
                 <Route path="/sector" element={<Sector />} />
                 <Route path="/create-package" element={<UmrahPackage />} />
+                <Route path="/create-package/:copyId" element={<UmrahPackage />} />
                 <Route path="/manage-package" element={<ManageUmrahPackage />} />
                 <Route path="/update-umrah-package/:id" element={<UpdateUmrahPackage />} />
                 <Route path="/airline" element={<Airline />} />

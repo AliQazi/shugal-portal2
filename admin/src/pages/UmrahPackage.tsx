@@ -1,6 +1,7 @@
 import { useFormik, FormikHelpers } from "formik";
 import * as Yup from "yup";
 import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router";
 import axiosInstance from "../Api/axios";
 import ComponentCard from "../components/common/ComponentCard";
 import { ToastContainer, toast } from "react-toastify";
@@ -216,13 +217,22 @@ const TRANSPORT_TYPES = [
   "Other",
 ];
 
+const optionalNonNegativeNumber = Yup.number()
+  .transform((value, originalValue) =>
+    originalValue === "" || originalValue === null ? null : value
+  )
+  .nullable()
+  .min(0);
+
 const UmrahPackage = () => {
   const { user } = useAuth();
+  const { copyId } = useParams();
   const canCreate = hasPermission(user, "create_umrah_package");
   const [logoPreview, setLogoPreview] = useState<string>("");
   const [flightLogoPreview, setFlightLogoPreview] = useState("");
   const [umrahGroups, setUmrahGroups] = useState<GroupTicketing[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [loadingCopy, setLoadingCopy] = useState(false);
   const [hotelOptions, setHotelOptions] = useState<HotelOption[]>([]);
   const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
   const [visaOptions, setVisaOptions] = useState<VisaOption[]>([]);
@@ -230,6 +240,10 @@ const UmrahPackage = () => {
   console.log(profitBreakdown)
   const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0, incentive: 0 });
   const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0 });
+  // Skips the packageTotals auto-sync effect for the renders triggered while a copied
+  // package's data (and the umrahGroups list) are still arriving, so the copied totals
+  // (including any manual incentive) aren't clobbered before the user sees them.
+  const skipSyncCountRef = useRef(0);
   const [internalStatus, setInternalStatus] = useState<"Public" | "Private">("Public");
   const { data3 = [] } = useAccountsList();
 
@@ -253,6 +267,9 @@ const UmrahPackage = () => {
 
   useEffect(() => {
     fetchUmrahGroups();
+    if (copyId) {
+      fetchPackageDetails(copyId);
+    }
     axiosInstance.get("/hotels/all").then((res) => {
       if (res.data.success) {
         setHotelOptions(
@@ -305,7 +322,7 @@ const UmrahPackage = () => {
         }
       }).catch(() => { });
     }).catch(() => { });
-  }, []);
+  }, [copyId]);
 
   const fetchUmrahGroups = async () => {
     try {
@@ -323,6 +340,150 @@ const UmrahPackage = () => {
       toast.error("Failed to load Umrah groups");
     } finally {
       setLoadingGroups(false);
+    }
+  };
+
+  // Copy mode: fetch an existing package's saved data and pre-fill this create form with
+  // it, so the admin can tweak a few fields and submit it as a brand-new package. Nothing
+  // about the source package is touched — submission always POSTs a new record.
+  const fetchPackageDetails = async (packageId: string) => {
+    try {
+      setLoadingCopy(true);
+      const res = await axiosInstance.get(`/umrahpackages/${packageId}`);
+      if (res.data.success) {
+        const data = res.data.package;
+
+        const formattedFlights = (data.flights || []).map((f: any) => ({
+          airline: f.airline || "",
+          flightNo: f.flightNo || "",
+          depDate: f.depDate ? f.depDate.slice(0, 10) : "",
+          depTime: f.depTime || "",
+          arrDate: f.arrDate ? f.arrDate.slice(0, 10) : "",
+          arrTime: f.arrTime || "",
+          sectorFrom: f.sectorFrom || "",
+          sectorTo: f.sectorTo || "",
+          fromTerminal: f.fromTerminal || "",
+          toTerminal: f.toTerminal || "",
+          flightClass: f.flightClass || "",
+          baggage: f.baggage || "",
+          meal: f.meal || "",
+        }));
+
+        const formattedTransports = (data.transports || []).map((t: any) => ({
+          route: t.route || "",
+          supplier: {
+            _id: t.supplier?._id || "",
+            name: t.supplier?.name || (typeof t.supplier === "string" ? t.supplier : ""),
+          },
+          transportType: t.transportType || "",
+        }));
+
+        const defaultRoom = () => ({ buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 });
+
+        const formattedHotels = (data.hotels || []).map((h: any) => ({
+          name: h.name || "",
+          supplier: {
+            _id: h.supplier?._id || "",
+            name: h.supplier?.name || (typeof h.supplier === "string" ? h.supplier : ""),
+          },
+          location: {
+            city: h.location?.city || "",
+            distance: h.location?.distance || "",
+            mapUrl: h.location?.mapUrl || "",
+          },
+          rating: Number(h.rating || 0),
+          checkIn: h.checkIn ? h.checkIn.slice(0, 10) : "",
+          checkOut: h.checkOut ? h.checkOut.slice(0, 10) : "",
+          nights: Number((h.nights ?? h.nightCount) || 0),
+          nightCount: Number((h.nights ?? h.nightCount) || 0),
+          buyingPrice: h.buyingPrice ?? undefined,
+          buyingRoe: h.buyingRoe ?? 1,
+          buyingCurrency: h.buyingCurrency || "PKR",
+          sellingPrice: h.sellingPrice ?? undefined,
+          sellingRoe: h.sellingRoe ?? 1,
+          sellingCurrency: h.sellingCurrency || "PKR",
+          currency: h.currency || "PKR",
+          doubleRoom: h.doubleRoom ? { ...defaultRoom(), ...h.doubleRoom } : defaultRoom(),
+          tripleRoom: h.tripleRoom ? { ...defaultRoom(), ...h.tripleRoom } : defaultRoom(),
+          quadRoom: h.quadRoom ? { ...defaultRoom(), ...h.quadRoom } : defaultRoom(),
+          sharedRoom: h.sharedRoom ? { ...defaultRoom(), ...h.sharedRoom } : defaultRoom(),
+        }));
+
+        const formattedVisa = data.visa ? {
+          visaId: data.visa.visaId || "",
+          visaType: data.visa.visaType || "",
+          supplier: {
+            _id: data.visa.supplier?._id || "",
+            name: data.visa.supplier?.name || "",
+          },
+          withTransport: data.visa.withTransport || false,
+          buyingPrice: data.visa.buyingPrice || 0,
+          buyingRoe: data.visa.buyingRoe || 1,
+          buyingCurrency: data.visa.buyingCurrency || data.visa.currency || "PKR",
+          sellingPrice: data.visa.sellingPrice || 0,
+          sellingRoe: data.visa.sellingRoe || 1,
+          sellingCurrency: data.visa.sellingCurrency || data.visa.currency || "PKR",
+          currency: data.visa.currency || "PKR",
+        } : null;
+
+        formik.setValues({
+          packageName: data.packageName || "",
+          selectedGroupTicketId: data.selectedGroupTicketId || "",
+          logo: "",
+          flightLogo: "",
+          flights: formattedFlights,
+          hotels: formattedHotels.length ? formattedHotels : formik.initialValues.hotels,
+          transports: formattedTransports.length ? formattedTransports : formik.initialValues.transports,
+          visa: formattedVisa,
+          rooms: data.rooms || {
+            sharing: "", quad: "", quint: "", triple: "", double: "",
+            childWithoutPackage: "", InfantWithoutPackage: "",
+          },
+          availableRooms: data.availableRooms || 0,
+          days: data.days || 0,
+        });
+
+        if (data.packageTotals) {
+          const inc = data.packageTotals.incentive || 0;
+          const base = {
+            double: (data.packageTotals.double || 0) - inc,
+            triple: (data.packageTotals.triple || 0) - inc,
+            quad: (data.packageTotals.quad || 0) - inc,
+            shared: (data.packageTotals.shared || 0) - inc,
+            childWithoutBed: (data.packageTotals.childWithoutBed || 0) - inc,
+            infant: (data.packageTotals.infant || 0) - inc,
+          };
+          baseTotalsRef.current = base;
+          setPackageTotals({
+            double: data.packageTotals.double || 0,
+            triple: data.packageTotals.triple || 0,
+            quad: data.packageTotals.quad || 0,
+            shared: data.packageTotals.shared || 0,
+            childWithoutBed: data.packageTotals.childWithoutBed || 0,
+            infant: data.packageTotals.infant || 0,
+            incentive: inc,
+          });
+          // The sync effect below fires again for the formik values set above, then once
+          // more when umrahGroups arrives (order between the two isn't guaranteed) -
+          // skip both so it doesn't overwrite the copied totals before the user sees them.
+          skipSyncCountRef.current = 2;
+        }
+
+        if (data.internalStatus) setInternalStatus(data.internalStatus);
+
+        // Logo/flightLogo are uploaded files, not carried over automatically - show the
+        // source package's images as a reference preview, but a new file must be chosen
+        // for this copy to have a logo (the create endpoint only stores an uploaded file).
+        if (data.logo) setLogoPreview(data.logo);
+        if (data.flightLogo) setFlightLogoPreview(data.flightLogo);
+
+        toast.info("Package data copied. Re-upload the logo/flight logo if needed, then review and submit.");
+      }
+    } catch (error) {
+      console.error("Error fetching package to copy:", error);
+      toast.error("Failed to load package details to copy");
+    } finally {
+      setLoadingCopy(false);
     }
   };
 
@@ -470,13 +631,13 @@ const UmrahPackage = () => {
       hotels: Yup.array().min(1, "Select at least one hotel"),
       visa: Yup.object().nullable().required("Visa is required"),
       rooms: Yup.object({
-        sharing: Yup.number().min(0),
-        quad: Yup.number().min(0),
-        quint: Yup.number().min(0),
-        triple: Yup.number().min(0),
-        double: Yup.number().min(0),
-        childWithoutPackage: Yup.number().min(0),
-        InfantWithoutPackage: Yup.number().min(0),
+        sharing: optionalNonNegativeNumber,
+        quad: optionalNonNegativeNumber,
+        quint: optionalNonNegativeNumber,
+        triple: optionalNonNegativeNumber,
+        double: optionalNonNegativeNumber,
+        childWithoutPackage: optionalNonNegativeNumber,
+        InfantWithoutPackage: optionalNonNegativeNumber,
       }),
       availableRooms: Yup.number().min(0),
       days: Yup.number().min(0),
@@ -814,6 +975,13 @@ const UmrahPackage = () => {
 
   // ✅ Effect to sync package totals from computed values
   useEffect(() => {
+    // Skip recalculation right after a copied package's data (and the umrahGroups list)
+    // arrives, so the copied packageTotals (including any manual incentive) aren't
+    // overwritten before the user gets to see/edit them.
+    if (skipSyncCountRef.current > 0) {
+      skipSyncCountRef.current -= 1;
+      return;
+    }
     const selectedGroup = getSelectedGroupTicket(formik.values.selectedGroupTicketId);
     const flightSellingPrice = selectedGroup?.price?.sellingAdultPriceB2B || 0;
     const childSellingPrice = selectedGroup?.price?.sellingChildPriceB2B || 0;
@@ -856,7 +1024,7 @@ const UmrahPackage = () => {
 
   if (!canCreate) {
     return (
-      <ComponentCard title="Add Umrah Package">
+      <ComponentCard title={copyId ? "Copy Umrah Package" : "Add Umrah Package"}>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-sm text-red-700 shadow-sm">
           You do not have permission to create Umrah Packages.
         </div>
@@ -865,8 +1033,14 @@ const UmrahPackage = () => {
   }
 
   return (
-    <ComponentCard title="Add Umrah Package">
+    <ComponentCard title={copyId ? "Copy Umrah Package" : "Add Umrah Package"}>
       <div className="overflow-hidden rounded-xl border-gray-200 bg-white dark:border-white/5 dark:bg-white/3">
+        {loadingCopy && (
+          <div className="flex items-center gap-2 border-b border-gray-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+            Loading package data to copy...
+          </div>
+        )}
         <form onSubmit={formik.handleSubmit} className="space-y-3 p-4">
           {(() => {
             const selectedGroup = getSelectedGroupTicket(formik.values.selectedGroupTicketId);

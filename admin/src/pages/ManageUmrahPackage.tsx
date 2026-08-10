@@ -9,6 +9,7 @@ import {
 import ComponentCard from "../components/common/ComponentCard";
 import axiosInstance from "../Api/axios";
 import { PencilIcon, TrashBinIcon } from "../icons";
+import { Copy } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAuth } from "../context/AuthContext";
@@ -109,6 +110,15 @@ interface GroupTicketSeatsData {
   _id?: string;
   id?: string;
   totalSeats?: number;
+  airline?: string;
+  sector?: string;
+  pnr?: string;
+}
+
+interface AirlineData {
+  _id?: string;
+  airlineName?: string;
+  shortCode?: string;
 }
 
 interface UmrahBookingData {
@@ -194,33 +204,33 @@ const getDepartureRange = (flights: FlightData[]) => {
   };
 };
 
-const getSectorText = (flights: FlightData[]) => {
-  if (!flights || flights.length === 0) return "No Sector";
+// const getSectorText = (flights: FlightData[]) => {
+//   if (!flights || flights.length === 0) return "No Sector";
 
-  const firstAirline = flights[0]?.airline || "AIRLINE";
+//   const firstAirline = flights[0]?.airline || "AIRLINE";
 
-  const routeParts: string[] = [];
+//   const routeParts: string[] = [];
 
-  flights.forEach((flight, index) => {
-    if (index === 0 && flight.sectorFrom) {
-      routeParts.push(flight.sectorFrom);
-    }
+//   flights.forEach((flight, index) => {
+//     if (index === 0 && flight.sectorFrom) {
+//       routeParts.push(flight.sectorFrom);
+//     }
 
-    if (flight.sectorTo) {
-      routeParts.push(flight.sectorTo);
-    }
-  });
+//     if (flight.sectorTo) {
+//       routeParts.push(flight.sectorTo);
+//     }
+//   });
 
-  const uniqueRoute = routeParts.filter(Boolean).join("-");
+//   const uniqueRoute = routeParts.filter(Boolean).join("-");
 
-  return `${firstAirline}-${uniqueRoute}`;
-};
+//   return `${firstAirline}-${uniqueRoute}`;
+// };
 
-const hasTransportInPackage = (pkg: PackageData) => {
-  return Boolean(
-    pkg.visa?.withTransport || (pkg.transports && pkg.transports.length > 0)
-  );
-};
+// const hasTransportInPackage = (pkg: PackageData) => {
+//   return Boolean(
+//     pkg.visa?.withTransport || (pkg.transports && pkg.transports.length > 0)
+//   );
+// };
 
 const getId = (value?: string | number | null) => String(value || "");
 
@@ -253,6 +263,12 @@ const ManageUmrahPackage = () => {
   const [packages, setPackages] = useState<PackageData[]>([]);
   const [groupTicketTotalSeats, setGroupTicketTotalSeats] = useState<
     Map<string, number>
+  >(new Map());
+  const [groupTicketDetails, setGroupTicketDetails] = useState<
+    Map<string, { airline?: string; sector?: string; pnr?: string }>
+  >(new Map());
+  const [airlineShortCodeMap, setAirlineShortCodeMap] = useState<
+    Map<string, string>
   >(new Map());
   const [bookedSeatsByGroup, setBookedSeatsByGroup] = useState<
     Map<string, BookedSeatsData>
@@ -338,12 +354,14 @@ const ManageUmrahPackage = () => {
           groupTicketRes,
           bookedSeatsRes,
           umrahBookingsRes,
+          airlineRes,
         ] =
           await Promise.allSettled([
             axiosInstance.get("/umrahpackages/"),
             axiosInstance.get("/group-ticketing"),
             axiosInstance.get("/bookings/getBookedSeats"),
             axiosInstance.get("/umrah-bookings/admin/all"),
+            axiosInstance.get("/airline"),
           ]);
 
         if (packageRes.status !== "fulfilled") {
@@ -365,14 +383,38 @@ const ManageUmrahPackage = () => {
           groupTicketRes.value.data?.success
         ) {
           const seatsMap = new Map<string, number>();
+          const detailsMap = new Map<
+            string,
+            { airline?: string; sector?: string; pnr?: string }
+          >();
           (groupTicketRes.value.data.data || []).forEach(
             (ticket: GroupTicketSeatsData) => {
               const ticketId = getId(ticket._id || ticket.id);
               if (!ticketId) return;
               seatsMap.set(ticketId, Number(ticket.totalSeats) || 0);
+              detailsMap.set(ticketId, {
+                airline: ticket.airline,
+                sector: ticket.sector,
+                pnr: ticket.pnr,
+              });
             }
           );
           setGroupTicketTotalSeats(seatsMap);
+          setGroupTicketDetails(detailsMap);
+        }
+
+        if (airlineRes.status === "fulfilled") {
+          const airlineList =
+            airlineRes.value.data?.data || airlineRes.value.data || [];
+          const shortCodeMap = new Map<string, string>();
+          (airlineList || []).forEach((airline: AirlineData) => {
+            if (!airline.airlineName || !airline.shortCode) return;
+            shortCodeMap.set(
+              airline.airlineName.toLowerCase(),
+              airline.shortCode
+            );
+          });
+          setAirlineShortCodeMap(shortCodeMap);
         }
 
         if (
@@ -491,6 +533,18 @@ const ManageUmrahPackage = () => {
       console.error("Error deleting package:", error);
       toast.error("Failed to delete package");
     }
+  };
+
+  const handleCopyPackage = (pkg: PackageData) => {
+    if (!canUseActions) {
+      toast.error("You don't have permission to manage Umrah packages");
+      return;
+    }
+    window.open(
+      `/admin-portal/create-package/${pkg._id}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const handleViewBookings = (pkg: PackageData) => {
@@ -632,6 +686,32 @@ const ManageUmrahPackage = () => {
     };
   };
 
+  const getPackageGroupTicketInfo = (pkg: PackageData) => {
+    const selectedGroupTicketId = getId(
+      pkg.selectedGroupTicketId || pkg.groupTicket?._id || pkg.groupTicket?.id
+    );
+    const ticketInfo = groupTicketDetails.get(selectedGroupTicketId);
+
+    const airlineName = ticketInfo?.airline || pkg.flights?.[0]?.airline || "";
+    const airlineShortCode =
+      (airlineName && airlineShortCodeMap.get(airlineName.toLowerCase())) ||
+      airlineName ||
+      "N/A";
+
+    const sector =
+      ticketInfo?.sector ||
+      (pkg.flights && pkg.flights.length > 0
+        ? pkg.flights
+          .map((flight) => `${flight.sectorFrom || ""}-${flight.sectorTo || ""}`)
+          .join(", ")
+        : "") ||
+      "N/A";
+
+    const pnr = ticketInfo?.pnr || "N/A";
+
+    return { airlineShortCode, sector, pnr };
+  };
+
   return (
     <ComponentCard title="Manage Umrah Packages">
       <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -679,7 +759,7 @@ const ManageUmrahPackage = () => {
           <Table>
             <TableHeader className="border-b border-gray-200 bg-gray-900 dark:border-white/10 dark:bg-gray-950">
               <TableRow>
-                <TableCell isHeader className="w-12 px-4 py-4">
+                <TableCell isHeader className="w-12 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -689,19 +769,18 @@ const ManageUmrahPackage = () => {
                 </TableCell>
 
                 {[
-                  "Date",
-                  "Package Name",
-                  "Departure Date",
+                  // "Package Name",
+                  "Package Details",
                   "Price",
-                  "Sector",
-                  "Visa Type",
-                  "Public",
+                  "Hotels",
+                  // "Visa Type",
+                  // "Public",
                   "Action",
                 ].map((header) => (
                   <TableCell
                     key={header}
                     isHeader
-                    className={`whitespace-nowrap px-4 py-4 text-start text-sm font-bold text-white ${header === "Action" ? "text-center!" : ""}`}
+                    className={`whitespace-nowrap px-4 py-3 text-start text-sm font-bold text-white ${header === "Action" ? "text-center!" : ""}`}
                   >
                     {header}
                   </TableCell>
@@ -737,9 +816,10 @@ const ManageUmrahPackage = () => {
                 filteredPackages.map((pkg) => {
                   const isSelected = selectedPackageIds.includes(pkg._id);
                   const departureRange = getDepartureRange(pkg.flights);
-                  const sectorText = getSectorText(pkg.flights);
-                  const transportAdded = hasTransportInPackage(pkg);
+                  // const sectorText = getSectorText(pkg.flights);
+                  // const transportAdded = hasTransportInPackage(pkg);
                   const seatStats = getPackageSeatStats(pkg);
+                  const groupTicketInfo = getPackageGroupTicketInfo(pkg);
 
                   return (
                     <TableRow
@@ -749,7 +829,7 @@ const ManageUmrahPackage = () => {
                         : "bg-white dark:bg-transparent"
                         }`}
                     >
-                      <TableCell className="px-4 py-5">
+                      <TableCell className="px-3 py-4">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -758,13 +838,7 @@ const ManageUmrahPackage = () => {
                         />
                       </TableCell>
 
-                      <TableCell className="whitespace-nowrap px-4 py-5 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <div className="leading-6">
-                          {formatDate(pkg.createdAt)}
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="min-w-42.5 px-4 py-5">
+                      {/* <TableCell className="min-w-42.5 px-3 py-4">
                         <div className="flex items-start gap-3">
                           {pkg.logo ? (
                             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-white/10">
@@ -777,10 +851,6 @@ const ManageUmrahPackage = () => {
                           ) : null}
 
                           <div>
-                            <p className="text-sm font-extrabold uppercase text-gray-800 dark:text-gray-100">
-                              {pkg.packageName || "N/A"}
-                            </p>
-
                             <p className="mt-2 text-xs font-bold text-gray-700 dark:text-gray-300">
                               No Of Days
                               <span className="ml-1 font-semibold">
@@ -789,20 +859,55 @@ const ManageUmrahPackage = () => {
                             </p>
                           </div>
                         </div>
-                      </TableCell>
+                      </TableCell> */}
 
-                      <TableCell className="min-w-40 px-4 py-5">
+                      <TableCell className="min-w-40 px-3 py-4">
                         <div className="space-y-1 text-sm font-semibold">
+                          <p className="text-gray-700 dark:text-gray-300">
+                            Sector: {groupTicketInfo.sector}
+                          </p>
+                          <p className="text-gray-700 dark:text-gray-300">
+                            Airline: {groupTicketInfo.airlineShortCode}
+                          </p>
+                          <p className="inline-block px-1.5 py-0.5 bg-linear-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-md text-xs font-mono font-bold">
+                            PNR: {groupTicketInfo.pnr}
+                          </p>
+
+                          <div className="flex items-start gap-3">
+                            {pkg.logo ? (
+                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-white/10">
+                                <img
+                                  src={pkg.logo}
+                                  alt={pkg.packageName}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ) : null}
+
+                            <div>
+                              <p className="mt-0 text-xs font-bold text-gray-700 dark:text-gray-300">
+                                No Of Days
+                                <span className="ml-1 font-semibold">
+                                  {pkg.days || 0}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
                           <p className="text-green-600">
-                            From: {departureRange.from}
+                            Departure: {departureRange.from}
                           </p>
                           <p className="text-red-500">
-                            To: {departureRange.to}
+                            Return: {departureRange.to}
+                          </p>
+
+                          <p className="text-xs text-gray-700 dark:text-gray-300">
+                            Created At: {formatDate(pkg.createdAt)}
                           </p>
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-90 px-4 py-5">
+                      <TableCell className="min-w-90 px-3 py-4">
                         <div className="overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
                           <table className="w-full border-collapse text-sm">
                             <thead>
@@ -892,10 +997,10 @@ const ManageUmrahPackage = () => {
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-105 px-4 py-5">
-                        <p className="mb-4 text-sm font-extrabold uppercase text-gray-900 dark:text-gray-100">
+                      <TableCell className="min-w-105 px-3 py-4">
+                        {/* <p className="mb-4 text-sm font-extrabold uppercase text-gray-900 dark:text-gray-100">
                           {sectorText}
-                        </p>
+                        </p> */}
 
                         <div className="overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
                           <table className="w-full border-collapse text-xs">
@@ -952,7 +1057,7 @@ const ManageUmrahPackage = () => {
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-32.5 px-4 py-5">
+                      {/* <TableCell className="min-w-32.5 px-3 py-4">
                         <div className="space-y-2">
                           {transportAdded ? (
                             <span className="whitespace-nowrap inline-flex rounded-md bg-gray-800 px-2.5 py-1 text-xs font-extrabold text-white dark:bg-gray-700">
@@ -964,9 +1069,9 @@ const ManageUmrahPackage = () => {
                             </span>
                           )}
                         </div>
-                      </TableCell>
+                      </TableCell> */}
 
-                      <TableCell className="px-4 py-5">
+                      {/* <TableCell className="px-3 py-4">
                         <label className="relative inline-flex cursor-pointer items-center">
                           <input
                             type="checkbox"
@@ -983,10 +1088,37 @@ const ManageUmrahPackage = () => {
 
                           <div className="peer h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-50" />
                         </label>
-                      </TableCell>
+                      </TableCell> */}
 
-                      <TableCell className="px-4 py-5">
+                      <TableCell className="px-3 py-4">
                         <div className="flex flex-col-reverse gap-2">
+                          <div className="flex items-center justify-center gap-2">
+                            <label className="relative inline-flex cursor-pointer items-center">
+                              <input
+                                type="checkbox"
+                                checked={(pkg.internalStatus || "Public") === "Public"}
+                                onChange={(event) =>
+                                  handleTogglePublicStatus(
+                                    pkg._id,
+                                    event.target.checked
+                                  )
+                                }
+                                disabled={!canUseActions}
+                                className="peer sr-only"
+                              />
+
+                              <div className="peer h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-green-600 peer-checked:after:translate-x-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-50" />
+                            </label>
+                            <span
+                              className={`text-xs font-semibold ${(pkg.internalStatus || "Public") === "Public"
+                                ? "text-green-600 dark:text-green-400"
+                                : "text-gray-500 dark:text-gray-400"
+                                }`}
+                            >
+                              {pkg.internalStatus || "Public"}
+                            </span>
+                          </div>
+
                           <button
                             onClick={() =>
                               canUseActions &&
@@ -998,7 +1130,7 @@ const ManageUmrahPackage = () => {
                             View Bookings
                           </button>
 
-                          <div className="flex flex-1 gap-2">
+                          <div className="flex flex-1 gap-1">
                             <button
                               onClick={() =>
                                 canUseActions &&
@@ -1016,6 +1148,19 @@ const ManageUmrahPackage = () => {
                               }
                             >
                               <PencilIcon className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleCopyPackage(pkg)}
+                              disabled={!canUseActions}
+                              className="flex justify-center flex-1 rounded-lg bg-purple-50 p-2 text-purple-600 transition-colors hover:bg-purple-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-purple-500/10"
+                              title={
+                                canUseActions
+                                  ? "Copy Package: open the create form pre-filled with this package's data"
+                                  : "You don't have permission to manage Umrah packages"
+                              }
+                            >
+                              <Copy className="h-4 w-4" />
                             </button>
 
                             <button

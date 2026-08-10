@@ -570,7 +570,7 @@ const GroupTicketingForm = () => {
                     sector: e.target.value,
                     groupCategory: selectedSector?.groupType || "",
                     groupType: selectedSector?.groupType || "",
-                    groupName: selectedAirline ? `${selectedAirline.airlineName}-${e.target.value || 'NULL'}` : formData.groupName
+                    groupName: selectedAirline ? `${selectedAirline.shortCode}-${e.target.value || 'NULL'}` : formData.groupName
                   });
                 }}
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
@@ -602,7 +602,7 @@ const GroupTicketingForm = () => {
                   setFormData({
                     ...formData,
                     airline: e.target.value,
-                    groupName: selectedAirline ? `${selectedAirline.airlineName}-${formData.sector || 'NULL'}` : formData.groupName,
+                    groupName: selectedAirline ? `${selectedAirline.shortCode}-${formData.sector || 'NULL'}` : formData.groupName,
                     flights: updatedFlights
                   });
                 }}
@@ -635,7 +635,7 @@ const GroupTicketingForm = () => {
                 type="text"
                 value={formData.groupName}
                 readOnly
-                placeholder="e.g., AIR SIAL-NULL"
+                placeholder="e.g., PF-NULL"
                 className="w-full h-11 rounded border border-gray-300 bg-gray-100 px-4 text-sm text-gray-800 outline-none dark:border-gray-700 dark:bg-gray-700 dark:text-white/90 cursor-not-allowed"
               />
             </div>

@@ -9,6 +9,7 @@ import { getAllBookingsAdmin } from "../Api/umrahBookingApi";
 import { useAuth } from "../context/AuthContext";
 import { hasPermission } from "../utils/permissions";
 import dayjs from 'dayjs'
+import { Pencil, Copy, Trash2, Check, X, Loader2 } from "lucide-react";
 
 const GROUP_TYPE_OPTIONS = [
   "UAE Groups",
@@ -21,6 +22,13 @@ const GROUP_TYPE_OPTIONS = [
 ];
 
 const STATUS_TABS = ["All", "Draft", "Private", "Public", "Sold", "Closed"];
+
+interface Airline {
+  _id: string;
+  airlineCode: string;
+  airlineName: string;
+  shortCode: string;
+}
 
 interface Flight {
   airline: string;
@@ -187,6 +195,202 @@ interface BookedSeatsData {
   totalBookings: number;
 }
 
+const formatCurrency = (amount?: number, currency = "PKR") => {
+  if (amount === undefined || amount === null || Number.isNaN(Number(amount))) return "-";
+  return `${currency} ${Number(amount).toLocaleString()}`;
+};
+
+interface PriceEditValues {
+  buyingAdultPrice: number;
+  buyingChildPrice: number;
+  buyingInfantPrice: number;
+  sellingAdultPriceB2B: number;
+  sellingChildPriceB2B: number;
+  sellingInfantPriceB2B: number;
+}
+
+const GroupPricingMiniTable = ({
+  booking,
+  canEdit,
+  onSave,
+}: {
+  booking: GroupTicketing;
+  canEdit: boolean;
+  onSave: (bookingId: string, price: PriceEditValues) => Promise<boolean>;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<PriceEditValues>({
+    buyingAdultPrice: booking.price.buyingAdultPrice || 0,
+    buyingChildPrice: booking.price.buyingChildPrice || 0,
+    buyingInfantPrice: booking.price.buyingInfantPrice || 0,
+    sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B || 0,
+    sellingChildPriceB2B: booking.price.sellingChildPriceB2B || 0,
+    sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B || 0,
+  });
+
+  const startEdit = () => {
+    setDraft({
+      buyingAdultPrice: booking.price.buyingAdultPrice || 0,
+      buyingChildPrice: booking.price.buyingChildPrice || 0,
+      buyingInfantPrice: booking.price.buyingInfantPrice || 0,
+      sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B || 0,
+      sellingChildPriceB2B: booking.price.sellingChildPriceB2B || 0,
+      sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B || 0,
+    });
+    setIsEditing(true);
+  };
+
+  const updateDraft = (field: keyof PriceEditValues, value: string) => {
+    const numeric = Number(value.replace(/[^0-9]/g, "")) || 0;
+    setDraft((prev) => ({ ...prev, [field]: numeric }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const ok = await onSave(booking._id, draft);
+    setSaving(false);
+    if (ok) setIsEditing(false);
+  };
+
+  const inputClass =
+    "w-16 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white";
+
+  return (
+    <div className="relative mt-3 max-w-86">
+      {canEdit && (
+        <div className="absolute -top-6 right-1 z-10 flex items-center gap-1">
+          {isEditing ? (
+            <>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                title="Save pricing"
+                className="rounded bg-green-600 p-1 text-white shadow hover:bg-green-700 disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={saving}
+                title="Cancel"
+                className="rounded bg-gray-400 p-1 text-white shadow hover:bg-gray-500 disabled:opacity-50"
+              >
+                <X size={11} />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={startEdit}
+              title="Edit pricing"
+              className="rounded bg-yellow-500 p-1 text-white shadow hover:bg-yellow-600"
+            >
+              <Pencil size={11} />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900/40">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <th className="px-2 py-1.5 text-left font-bold">Type</th>
+              <th className="px-2 py-1.5 text-left font-bold">Adult</th>
+              <th className="px-2 py-1.5 text-left font-bold">Child</th>
+              <th className="px-2 py-1.5 text-left font-bold">Infant</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-gray-100 text-blue-600 dark:border-gray-800 dark:text-blue-300">
+              <td className="px-2 py-1.5 font-bold">Buying</td>
+              {isEditing ? (
+                <>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.buyingAdultPrice}
+                      onChange={(e) => updateDraft("buyingAdultPrice", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.buyingChildPrice}
+                      onChange={(e) => updateDraft("buyingChildPrice", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.buyingInfantPrice}
+                      onChange={(e) => updateDraft("buyingInfantPrice", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingAdultPrice, booking.price.buyingCurrency)}</td>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingChildPrice, booking.price.buyingCurrency)}</td>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingInfantPrice, booking.price.buyingCurrency)}</td>
+                </>
+              )}
+            </tr>
+            <tr className="border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300">
+              <td className="px-2 py-1.5 font-bold">Selling</td>
+              {isEditing ? (
+                <>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.sellingAdultPriceB2B}
+                      onChange={(e) => updateDraft("sellingAdultPriceB2B", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.sellingChildPriceB2B}
+                      onChange={(e) => updateDraft("sellingChildPriceB2B", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.sellingInfantPriceB2B}
+                      onChange={(e) => updateDraft("sellingInfantPriceB2B", e.target.value)}
+                      className={inputClass}
+                    />
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingAdultPriceB2B, booking.price.sellingCurrencyB2B)}</td>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingChildPriceB2B, booking.price.sellingCurrencyB2B)}</td>
+                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingInfantPriceB2B, booking.price.sellingCurrencyB2B)}</td>
+                </>
+              )}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const GroupTicketing = () => {
   const { user } = useAuth();
   const canView = hasPermission(user, "view_groups");
@@ -196,6 +400,7 @@ const GroupTicketing = () => {
   const location = useLocation();
   const [bookings, setBookings] = useState<GroupTicketing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [airlines, setAirlines] = useState<Airline[]>([]);
   const [bookedSeatsData, setBookedSeatsData] = useState<Map<string, BookedSeatsData>>(new Map());
 
   // Filters
@@ -219,10 +424,28 @@ const GroupTicketing = () => {
     if (canView) {
       fetchBookings();
       fetchBookedSeats();
+      fetchAirlines();
     } else {
       setLoading(false);
     }
   }, [canView]);
+
+  const fetchAirlines = async () => {
+    try {
+      const response = await axiosInstance.get("/airline");
+      setAirlines(response.data?.data || response.data || []);
+    } catch (error) {
+      console.error("Error fetching airlines:", error);
+    }
+  };
+
+  const getAirlineShortCode = (airlineName?: string) => {
+    if (!airlineName) return undefined;
+    const match = airlines.find(
+      (a) => a.airlineName?.toLowerCase() === airlineName.toLowerCase()
+    );
+    return match?.shortCode;
+  };
 
   useEffect(() => {
     const queryGroupType = new URLSearchParams(location.search).get("groupType");
@@ -277,6 +500,14 @@ const GroupTicketing = () => {
       return;
     }
     window.open(`/admin-portal/group-ticketing/edit/${bookingId}`, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCopy = (bookingId: string) => {
+    if (!canCreate) {
+      window.alert("You don't have permission to create groups");
+      return;
+    }
+    window.open(`/admin-portal/group-ticketing/create/${bookingId}`, "_blank", "noopener,noreferrer");
   };
 
   const handleDelete = async (bookingId: string) => {
@@ -506,9 +737,46 @@ const GroupTicketing = () => {
     return counts;
   }, [bookings]);
 
-  const formatCurrency = (amount?: number, currency = "PKR") => {
-    if (amount === undefined || amount === null || Number.isNaN(Number(amount))) return "-";
-    return `${currency} ${Number(amount).toLocaleString()}`;
+  const handleSavePricing = async (bookingId: string, priceUpdates: PriceEditValues): Promise<boolean> => {
+    if (!canUseActions) {
+      window.alert("You don't have permission to manage groups");
+      return false;
+    }
+
+    const target = bookings.find((group) => group._id === bookingId);
+    if (!target) return false;
+
+    try {
+      const token = localStorage.getItem("admin_token");
+      const response = await axiosInstance.put(
+        `/group-ticketing/${bookingId}`,
+        {
+          price: { ...target.price, ...priceUpdates },
+          // Sent alongside price so the backend's partial-update route doesn't
+          // reset totalSeatsAfterPartial (it recomputes from these two fields
+          // on every PUT, defaulting missing ones to 0).
+          totalSeats: target.totalSeats,
+          partialSeats: (target as unknown as { partialSeats?: number }).partialSeats || 0,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setBookings((prev) =>
+          prev.map((group) => (group._id === bookingId ? response.data.data : group))
+        );
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      console.error("Error updating pricing:", error);
+      window.alert("❌ " + (error.response?.data?.message || "Failed to update pricing"));
+      return false;
+    }
   };
 
   const statusBadgeClass = (status?: string) => {
@@ -551,14 +819,14 @@ const GroupTicketing = () => {
     infants?: number;
     bookings?: number;
   }) => {
-    const total = adults + children + infants;
+    // const total = adults + children + infants;
 
     return (
       <div className="min-w-34 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/40">
-        <div className="mb-2 flex items-center justify-between">
+        {/* <div className="mb-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Passengers</span>
           <span className="rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-bold text-white dark:bg-white dark:text-gray-900">{total}</span>
-        </div>
+        </div> */}
         <div className="grid grid-cols-3 gap-1 text-center">
           {[
             ["Adult", adults],
@@ -579,35 +847,6 @@ const GroupTicketing = () => {
       </div>
     );
   };
-
-  const GroupPricingMiniTable = ({ booking }: { booking: GroupTicketing }) => (
-    <div className="min-w-76 overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900/40">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-            <th className="px-2 py-1.5 text-left font-bold">Type</th>
-            <th className="px-2 py-1.5 text-left font-bold">Adult</th>
-            <th className="px-2 py-1.5 text-left font-bold">Child</th>
-            <th className="px-2 py-1.5 text-left font-bold">Infant</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border-t border-gray-100 text-blue-600 dark:border-gray-800 dark:text-blue-300">
-            <td className="px-2 py-1.5 font-bold">Buying</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingAdultPrice, booking.price.buyingCurrency)}</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingChildPrice, booking.price.buyingCurrency)}</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingInfantPrice, booking.price.buyingCurrency)}</td>
-          </tr>
-          <tr className="border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300">
-            <td className="px-2 py-1.5 font-bold">Selling</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingAdultPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingChildPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-            <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingInfantPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
 
   if (!canView) {
     return (
@@ -733,11 +972,8 @@ const GroupTicketing = () => {
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Group & Voucher</th>
                     {/* <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Sector (Route)</th> */}
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Airline & PNR</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Seats (Booked/Total)</th>
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Passengers (A/C/I)</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Posted By</th>
-                    <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Public</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Price</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Pricing</th>
                     <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -764,8 +1000,11 @@ const GroupTicketing = () => {
                               ({booking.groupNo || "-"})
                             </p>
                           }
-                          <div className="text-sm font-bold text-gray-800 dark:text-white">
+                          {/* <div className="text-sm font-bold text-gray-800 dark:text-white">
                             {booking.groupName || "Unnamed Group"}
+                          </div> */}
+                          <div className="text-sm text-gray-800 font-semibold dark:text-white">
+                            Sector: {booking.sector || "Unnamed Group"}
                           </div>
                           {/* <div className="text-[11px] text-gray-500 font-mono">{booking.voucher_id}</div> */}
                           <div className="mt-1">
@@ -790,83 +1029,48 @@ const GroupTicketing = () => {
                           </div>
                         </td>
 
-                        {/* Sector / Route */}
-                        {/* <td className="px-4 py-4">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white">
-                            <span>{booking.flights[0]?.sectorFrom || "N/A"}</span>
-                            <span className="text-blue-500">➔</span>
-                            <span>{booking.flights[booking.flights.length - 1]?.sectorTo || "N/A"}</span>
-                          </div>
-                          <div className="text-[11px] text-gray-500 mt-0.5">
-                            {booking.flights[0]?.depTime} | {new Date(booking.flights[0]?.depDate).toLocaleDateString('en-GB')}
-                          </div>
-                        </td> */}
-                        {/* <td className="px-4 py-4">
-                          <div className="flex flex-col gap-2">
-                            {booking.flights && booking.flights.length > 0 ? (
-                              booking.flights.map((flight, flightIndex) => (
-                                <div
-                                  key={`${flight.flightNo}-${flightIndex}`}
-                                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/40"
-                                >
-                                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white">
-                                    <span>{flight.sectorFrom || "N/A"}</span>
-                                    <span className="text-blue-500">➔</span>
-                                    <span>{flight.sectorTo || "N/A"}</span>
-                                  </div>
-
-                                  <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                                    <span className="font-semibold">Dep:</span>{" "}
-                                    {flight.depTime || "N/A"} |{" "}
-                                    {flight.depDate
-                                      ? dayjs(flight.depDate).format("DD MMM YYYY")
-                                      : "N/A"}
-                                  </div>
-
-                                  <div className="text-[11px] text-gray-500 dark:text-gray-400">
-                                    <span className="font-semibold">Arr:</span>{" "}
-                                    {flight.arrTime || "N/A"} |{" "}
-                                    {flight.arrDate
-                                      ? dayjs(flight.arrDate).format("DD MMM YYYY")
-                                      : "N/A"}
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">No flights</span>
-                            )}
-                          </div>
-                        </td> */}
-
                         {/* Airline & PNR */}
                         <td className="px-4 py-4 text-sm">
                           <div className="font-medium text-gray-700 dark:text-gray-300">
-                            {booking.airline || "Multiple"}
+                            {getAirlineShortCode(booking.airline) || booking.airline || "Multiple"}
                           </div>
                           {booking.pnr ? (
-                            <div className="mt-1.5 inline-block px-3 py-1.5 bg-linear-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-md text-sm font-mono font-bold shadow-md">
-                              PNR: {booking.pnr}
+                            <div className="flex items-center gap-1">
+                              <div className="mt-1.5 inline-block px-1.5 py-0.5 bg-linear-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400 rounded-md text-sm font-mono font-bold shadow-md">
+                                PNR: {booking.pnr}
+                              </div>
+
+                              {booking.flights[0]?.flightClass && (
+                                <div className="mt-1.5">
+                                  <span className={`inline-block px-1.5 py-0.5 text-[11px] font-semibold rounded-md ${booking.flights[0].flightClass.toLowerCase().includes('business')
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400'
+                                    : booking.flights[0].flightClass.toLowerCase().includes('first')
+                                      ? 'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-900/30 dark:text-purple-400'
+                                      : 'bg-gray-100 text-gray-800 border border-gray-300 dark:bg-gray-900/30 dark:text-gray-400'
+                                    }`}>
+                                    {booking.flights[0].flightClass}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400 italic">No PNR</span>
                           )}
-                          {booking.flights[0]?.flightClass && (
-                            <div className="mt-1.5">
-                              <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-md ${booking.flights[0].flightClass.toLowerCase().includes('business')
-                                ? 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400'
-                                : booking.flights[0].flightClass.toLowerCase().includes('first')
-                                  ? 'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-900/30 dark:text-purple-400'
-                                  : 'bg-gray-100 text-gray-800 border border-gray-300 dark:bg-gray-900/30 dark:text-gray-400'
-                                }`}>
-                                {booking.flights[0].flightClass}
-                              </span>
+
+                          <div className="mt-2">
+                            <p className="text-xs mb-1 font-semibold">Posted By:</p>
+                            <div className="text-sm text-gray-800 dark:text-white">
+                              {postedBy?.name || "-"}
                             </div>
-                          )}
+                            {/* <div className="mt-0.5 break-all text-xs text-gray-500 dark:text-gray-400">
+                              {postedBy?.email || "-"}
+                            </div> */}
+                          </div>
                         </td>
 
-                        {/* Seats - Show Booked vs Total */}
+                        {/* Passenger Breakdown */}
                         <td className="px-4 py-4">
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-1 mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-gray-800 dark:text-white">
                                 {bookedSeats} / {totalSeats}
@@ -894,10 +1098,7 @@ const GroupTicketing = () => {
                               </div>
                             )}
                           </div>
-                        </td>
 
-                        {/* Passenger Breakdown */}
-                        <td className="px-4 py-4">
                           <PassengerSummary
                             adults={bookedInfo?.totalAdults || 0}
                             children={bookedInfo?.totalChildren || 0}
@@ -906,64 +1107,67 @@ const GroupTicketing = () => {
                           />
                         </td>
 
-                        {/* Posted By */}
-                        <td className="px-4 py-4">
-                          <div className="min-w-44">
-                            <div className="text-sm font-semibold text-gray-800 dark:text-white">
-                              {postedBy?.name || "-"}
-                            </div>
-                            <div className="mt-0.5 break-all text-xs text-gray-500 dark:text-gray-400">
-                              {postedBy?.email || "-"}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Internal Status */}
-                        <td className="px-4 py-4 text-sm">
-                          <div className="flex justify-center items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleInternalStatus(booking._id, booking.internalStatus || "Private")}
-                              disabled={!canUseActions}
-                              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${booking.internalStatus === 'Public' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'} ${!canUseActions ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-400'}`}
-                              title={!canUseActions ? "You don't have permission to manage groups" : booking.internalStatus === 'Public' ? "Set Private" : "Set Public"}
-                            >
-                              <span className={`inline-block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${booking.internalStatus === 'Public' ? 'translate-x-5.5' : ''}`} />
-                            </button>
-                          </div>
-                        </td>
-
                         {/* Pricing */}
                         <td className="px-4 py-4 text-sm">
-                          <GroupPricingMiniTable booking={booking} />
+                          <GroupPricingMiniTable
+                            booking={booking}
+                            canEdit={canUseActions}
+                            onSave={handleSavePricing}
+                          />
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-4 text-sm max-w-40">
-                          <div className="flex justify-center items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => handleEdit(booking._id)}
-                              disabled={!canUseActions}
-                              className="rounded-md bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={!canUseActions ? "You don't have permission to manage groups" : ""}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(booking._id)}
-                              disabled={!canUseActions}
-                              className="rounded-md bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={!canUseActions ? "You don't have permission to manage groups" : ""}
-                            >
-                              Delete
-                            </button>
+                        <td className="px-4 py-4 text-sm">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="flex justify-center gap-1.5">
+                              <button
+                                onClick={() => handleEdit(booking._id)}
+                                disabled={!canUseActions}
+                                className="rounded-md bg-blue-500 p-1.5 text-white hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={!canUseActions ? "You don't have permission to manage groups" : "Edit"}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleCopy(booking._id)}
+                                disabled={!canCreate}
+                                className="rounded-md bg-purple-600 p-1.5 text-white hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={!canCreate ? "You don't have permission to create groups" : "Open the create form pre-filled with this group's data"}
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(booking._id)}
+                                disabled={!canUseActions}
+                                className="rounded-md bg-red-500 p-1.5 text-white hover:bg-red-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={!canUseActions ? "You don't have permission to manage groups" : "Delete"}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+
                             <button
                               onClick={() => handleViewBookings(booking)}
-                              className="rounded-md bg-green-500 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
+                              className="rounded-md bg-green-500 px-2.5 py-1.5 text-xs whitespace-nowrap font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
                               title="View bookings for this group's departure date"
                             >
                               View Bookings
                             </button>
+
+                            <div className="flex justify-center items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleInternalStatus(booking._id, booking.internalStatus || "Private")}
+                                disabled={!canUseActions}
+                                className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${booking.internalStatus === 'Public' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'} ${!canUseActions ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-400'}`}
+                                title={!canUseActions ? "You don't have permission to manage groups" : booking.internalStatus === 'Public' ? "Set Private" : "Set Public"}
+                              >
+                                <span className={`inline-block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${booking.internalStatus === 'Public' ? 'translate-x-5.5' : ''}`} />
+                              </button>
+                              <span className={`text-xs font-semibold ${booking.internalStatus === 'Public' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                {booking.internalStatus || "Private"}
+                              </span>
+                            </div>
                           </div>
                         </td>
                       </tr>

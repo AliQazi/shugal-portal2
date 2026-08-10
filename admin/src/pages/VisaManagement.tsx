@@ -49,7 +49,7 @@ const visaTypeOptions = [
 
 const initialState: VisaType = {
     visaType: "",
-    withTransport: false,
+    withTransport: true,
     processingTime: 0,
     buyingPrice: 0,
     buyingRoe: 0,
@@ -885,8 +885,8 @@ export default function VisaManagement() {
                     </div>
 
                     {/* ── Tables ── */}
-                    <VisaTable data={visasWithoutTransport} title="Umrah Visa — Without Transport" accent="#0891b2" icon={NoSymbolIcon} onEdit={handleEdit} onDelete={handleDelete} canManage={canManage} />
                     <VisaTable data={visasWithTransport} title="Umrah Visa — With Transport" accent="#059669" icon={TruckIcon} onEdit={handleEdit} onDelete={handleDelete} canManage={canManage} />
+                    <VisaTable data={visasWithoutTransport} title="Umrah Visa — Without Transport" accent="#0891b2" icon={NoSymbolIcon} onEdit={handleEdit} onDelete={handleDelete} canManage={canManage} />
                 </div>
             </div>
         </>

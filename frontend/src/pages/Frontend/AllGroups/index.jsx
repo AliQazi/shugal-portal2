@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useContext } from "react";
-import { FaRegCopy, FaCheck } from "react-icons/fa";
-import { DashboardUIContext } from "../../../components/Dashboard/DashboardLayout";
-import { Menu, Package } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { FaRegCopy, FaCheck, FaBus } from "react-icons/fa";
+import { Menu, Package, Plane } from "lucide-react";
 import { FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
@@ -10,6 +9,428 @@ import MaskedDatePicker from "../../../components/MaskedDatePicker";
 import { theme } from "../../../theme/theme";
 import TopBar from "../../../components/TopBar/TopBar";
 import { generateUmrahPackagesPDF } from "../../../utils/umrahPDFGen";
+
+const MONTHS_TITLE = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+// packageTotals uses "shared" but the room-selector UI uses "sharing"
+const ROOM_TOTALS_KEY_MAP = {
+  sharing: "shared",
+  quint: "quint",
+  quad: "quad",
+  triple: "triple",
+  double: "double",
+  childWithoutBed: "childWithoutBed",
+  infant: "infant",
+};
+
+const ROOM_ORDER = [
+  "sharing",
+  "quint",
+  "quad",
+  "triple",
+  "double",
+  // "childWithoutBed",
+  // "infant",
+];
+
+const fmt = (n) => Number(n).toLocaleString();
+
+const formatTime = (time) => {
+  if (!time) return "";
+  if (time.length === 4 && !time.includes(":"))
+    return `${time.slice(0, 2)}:${time.slice(2, 4)}`;
+  return time.slice(0, 5);
+};
+
+// Room price resolution mirrors the previous card logic: packageTotals wins
+// when set, falling back to the raw rooms map saved on the package.
+const getRoomPrice = (pkg, key) => {
+  const totalsKey = ROOM_TOTALS_KEY_MAP[key] || key;
+  const fromTotals = pkg.packageTotals?.[totalsKey];
+  if (typeof fromTotals === "number" && fromTotals > 0) return fromTotals;
+  const fromRooms = pkg.rooms?.[key];
+  return typeof fromRooms === "number" && fromRooms > 0 ? fromRooms : null;
+};
+
+const combineHotelsByName = (hotels) =>
+  hotels.reduce((combined, hotel) => {
+    const hotelName = (hotel.name || "").trim();
+    const normalizedName = hotelName.toLowerCase();
+    const existing = combined.find(
+      (item) => (item.name || "").trim().toLowerCase() === normalizedName,
+    );
+    if (existing && normalizedName) {
+      existing.nightCount += Number(hotel.nightCount) || 0;
+      return combined;
+    }
+    combined.push({
+      ...hotel,
+      name: hotelName || hotel.name,
+      nightCount: Number(hotel.nightCount) || 0,
+    });
+    return combined;
+  }, []);
+
+const getCityHotels = (pkg, cities) =>
+  combineHotelsByName(
+    (pkg.hotels || []).filter((hotel) =>
+      cities.includes((hotel.city || "").toLowerCase()),
+    ),
+  );
+
+const roomLabel = (key) =>
+  key === "childWithoutBed"
+    ? "Child"
+    : key === "infant"
+      ? "Infant"
+      : key.charAt(0).toUpperCase() + key.slice(1);
+
+// The room columns rendered for a batch are the union of whatever room
+// types any package on that group ticket actually has priced, so the table
+// stays aligned across rows instead of guessing a fixed column set.
+const getBatchRoomColumns = (packages) =>
+  ROOM_ORDER.filter((key) =>
+    packages.some((pkg) => getRoomPrice(pkg, key) !== null),
+  ).map((key) => ({ key, label: roomLabel(key) }));
+
+// Transport can vary between the different Group Tickets merged into one
+// Airline+Sector batch, so collect the union across every package instead
+// of assuming it's identical, deduping on route + transport type.
+const getBatchTransport = (packages) => {
+  const seen = new Set();
+  const combined = [];
+  packages.forEach((pkg) => {
+    (pkg.transport || []).forEach((t) => {
+      const dedupeKey = `${(t.route || "").trim().toLowerCase()}|${(t.transportType || "").trim().toLowerCase()}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      combined.push(t);
+    });
+  });
+  return combined;
+};
+
+// Falls back to the first room type (in ROOM_ORDER) that has a price when
+// the generic "Book Now" button is used instead of a specific price cell —
+// mirrors the default selection DetailPage used to make before booking.
+const getDefaultRoomSelection = (pkg) => {
+  for (const key of ROOM_ORDER) {
+    const price = getRoomPrice(pkg, key);
+    if (price !== null) return { room: key, price };
+  }
+  return { room: "sharing", price: 0 };
+};
+
+// Short date used inside the combined Schedule column, e.g. "15 AUG" — no
+// year, month abbreviation uppercased to match the requested format.
+const formatScheduleDate = (dateStr) => {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (isNaN(d)) return "-";
+  return `${String(d.getDate()).padStart(2, "0")} ${MONTHS_TITLE[d.getMonth()].toUpperCase()}`;
+};
+
+// Collapses Departure/Arrival/Dep Date Time/Arr Date Time into one line,
+// e.g. "PK 15 AUG LHE-JED 17:30 21:30".
+const formatScheduleLine = (fl, airlineCode) => {
+  const prefix = airlineCode ? `${airlineCode} ` : "";
+  const route = `${fl.sectorFrom || "-"}-${fl.sectorTo || "-"}`;
+  const depTime = formatTime(fl.depTime) || "-";
+  const arrTime = formatTime(fl.arrTime) || "-";
+  return `${prefix}${formatScheduleDate(fl.depDate)} ${route} ${depTime} ${arrTime}`;
+};
+
+const HotelCellLines = ({ pkg }) => {
+  const makkah = getCityHotels(pkg, ["makkah", "mecca"]);
+  const madinah = getCityHotels(pkg, ["madinah", "madina", "medina"]);
+  const lines = [
+    ...makkah.map((h) => ({ tag: "Makkah", hotel: h })),
+    ...madinah.map((h) => ({ tag: "Madina", hotel: h })),
+  ];
+
+  if (!lines.length) {
+    return <span className="text-xs text-gray-400 italic">No hotels</span>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map(({ tag, hotel }, i) => (
+        <div key={hotel._id || i} className="text-xs leading-relaxed">
+          <span className="font-bold text-gray-800">{tag}:</span>{" "}
+          <span className="text-gray-700">{hotel.name || "-"}</span>
+          {hotel.distance && hotel.distance !== "-" && (
+            <span className="text-gray-500"> ({hotel.distance})</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// A batch groups every package that shares the same Airline + Sector,
+// regardless of which Group Ticket it was built from — packages from
+// different Group Tickets (different flight dates, hotels, etc.) on the
+// same route collapse into one card. The shared airline/sector info is
+// shown once in the header, and every hotel/room combination — from any
+// of the underlying Group Tickets — becomes one row of the table below,
+// each keeping its own flight legs, dates and (critically) its own
+// Group Ticket's seat availability for booking.
+const UmrahBatchCard = ({ batch, index, onBook }) => {
+  const packages = batch.packages;
+  const headerPkg = packages[0];
+  const flights = headerPkg.flights || [];
+  const roomColumns = getBatchRoomColumns(packages);
+  // Transport can differ between the merged Group Tickets, so the header
+  // shows the union (deduped by route + type) instead of just headerPkg's.
+  const batchTransport = getBatchTransport(packages);
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden mb-3 bg-white shadow-sm"
+      style={{ border: `1px solid ${theme.colors.border}` }}
+    >
+      {/* Header Bar: airline logo left, sector centered, badges right */}
+      <div
+        className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 p-2 sm:p-3.5"
+        style={{ borderBottom: `3px solid ${theme.colors.primary}` }}
+      >
+        <div className="flex-1 flex items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
+          <div className="w-40 h-8 shrink-0 bg-white rounded-md flex items-center justify-center overflow-hidden">
+            <img
+              src={
+                headerPkg.airline?.logo_url ||
+                "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=100&h=100&fit=crop"
+              }
+              alt={headerPkg.airlineName}
+              className="w-full! h-full! object-contain"
+              onError={(e) => {
+                e.currentTarget.src =
+                  "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=100&h=100&fit=crop";
+              }}
+            />
+          </div>
+          <span className="sm:hidden text-xs font-bold text-gray-400">
+            {index !== undefined ? `#${index + 1}` : ""}
+          </span>
+        </div>
+
+        <div className="shrink-0 flex items-center justify-center gap-2">
+          <Plane
+            size={16}
+            className="shrink-0"
+            style={{ color: theme.colors.primary }}
+          />
+          <span
+            className="text-base sm:text-lg font-bold tracking-wide text-center"
+            style={{ color: theme.colors.textPrimary }}
+          >
+            {headerPkg.sector || headerPkg.airlineName || "Group"}
+          </span>
+        </div>
+
+        <div className="flex-1 flex flex-wrap items-center justify-center sm:justify-end gap-1.5">
+          {headerPkg.packageDuration && (
+            <span
+              className="rounded-full border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
+              style={{
+                borderColor: theme.colors.border,
+                background: theme.colors.background,
+                color: theme.colors.primaryDark,
+              }}
+            >
+              {headerPkg.packageDuration} Days
+            </span>
+          )}
+          {headerPkg.nightCount && (
+            <span
+              className="rounded-full border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
+              style={{
+                borderColor: theme.colors.border,
+                background: theme.colors.background,
+                color: theme.colors.primaryDark,
+              }}
+            >
+              {headerPkg.nightCount} Nights
+            </span>
+          )}
+          {/* {headerPkg.availableRooms !== "" &&
+            headerPkg.availableRooms !== undefined && (
+              <span
+                className="rounded-full border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
+                style={{
+                  borderColor: theme.colors.border,
+                  background: theme.colors.background,
+                  color: theme.colors.primaryDark,
+                }}
+              >
+                Seats: {headerPkg.availableRooms}
+              </span>
+            )} */}
+          {/* {packages.length > 1 && (
+            <span className="rounded-full bg-amber-100 border border-amber-300 text-amber-800 px-2.5 py-1 text-xs font-black whitespace-nowrap">
+              {packages.length} Options
+            </span>
+          )} */}
+        </div>
+      </div>
+
+      {/* Transport info (union across every merged Group Ticket, shown once) */}
+      {batchTransport.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1.5 px-3 sm:px-4 py-2 border-b"
+          style={{
+            borderColor: theme.colors.border,
+            background: theme.colors.background,
+          }}
+        >
+          {batchTransport.map((t, i) => (
+            <span
+              key={i}
+              className="flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-200 text-blue-700 px-2.5 py-1 rounded-lg font-medium"
+            >
+              <FaBus size={11} />
+              {t.route} ({t.transportType})
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Flight + hotel + pricing table — one row per hotel/room option */}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-190 text-left border-collapse">
+          <thead>
+            <tr style={{ background: theme.colors.background }}>
+              <th className="px-3 sm:px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">
+                Hotels
+              </th>
+              <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">
+                Schedule
+              </th>
+              <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">
+                Luggage
+              </th>
+              {roomColumns.map((col) => (
+                <th
+                  key={col.key}
+                  className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap"
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody
+            className="divide-y"
+            style={{ borderColor: theme.colors.border }}
+          >
+            {packages.map((pkg) => {
+              const legs = pkg.flights?.length ? pkg.flights : flights;
+
+              return (
+                <tr
+                  key={pkg.id || pkg._id}
+                  className="align-top even:bg-gray-50"
+                  style={{ borderColor: theme.colors.border }}
+                >
+                  <td className="px-3 sm:px-4 py-4 min-w-44">
+                    <HotelCellLines pkg={pkg} />
+                    {pkg.notes && (
+                      <div className="text-[11px] text-amber-700 mt-1.5">
+                        📝 {pkg.notes}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-4 text-xs font-semibold text-gray-700 whitespace-nowrap leading-relaxed">
+                    {legs.map((fl, i) => (
+                      <div key={i}>
+                        {formatScheduleLine(fl, pkg.airline?.airlineCode)}
+                      </div>
+                    ))}
+                  </td>
+                  <td className="px-3 py-4 text-xs text-gray-700 whitespace-nowrap">
+                    <div className="flex flex-col gap-1">
+                      {legs.map((fl, i) => {
+                        const baggage = fl.baggage || "-";
+                        return (
+                          <div key={i} className="leading-relaxed">
+                            <span className="inline-flex items-center gap-1 text-xs">
+                              <svg
+                                className="w-3 h-3 text-gray-500"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                />
+                              </svg>
+                              {baggage}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </td>
+                  {roomColumns.map((col) => {
+                    const price = getRoomPrice(pkg, col.key);
+                    return (
+                      <td key={col.key} className="px-3 py-4 text-center">
+                        {price ? (
+                          <button
+                            onClick={() => onBook(pkg, col.key, price)}
+                            className="group relative inline-flex w-fit flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg px-4 py-2 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                          >
+                            {/* Gradient layer only shows on hover — the price
+                                stays plain text otherwise */}
+                            <span
+                              className="absolute inset-0 rounded-lg opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                              style={{
+                                background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
+                              }}
+                            />
+                            <span
+                              className="relative text-sm font-bold whitespace-nowrap transition-colors duration-200 group-hover:text-white"
+                            >
+                              {fmt(price)}
+                            </span>
+                            {/* Space is always reserved so hovering never shifts row height */}
+                            <span className="relative text-[10px] font-black uppercase tracking-wide text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                              Book Now
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="flex min-h-14 items-center justify-center text-gray-300">
+                            —
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
 export default function AllGroups({ headerType, header, searchParams, user }) {
   // const [copiedAll, setCopiedAll] = useState(false);
@@ -39,21 +460,6 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
       setDownloadingPDF(false);
     }
   };
-
-  const MONTHS_TITLE = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
 
   // const buildCopyText = (groupsList) => {
   //   if (!groupsList.length) return "";
@@ -116,7 +522,6 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
   //   );
   // };
 
-  const dashboardUI = useContext(DashboardUIContext);
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,35 +532,28 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
     searchKeyword: "",
     departDate: null,
   });
+  // Advanced Search stays collapsed by default until the user opts in.
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [airlines, setAirlines] = useState([]);
   const [sectors, setSectors] = useState([]);
 
   useEffect(() => {
-    if (dashboardUI) setShowAdvancedSearch(true);
-  }, []);
-  useEffect(() => {
     window.scrollTo(0, 0);
     fetchGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  const formatTime = (time) => {
-    if (!time) return "";
-    if (time.length === 4 && !time.includes(":"))
-      return `${time.slice(0, 2)}:${time.slice(2, 4)}`;
-    return time.slice(0, 5);
-  };
 
   const getId = (value) => String(value || "");
 
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      const [packageRes, groupTicketRes, bookedSeatsRes] =
+      const [packageRes, groupTicketRes, bookedSeatsRes, airlineRes] =
         await Promise.allSettled([
           axiosInstance.get("/umrahpackages/"),
           axiosInstance.get("/group-ticketing"),
           axiosInstance.get("/bookings/getBookedSeats"),
+          axiosInstance.get("/airline"),
         ]);
 
       if (packageRes.status !== "fulfilled") {
@@ -196,6 +594,32 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
         );
       }
 
+      // Real-time airline logos from the Airline collection, keyed every way
+      // a package's airline field might be stored (full name / short code /
+      // IATA code) so a match is found regardless of data source.
+      const airlineLogoByKey = {};
+      // Same idea, but resolving the airline's short IATA-style code (e.g.
+      // "PK") used as the prefix in the Schedule column.
+      const airlineCodeByKey = {};
+      if (
+        airlineRes.status === "fulfilled" &&
+        airlineRes.value.data?.success
+      ) {
+        (airlineRes.value.data.data || []).forEach((airline) => {
+          const keys = [
+            airline.airlineName,
+            airline.shortCode,
+            airline.airlineCode,
+          ].filter(Boolean);
+          keys.forEach((key) => {
+            const normalizedKey = key.trim().toLowerCase();
+            if (airline.logo) airlineLogoByKey[normalizedKey] = airline.logo;
+            if (airline.airlineCode)
+              airlineCodeByKey[normalizedKey] = airline.airlineCode;
+          });
+        });
+      }
+
       const filtered = fetchedGroups.filter(
         (pkg) => pkg.internalStatus === "Public",
       );
@@ -213,12 +637,22 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             pkg.airlineName ||
             "";
 
+          // Prefer the airline's current logo from the Airline collection
+          // (kept up to date by admins) over the snapshot saved on the
+          // package at creation time.
+          const airlineLogo = airlineName
+            ? airlineLogoByKey[airlineName.trim().toLowerCase()]
+            : undefined;
+          const airlineCode = airlineName
+            ? airlineCodeByKey[airlineName.trim().toLowerCase()]
+            : undefined;
+
           const sectorPoints =
             flights.length > 0
               ? [
-                  firstFlight.sectorFrom || "",
-                  ...flights.map((f) => f.sectorTo || ""),
-                ].filter(Boolean)
+                firstFlight.sectorFrom || "",
+                ...flights.map((f) => f.sectorTo || ""),
+              ].filter(Boolean)
               : [];
           const sector = sectorPoints.join("-");
 
@@ -270,8 +704,8 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
 
           const selectedGroupTicketId = getId(
             pkg.selectedGroupTicketId ||
-              pkg.groupTicket?._id ||
-              pkg.groupTicket?.id,
+            pkg.groupTicket?._id ||
+            pkg.groupTicket?.id,
           );
           const groupTicketSeats = groupTicketTotalSeats[selectedGroupTicketId];
           const groupTicketBookedSeats =
@@ -310,7 +744,8 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             airlineName,
             airline: {
               airline_name: airlineName,
-              logo_url: pkg.flightLogo || null,
+              logo_url: airlineLogo || pkg.flightLogo || null,
+              airlineCode: airlineCode || pkg.airlineCode || "",
             },
             logo: pkg.logo,
             dept_date: toDate(firstFlight.depDate),
@@ -430,6 +865,34 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
     return true;
   });
 
+  // Packages are shown as one batch card per Airline + Sector — packages
+  // built from different Group Tickets (different flight dates, hotels,
+  // etc.) collapse into the same card as long as the airline and sector
+  // match exactly, with each hotel/room combination becoming its own
+  // option row. Each row still carries its own package object (and thus
+  // its own Group Ticket's seat availability/pricing), so booking a
+  // specific row always books against the correct Group Ticket — only the
+  // card grouping changes, not what gets booked.
+  const batchMap = new Map();
+  filteredGroups.forEach((group) => {
+    const airlineKey = (group.airlineName || "").trim().toLowerCase();
+    const sectorKey = (group.sector || "").trim().toUpperCase();
+    const key =
+      airlineKey && sectorKey
+        ? `route-${airlineKey}|${sectorKey}`
+        : group.groupTiktId
+          ? `ticket-${group.groupTiktId}`
+          : `single-${group.id || group._id}`;
+    if (!batchMap.has(key)) batchMap.set(key, { key, packages: [] });
+    batchMap.get(key).packages.push(group);
+  });
+  const groupedPackageCards = Array.from(batchMap.values()).map((batch) => ({
+    ...batch,
+    packages: [...batch.packages].sort(
+      (a, b) => (a.price || 0) - (b.price || 0),
+    ),
+  }));
+
   const FilterContent = () => (
     <>
       <h3 className="font-bold text-sm mb-3 text-gray-800">Airlines</h3>
@@ -474,417 +937,6 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
     </>
   );
 
-  const UmrahPackageCard = ({ group, index }) => {
-    const allFlights = group.flights || [];
-    // const hotels = group.hotels || [];
-    const rooms = group.rooms || {};
-
-    // const makkahHotels = hotels.slice(0, 1);
-    // const madinahHotels = hotels.slice(1, 2);
-    // const makkahHotels = hotels.filter((hotel) =>
-    //   ["makkah", "mecca"].includes((hotel.city || "").toLowerCase())
-    // );
-
-    // const madinahHotels = hotels.filter((hotel) =>
-    //   ["madinah", "madina", "medina"].includes((hotel.city || "").toLowerCase())
-    // );
-
-    const allDisplayHotels = group.hotels || [];
-
-    const combineHotelsByName = (hotels) =>
-      hotels.reduce((combinedHotels, hotel) => {
-        const hotelName = (hotel.name || "").trim();
-        const normalizedName = hotelName.toLowerCase();
-        const existingHotel = combinedHotels.find(
-          (item) => (item.name || "").trim().toLowerCase() === normalizedName,
-        );
-
-        if (existingHotel && normalizedName) {
-          existingHotel.nightCount += Number(hotel.nightCount) || 0;
-          return combinedHotels;
-        }
-
-        combinedHotels.push({
-          ...hotel,
-          name: hotelName || hotel.name,
-          nightCount: Number(hotel.nightCount) || 0,
-        });
-        return combinedHotels;
-      }, []);
-
-    const makkahHotels = combineHotelsByName(
-      allDisplayHotels.filter((hotel) =>
-        ["makkah", "mecca"].includes((hotel.city || "").toLowerCase()),
-      ),
-    );
-
-    const madinahHotels = allDisplayHotels.filter((hotel) =>
-      ["madinah", "madina", "medina"].includes(
-        (hotel.city || "").toLowerCase(),
-      ),
-    );
-
-    const packageTotals = group.packageTotals || {};
-    // packageTotals uses "shared" but display uses "sharing"
-    const totalsKeyMap = {
-      sharing: "shared",
-      quint: "quint",
-      quad: "quad",
-      triple: "triple",
-      double: "double",
-      childWithoutBed: "childWithoutBed",
-      infant: "infant",
-    };
-
-    const roomOrder = [
-      "sharing",
-      "quint",
-      "quad",
-      "triple",
-      "double",
-      "childWithoutBed",
-      "infant",
-    ];
-    const roomColors = {
-      sharing: { bg: "#e8f4fd", text: "#1565c0", border: "#90caf9" },
-      quad: { bg: "#f3e5f5", text: "#6a1b9a", border: "#ce93d8" },
-      triple: { bg: "#e8f5e9", text: "#2e7d32", border: "#a5d6a7" },
-      double: { bg: "#fff8e1", text: "#e65100", border: "#ffcc80" },
-      quint: { bg: "#fce4ec", text: "#880e4f", border: "#f48fb1" },
-      childWithoutBed: { bg: "#fef9c3", text: "#854d0e", border: "#fde047" },
-      infant: { bg: "#fce7f3", text: "#9d174d", border: "#f9a8d4" },
-    };
-
-    const getRoomPrice = (key) => {
-      const totalsKey = totalsKeyMap[key] || key;
-      const fromTotals = packageTotals[totalsKey];
-      if (typeof fromTotals === "number" && fromTotals > 0) return fromTotals;
-      return rooms[key];
-    };
-
-    const availableRoomTypes = roomOrder
-      .filter((key) => {
-        const price = getRoomPrice(key);
-        return typeof price === "number" && price > 0;
-      })
-      .map((key) => ({
-        key,
-        label:
-          key === "childWithoutBed"
-            ? "Child"
-            : key === "infant"
-              ? "Infant"
-              : key.charAt(0).toUpperCase() + key.slice(1),
-      }));
-
-    const fmt = (n) => Number(n).toLocaleString();
-    const flightRowText = (fl) => {
-      const depD = fl.depDate ? new Date(fl.depDate) : null;
-
-      const dateStr = depD
-        ? `${String(depD.getDate()).padStart(2, "0")} ${MONTHS_TITLE[depD.getMonth()]}`
-        : "";
-
-      const sector =
-        fl.sectorFrom && fl.sectorTo ? `${fl.sectorFrom}-${fl.sectorTo}` : "";
-
-      const times = [fl.depTime, fl.arrTime].filter(Boolean).join("–");
-
-      const baggage = fl.baggage ? fl.baggage : "";
-
-      const parts = [];
-
-      if (dateStr) parts.push(dateStr);
-      if (sector) parts.push(sector);
-      if (fl.flightNo) parts.push(fl.flightNo);
-      if (times) parts.push(times);
-      if (baggage) parts.push(baggage);
-
-      return parts.join(" • ");
-    };
-
-    // const HotelInfo = ({ hotels, icon, alt }) => (
-    //   <div className="flex flex-col items-center gap-2 min-w-45 max-w-60">
-    //     <img
-    //       className="w-12 h-12 object-contain shrink-0"
-    //       src={icon}
-    //       alt={alt}
-    //     />
-
-    //     <div className="flex flex-col gap-1">
-    //       {hotels.map((hotel, i) => (
-    //         <div key={hotel._id || i} className="text-center">
-    //           <div className="text-[10px] md:text-[11px] font-bold text-gray-900 leading-tight uppercase">
-    //             {hotel.name || "-"}
-    //           </div>
-
-    //           <div className="text-[9px] md:text-[10px] text-red-500 font-bold leading-tight">
-    //             {hotel.distance || "-"} - ({hotel.nightCount || 0} Nights)
-    //           </div>
-    //         </div>
-    //       ))}
-    //     </div>
-    //   </div>
-    // );
-
-    const HotelInfo = ({ hotels, icon, alt }) => (
-      <div className="flex flex-col items-center gap-2 w-full min-w-0">
-        <img
-          className="w-10 h-10 sm:w-12 sm:h-12 object-contain shrink-0"
-          src={icon}
-          alt={alt}
-        />
-
-        <div className="flex flex-col gap-1 w-full min-w-0">
-          {hotels.map((hotel, i) => (
-            <div key={hotel._id || i} className="text-center min-w-0">
-              <div className="text-[10px] md:text-[11px] font-bold text-gray-900 leading-tight uppercase wrap-break-word">
-                {hotel.name || "-"}
-              </div>
-
-              <div className="text-[9px] md:text-[10px] text-red-500 font-bold leading-tight wrap-break-word">
-                {hotel.distance || "-"} - ({hotel.nightCount || 0} Nights)
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-
-    const cream = "#F5F5DC";
-
-    return (
-      <div
-        className="rounded-xl overflow-hidden mb-4 bg-white shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
-        style={{
-          border: `1px solid ${theme.colors.border}`,
-          boxShadow:
-            "0 4px 16px -4px rgba(127,29,29,0.12), 0 2px 6px -2px rgba(127,29,29,0.06)",
-        }}
-      >
-        {/* Header Bar */}
-        <div
-          className="flex flex-col sm:flex-row items-start sm:items-center p-3 sm:p-4 gap-2 sm:gap-3"
-          style={{
-            background: `linear-gradient(135deg, #FFFCF7 0%, #F5EEDC 100%)`,
-            borderBottom: `3px solid ${theme.colors.primary}`,
-          }}
-        >
-          <div
-            className="text-xs sm:text-sm font-bold"
-            // style={{ color: theme.colors.primaryDark }}
-          >
-            {index !== undefined ? `${index + 1} ` : ""}
-            <span>★</span> {group.packageName}
-          </div>
-
-          <div className="flex-1 flex flex-col items-start sm:items-center gap-1 w-full sm:w-auto">
-            {allFlights.map((fl, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold flex-wrap"
-                // style={{ color: theme.colors.textSecondary }}
-              >
-                <span className="text-xs opacity-90">✈</span>
-                <span className="break-all">{flightRowText(fl)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {group.packageDuration && (
-              <div
-                className="rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold whitespace-nowrap shadow-sm text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-                }}
-              >
-                {group.packageDuration} DAYS
-              </div>
-            )}
-            {group.nightCount && (
-              <div
-                className="rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold whitespace-nowrap shadow-sm text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-                }}
-              >
-                {group.nightCount} NIGHTS
-              </div>
-            )}
-            {group.availableRooms !== "" &&
-              group.availableRooms !== undefined && (
-                <div
-                  className="rounded-full px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold whitespace-nowrap shadow-sm text-white"
-                  style={{
-                    background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-                  }}
-                >
-                  Seats: {group.availableRooms}
-                </div>
-              )}
-            {/* {group.visa?.visaType && (
-              <div className="bg-white/20 border border-white/40 rounded-full px-2 sm:px-3 py-1 text-white text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                🛂 {group.visa.visaType} Visa
-              </div>
-            )} */}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="p-2.5 sm:p-3" style={{ background: "#FFFDF9" }}>
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(420px,1.15fr)_auto] gap-4 xl:gap-5 items-center">
-            {/* LEFT SIDE: Airline + Hotels */}
-            <div className="flex flex-col md:flex-row items-center md:items-center justify-center md:justify-start gap-3 md:gap-4 min-w-0">
-              {/* Airline Logo */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 bg-white rounded-md flex items-center justify-center">
-                <img
-                  src={
-                    group.airline?.logo_url ||
-                    "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=100&h=100&fit=crop"
-                  }
-                  alt={group.airlineName}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.currentTarget.src =
-                      "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=100&h=100&fit=crop";
-                  }}
-                />
-              </div>
-
-              {/* Hotels */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
-                {/* Makkah Hotels */}
-                <div className="flex items-center justify-center min-w-10">
-                  {makkahHotels.length > 0 ? (
-                    <HotelInfo
-                      hotels={makkahHotels}
-                      icon="https://www.mtctutorials.com/wp-content/uploads/2022/06/Kaaba-High-Quality-PNG-Image-1.png"
-                      alt="Makkah Hotels"
-                    />
-                  ) : (
-                    <div className="text-[10px] text-gray-400 italic text-center">
-                      No Makkah hotel
-                    </div>
-                  )}
-                </div>
-
-                {/* Madinah Hotels */}
-                <div className="flex items-center justify-center min-w-10">
-                  {madinahHotels.length > 0 ? (
-                    <HotelInfo
-                      hotels={madinahHotels}
-                      icon="https://png.pngtree.com/png-clipart/20220616/original/pngtree-prophet-mohammad-madina-or-madinah-nabawi-mosque-masjid-milad-un-nabi-png-image_8081426.png"
-                      alt="Madinah Hotels"
-                    />
-                  ) : (
-                    <div className="text-[10px] text-gray-400 italic text-center">
-                      No Madinah hotel
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT SIDE: Pricing + Notes + Transport */}
-            <div className="flex flex-col items-center justify-center gap-3 min-w-0 w-full">
-              {/* Room Types */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 items-stretch justify-center gap-1 sm:gap-1.5 w-full">
-                {availableRoomTypes.length > 0 ? (
-                  availableRoomTypes.map(({ key, label }) => {
-                    const c = roomColors[key] || {
-                      bg: "#f3f4f6",
-                      text: "#374151",
-                      border: "#d1d5db",
-                    };
-
-                    return (
-                      <div
-                        key={key}
-                        className="flex flex-col items-center justify-center gap-0.5 px-0.5 sm:px-1.5 py-1 sm:py-1.5 rounded-md min-w-0"
-                        style={{
-                          // background: "#FCFAF5",
-                          border: `1px solid ${c.border}`,
-                          color: "#3A3A3A",
-                        }}
-                      >
-                        <span
-                          className="text-[6px] sm:text-[7px] md:text-[8px] font-bold uppercase tracking-wide text-center truncate w-full"
-                          // style={{ color: c.text }}
-                        >
-                          {label}
-                        </span>
-
-                        <span
-                          className="text-[10px] xs:text-[11px] sm:text-[12px] md:text-[14px] font-bold text-center w-full wrap-break-word leading-tight"
-                          style={{ color: c.text }}
-                        >
-                          Rs {fmt(getRoomPrice(key))}
-                        </span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <span className="text-xs text-gray-400 italic col-span-full">
-                    Pricing unavailable
-                  </span>
-                )}
-              </div>
-
-              {/* Notes */}
-              {group.notes && (
-                <div className="w-full max-w-xl px-3 py-2 bg-yellow-50 border border-yellow-300 rounded-lg">
-                  <div className="flex items-start gap-1.5 text-[11px]">
-                    <span className="text-yellow-600 mt-0.5">📝</span>
-                    <span className="font-bold text-yellow-800 shrink-0">
-                      Note:
-                    </span>
-                    <span className="text-yellow-900 font-medium wrap-break-word">
-                      {group.notes}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Transport info */}
-              {group.transport && group.transport.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 justify-center w-full">
-                  {group.transport.map((t, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1 text-[10px] md:text-[11px] bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded-full font-medium max-w-full"
-                    >
-                      <span>🚌</span>
-                      <span className="wrap-break-word">
-                        {t.route} ({t.transportType})
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ACTION BUTTON */}
-            <div className="flex items-center justify-center xl:justify-end w-full xl:w-auto">
-              <button
-                onClick={() =>
-                  navigate("/dashboard/pkg-detail", { state: { group } })
-                }
-                className="w-full sm:w-auto px-6 py-2.5 rounded-lg text-white text-xs font-bold whitespace-nowrap hover:brightness-110 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-                  boxShadow: "0 4px 12px -2px rgba(127,29,29,0.35)",
-                }}
-              >
-                Book Now
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const LoadingSkeleton = () => (
     <div className="flex flex-col gap-3">
       {[1, 2, 3].map((i) => (
@@ -921,105 +973,64 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
         title={"Umrah Packages"}
         icon={<Package className="text-white w-5 h-5 sm:w-6 sm:h-6" />}
       />
-      <div className="w-full min-h-screen bg-gray-50">
-        {headerType === "dashboard" && groups.length > 0 && (
-          <div className="flex flex-wrap justify-end gap-2 mb-3">
-            <button
-              onClick={handleDownloadPDF}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all"
-              style={{ background: downloadingPDF ? "#94a3b8" : "#dc2626" }}
-              disabled={downloadingPDF}
-            >
-              {downloadingPDF ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-2 border-white border-t-transparent" />
-                  <span className="hidden xs:inline">Generating...</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-3 h-3 sm:w-4 sm:h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  <span className="xs:inline">Download PDF</span>
-                  <span className="xs:hidden">PDF</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+      <div className="w-full min-h-screen umrah-groups-page">
+        {/* NEW: Combined Header Row for Tabs and PDF Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 mb-4 gap-4">
 
-        {/* Duration Tabs */}
-        <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200">
-          <button
-            onClick={() => setActiveDurationTab("all")}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeDurationTab === "all"
-                ? "text-white bg-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            }`}
-            style={
-              activeDurationTab === "all"
-                ? { background: theme.colors.primary, color: "white" }
-                : {}
-            }
-          >
-            All ({getCountForDuration("all")})
-          </button>
-          <button
-            onClick={() => setActiveDurationTab("14")}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeDurationTab === "14"
-                ? "text-white bg-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            }`}
-            style={
-              activeDurationTab === "14"
-                ? { background: theme.colors.primary, color: "white" }
-                : {}
-            }
-          >
-            14 Days ({getCountForDuration(14)})
-          </button>
-          <button
-            onClick={() => setActiveDurationTab("21")}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeDurationTab === "21"
-                ? "text-white bg-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            }`}
-            style={
-              activeDurationTab === "21"
-                ? { background: theme.colors.primary, color: "white" }
-                : {}
-            }
-          >
-            21 Days ({getCountForDuration(21)})
-          </button>
-          <button
-            onClick={() => setActiveDurationTab("28")}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeDurationTab === "28"
-                ? "text-white bg-primary border-b-2 border-primary"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            }`}
-            style={
-              activeDurationTab === "28"
-                ? { background: theme.colors.primary, color: "white" }
-                : {}
-            }
-          >
-            28 Days ({getCountForDuration(28)})
-          </button>
+          {/* Duration Tabs - overflow-x-auto allows scrolling on tiny screens */}
+          <div className="flex overflow-x-auto no-scrollbar">
+            {[
+              { id: "all", label: "All", count: getCountForDuration("all") },
+              { id: "14", label: "14 Days", count: getCountForDuration(14) },
+              { id: "21", label: "21 Days", count: getCountForDuration(21) },
+              { id: "28", label: "28 Days", count: getCountForDuration(28) },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveDurationTab(tab.id)}
+                className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${activeDurationTab === tab.id
+                  ? "text-primary border-primary"
+                  : "text-gray-600 border-transparent hover:text-gray-800 hover:bg-gray-50"
+                  }`}
+                style={
+                  activeDurationTab === tab.id
+                    ? { color: theme.colors.primary, borderColor: theme.colors.primary }
+                    : {}
+                }
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+
+          {/* PDF Download Button - hidden on mobile if needed, or just shrunk */}
+          {headerType === "dashboard" && groups.length > 0 && (
+            <div className="pb-2 sm:pb-0 pr-2">
+              <button
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 rounded-lg text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 shadow-sm"
+                style={{
+                  background: downloadingPDF ? "#94a3b8" : "#dc2626",
+                  marginBottom: '2px' // Aligns visually with the tab border
+                }}
+                disabled={downloadingPDF}
+              >
+                {downloadingPDF ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Download PDF</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -1135,11 +1146,28 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredGroups.map((group, idx) => (
-                  <UmrahPackageCard
-                    key={group.id || group._id || idx}
-                    group={group}
+                {groupedPackageCards.map((batch, idx) => (
+                  <UmrahBatchCard
+                    key={batch.key}
+                    batch={batch}
                     index={idx}
+                    onBook={(pkg, roomKey, price) => {
+                      // A specific price cell was clicked ⇒ book that exact
+                      // room; the generic "Book Now" button falls back to
+                      // the first priced room, same default DetailPage used
+                      // to pick before we cut it out of the booking flow.
+                      const selection =
+                        roomKey && price
+                          ? { room: roomKey, price }
+                          : getDefaultRoomSelection(pkg);
+                      navigate("/dashboard/book-umrah", {
+                        state: {
+                          packageData: pkg,
+                          selectedRoom: selection.room,
+                          pricePerPerson: selection.price,
+                        },
+                      });
+                    }}
                   />
                 ))}
               </div>
@@ -1150,6 +1178,13 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
 
       {/* Add responsive styles */}
       <style jsx>{`
+        @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800;900&display=swap");
+        /* Font is scoped to this page only via .umrah-groups-page — do not
+           move this to a global stylesheet, other pages must stay as-is. */
+        .umrah-groups-page,
+        .umrah-groups-page * {
+          font-family: "Roboto", sans-serif;
+        }
         @media (max-width: 640px) {
           .xs\\:inline {
             display: inline;

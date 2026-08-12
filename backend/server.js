@@ -33,6 +33,7 @@ import groupPricingRuleRoutes from "./routes/groupPricingRule.routes.js";
 import umrahCalculatorRoutes from "./routes/umrahCalculator.routes.js";
 import ummrahVisaRoutes from "./routes/ummrahVisa.routes.js";
 import transportRouteRatesRoutes from "./routes/transportRouteRates.routes.js";
+import rateVolumeRoutes from "./routes/rateVolume.routes.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -93,6 +94,7 @@ app.use("/api/activity-logs", activityLogRoutes);
 app.use("/api/umrah-calculator", umrahCalculatorRoutes);
 app.use("/api/ummrah-visa", ummrahVisaRoutes);
 app.use("/api/transport-route-rates", transportRouteRatesRoutes);
+app.use("/api/rate-volumes", rateVolumeRoutes);
 // Sabaoon integration removed. Only Al-Haider API is used for group data.
 
 /* 🔥 Start Expiry Cron Job */

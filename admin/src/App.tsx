@@ -49,6 +49,7 @@ import UmrahPackage from "./pages/UmrahPackage";
 import UpdateUmrahPackage from "./pages/UpdateUmrahPackage";
 import ManageUmrahPackage from "./pages/ManageUmrahPackage";
 import Hotel from "./pages/Hotel";
+import RateVolumes from "./pages/RateVolumes";
 import Transport from "./pages/Transport";
 import VisaManagement from "./pages/VisaManagement";
 import ManageSubUsers from "./pages/ManageSubUsers";
@@ -108,6 +109,7 @@ export default function App() {
                 <Route path="/ledger/:id" element={<Ledger />} />
 
                 <Route path="/hotel" element={<Hotel />} />
+                <Route path="/rate-volumes" element={<RateVolumes />} />
                 <Route path="/transport" element={<Transport />} />
                 <Route path="/visaManagement" element={<VisaManagement />} />
                 <Route path="/manage-sub-users" element={<ManageSubUsers />} />

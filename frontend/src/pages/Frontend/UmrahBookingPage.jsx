@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   X,
@@ -295,6 +295,10 @@ export default function UmrahBookingPage({ user }) {
   const [mrzError, setMrzError] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Get room capacity (how many pax fit in one room)
   const getRoomCapacity = () => {
     const roomType = selectedRoom?.toLowerCase();
@@ -555,16 +559,16 @@ export default function UmrahBookingPage({ user }) {
       fd.append(
         "packageId",
         packageData._id ||
-          packageData.id ||
-          packageData.voucher_id ||
-          "PKG-" + Date.now(),
+        packageData.id ||
+        packageData.voucher_id ||
+        "PKG-" + Date.now(),
       );
       fd.append(
         "packageName",
         packageData.packageName ||
-          packageData.title ||
-          packageData.name ||
-          "Umrah Package",
+        packageData.title ||
+        packageData.name ||
+        "Umrah Package",
       );
       fd.append("packageSource", packageData.packageSource || "local-db");
       fd.append("user", user?._id || user || "Guest");
@@ -873,7 +877,7 @@ export default function UmrahBookingPage({ user }) {
         {/* Header */}
         <div
           style={{
-            background: theme.colors.primary,
+            background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
             borderRadius: "20px",
             padding: "40px 30px",
             color: "white",
@@ -1331,11 +1335,11 @@ export default function UmrahBookingPage({ user }) {
                             }}
                             src={
                               city?.toLowerCase().includes("makkah") ||
-                              city?.toLowerCase().includes("mecca")
+                                city?.toLowerCase().includes("mecca")
                                 ? "https://www.mtctutorials.com/wp-content/uploads/2022/06/Kaaba-High-Quality-PNG-Image-1.png"
                                 : city?.toLowerCase().includes("madinah") ||
-                                    city?.toLowerCase().includes("madina") ||
-                                    city?.toLowerCase().includes("medina")
+                                  city?.toLowerCase().includes("madina") ||
+                                  city?.toLowerCase().includes("medina")
                                   ? "https://png.pngtree.com/png-clipart/20220616/original/pngtree-prophet-mohammad-madina-or-madinah-nabawi-mosque-masjid-milad-un-nabi-png-image_8081426.png"
                                   : "https://static.vecteezy.com/system/resources/previews/024/160/410/non_2x/blank-board-with-shop-store-building-icon-in-peach-and-white-color-vector.jpg"
                             }

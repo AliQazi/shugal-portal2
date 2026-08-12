@@ -1,6 +1,6 @@
 import { useFormik, FormikHelpers } from "formik";
 import * as Yup from "yup";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router";
 import axiosInstance from "../Api/axios";
 import ComponentCard from "../components/common/ComponentCard";
@@ -172,6 +172,22 @@ interface VisaOption {
   };
 }
 
+interface RateVolumeData {
+  volumeName: string;
+  buyingPrice: number;
+  buyingRoe: number;
+  buyingCurrency: string;
+  sellingPrice: number;
+  sellingRoe: number;
+  sellingCurrency: string;
+}
+
+interface RateVolumeOption {
+  value: string;
+  label: string;
+  data: RateVolumeData;
+}
+
 // ✅ Profit Breakdown Interface
 interface ProfitBreakdown {
   flightCost: number;
@@ -228,14 +244,27 @@ const UmrahPackage = () => {
   const { user } = useAuth();
   const { copyId } = useParams();
   const canCreate = hasPermission(user, "create_umrah_package");
-  const [logoPreview, setLogoPreview] = useState<string>("");
-  const [flightLogoPreview, setFlightLogoPreview] = useState("");
+  // Logo/Flight Logo fields are hidden from this form (not currently needed).
   const [umrahGroups, setUmrahGroups] = useState<GroupTicketing[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingCopy, setLoadingCopy] = useState(false);
   const [hotelOptions, setHotelOptions] = useState<HotelOption[]>([]);
   const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
   const [visaOptions, setVisaOptions] = useState<VisaOption[]>([]);
+  const [rateVolumeOptions, setRateVolumeOptions] = useState<RateVolumeOption[]>([]);
+  // Tracks which Rate Volume is currently picked per hotel row (by hotel index), purely
+  // for displaying the dropdown's selection - not submitted with the package.
+  const [selectedRateVolumeByHotel, setSelectedRateVolumeByHotel] = useState<Record<number, string>>({});
+  // City choices for the Hotel Details "City" field, extracted from the already-saved
+  // Hotels list so it stays in sync with whatever cities are actually in use.
+  const cityOptions = useMemo(
+    () =>
+      Array.from(new Set(hotelOptions.map((h) => h.data?.city).filter((c): c is string => Boolean(c)))).map((c) => ({
+        value: c,
+        label: c,
+      })),
+    [hotelOptions]
+  );
   const [profitBreakdown, setProfitBreakdown] = useState<ProfitBreakdown | null>(null);
   console.log(profitBreakdown)
   const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0, incentive: 0 });
@@ -290,6 +319,25 @@ const UmrahPackage = () => {
               sellingCurrency: h.sellingCurrency || h.currency || "PKR",
               currency: h.currency,
             }
+          }))
+        );
+      }
+    }).catch(() => { });
+    axiosInstance.get("/rate-volumes/all", { params: { isActive: true } }).then((res) => {
+      if (res.data.success) {
+        setRateVolumeOptions(
+          (res.data.data || []).map((v: any) => ({
+            value: v._id,
+            label: `${v.volumeName} (Buy ${v.buyingPrice} ${v.buyingCurrency} / Sell ${v.sellingPrice} ${v.sellingCurrency})`,
+            data: {
+              volumeName: v.volumeName,
+              buyingPrice: v.buyingPrice || 0,
+              buyingRoe: v.buyingRoe || 1,
+              buyingCurrency: v.buyingCurrency || "PKR",
+              sellingPrice: v.sellingPrice || 0,
+              sellingRoe: v.sellingRoe || 1,
+              sellingCurrency: v.sellingCurrency || "PKR",
+            },
           }))
         );
       }
@@ -471,13 +519,7 @@ const UmrahPackage = () => {
 
         if (data.internalStatus) setInternalStatus(data.internalStatus);
 
-        // Logo/flightLogo are uploaded files, not carried over automatically - show the
-        // source package's images as a reference preview, but a new file must be chosen
-        // for this copy to have a logo (the create endpoint only stores an uploaded file).
-        if (data.logo) setLogoPreview(data.logo);
-        if (data.flightLogo) setFlightLogoPreview(data.flightLogo);
-
-        toast.info("Package data copied. Re-upload the logo/flight logo if needed, then review and submit.");
+        toast.info("Package data copied. Review and submit.");
       }
     } catch (error) {
       console.error("Error fetching package to copy:", error);
@@ -716,8 +758,6 @@ const UmrahPackage = () => {
         console.log("Package created:", res.data.package);
 
         resetForm();
-        setLogoPreview("");
-        setFlightLogoPreview("");
 
         const logoInput = document.getElementById("logoInput") as HTMLInputElement;
         const flightLogoInput = document.getElementById("flightLogoInput") as HTMLInputElement;
@@ -850,8 +890,6 @@ const UmrahPackage = () => {
       }]);
       formik.setFieldValue("rooms", { sharing: "", quad: "", quint: "", triple: "", double: "", childWithoutPackage: "", InfantWithoutPackage: "" });
 
-      setLogoPreview("");
-
       const logoInput = document.getElementById("logoInput") as HTMLInputElement;
       if (logoInput) logoInput.value = "";
 
@@ -959,6 +997,71 @@ const UmrahPackage = () => {
     formik.setFieldValue("hotels", updated);
   };
 
+  // Deselects the "Rate Volume" dropdown for a hotel row once any of the 6 pricing
+  // fields it filled in gets edited by hand, so the dropdown never shows a volume that
+  // no longer matches the actual values.
+  const clearSelectedRateVolume = (index: number) => {
+    setSelectedRateVolumeByHotel((prev) => {
+      if (!(index in prev)) return prev;
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+  };
+
+  // Fill Buying + Selling price/ROE/currency (and the per-room-type breakdown) from a
+  // saved Rate Volume, triggered by the "Rate Volume" dropdown next to the supplier.
+  const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
+    const buying = volume.buyingPrice || 0;
+    const buyingRoe = volume.buyingRoe || 1;
+    const selling = volume.sellingPrice || 0;
+    const sellingRoe = volume.sellingRoe || 1;
+    updateHotel(index, {
+      buyingPrice: buying,
+      buyingRoe,
+      buyingCurrency: volume.buyingCurrency,
+      sellingPrice: selling,
+      sellingRoe,
+      sellingCurrency: volume.sellingCurrency,
+      doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((buying / 2).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 2).toFixed(2)), sellingRoe },
+      tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((buying / 3).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 3).toFixed(2)), sellingRoe },
+      quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((buying / 4).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 4).toFixed(2)), sellingRoe },
+      sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((buying / 5).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 5).toFixed(2)), sellingRoe },
+    });
+  };
+
+  // Manual entry for Buying Price/Room (used when no Rate Volume is picked) - mirrors
+  // the previous plain-number-input behaviour, recomputing Selling Price via the ROE.
+  const handleManualBuyingPrice = (index: number, hotel: HotelForm, rawValue: string) => {
+    clearSelectedRateVolume(index);
+    const val = rawValue.trim() === "" ? undefined : Number(rawValue);
+    const numVal = val || 0;
+    const roe = hotel.buyingRoe || 1;
+    const selling = parseFloat((numVal * roe).toFixed(2));
+    updateHotel(index, {
+      buyingPrice: val,
+      sellingPrice: selling,
+      doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((numVal / 2).toFixed(2)), sellingPrice: parseFloat((selling / 2).toFixed(2)) },
+      tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((numVal / 3).toFixed(2)), sellingPrice: parseFloat((selling / 3).toFixed(2)) },
+      quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((numVal / 4).toFixed(2)), sellingPrice: parseFloat((selling / 4).toFixed(2)) },
+      sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((numVal / 5).toFixed(2)), sellingPrice: parseFloat((selling / 5).toFixed(2)) },
+    });
+  };
+
+  // Manual entry for Selling Price/Room (used when no Rate Volume is picked).
+  const handleManualSellingPrice = (index: number, hotel: HotelForm, rawValue: string) => {
+    clearSelectedRateVolume(index);
+    const val = rawValue.trim() === "" ? undefined : Number(rawValue);
+    const numVal = val || 0;
+    updateHotel(index, {
+      sellingPrice: val,
+      doubleRoom: { ...hotel.doubleRoom, sellingPrice: parseFloat((numVal / 2).toFixed(2)) },
+      tripleRoom: { ...hotel.tripleRoom, sellingPrice: parseFloat((numVal / 3).toFixed(2)) },
+      quadRoom: { ...hotel.quadRoom, sellingPrice: parseFloat((numVal / 4).toFixed(2)) },
+      sharedRoom: { ...hotel.sharedRoom, sellingPrice: parseFloat((numVal / 5).toFixed(2)) },
+    });
+  };
+
   // ✅ Effect to update profit breakdown when form values change
   useEffect(() => {
     if (formik.values.selectedGroupTicketId && formik.values.hotels.length > 0) {
@@ -1047,7 +1150,10 @@ const UmrahPackage = () => {
 
             return (
               <>
-                {/* Package Name and Logos - Row 1 */}
+                {/* Package Name, Logo and Flight Logo fields are hidden. Package Name is
+                    auto-derived from the selected group ticket's sector (see the
+                    Umrah Group Ticket onChange below) and still saved with the package;
+                    Logo/Flight Logo are not currently needed.
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold mb-1">Package Name</label>
@@ -1064,7 +1170,6 @@ const UmrahPackage = () => {
                     )}
                   </div>
 
-                  {/* Logo */}
                   <div>
                     <label className="block text-xs font-semibold mb-1">Logo</label>
                     <div
@@ -1100,7 +1205,6 @@ const UmrahPackage = () => {
                     )}
                   </div>
 
-                  {/* Flight Logo */}
                   <div>
                     <label className="block text-xs font-semibold mb-1">Flight Logo</label>
                     <div
@@ -1136,6 +1240,7 @@ const UmrahPackage = () => {
                     )}
                   </div>
                 </div>
+                */}
 
                 <div className="border rounded-lg p-4 space-y-4 bg-white shadow-sm">
                   <div>
@@ -1148,6 +1253,14 @@ const UmrahPackage = () => {
                         const group = getSelectedGroupTicket(groupId);
                         formik.setFieldValue("selectedGroupTicketId", groupId);
                         formik.setFieldValue("flights", group?.flights || []);
+                        // Package Name and Total Seats are no longer shown as inputs - they
+                        // are derived from the selected group ticket's sector and seat count.
+                        const sector =
+                          group?.sector ||
+                          group?.flights?.map((flight) => `${flight.sectorFrom}-${flight.sectorTo}`).join(", ") ||
+                          "";
+                        formik.setFieldValue("packageName", sector);
+                        formik.setFieldValue("availableRooms", group?.totalSeats || 0);
                       }}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors duration-200"
                       disabled={loadingGroups}
@@ -1280,19 +1393,23 @@ const UmrahPackage = () => {
                 </div>
 
                 {/* Available Rooms and Days - Row 2 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Total Seats</label>
-                    <input
-                      type="number"
-                      name="availableRooms"
-                      onChange={formik.handleChange}
-                      value={formik.values.availableRooms || ""}
-                      className="border p-2 w-full rounded text-sm h-9"
-                      min={0}
-                      placeholder="0"
-                    />
-                  </div>
+                {/* Total Seats is hidden - it is auto-filled from the selected group
+                    ticket's seat count (see the Umrah Group Ticket onChange above) and
+                    still saved with the package.
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Total Seats</label>
+                  <input
+                    type="number"
+                    name="availableRooms"
+                    onChange={formik.handleChange}
+                    value={formik.values.availableRooms || ""}
+                    className="border p-2 w-full rounded text-sm h-9"
+                    min={0}
+                    placeholder="0"
+                  />
+                </div>
+                */}
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-xs font-semibold mb-1">Package Duration (Days)</label>
                     <input
@@ -1331,8 +1448,8 @@ const UmrahPackage = () => {
                       </div>
 
                       <div className="p-4 space-y-4">
-                        {/* Row 1: Supplier, City, Hotel Name */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* Row 1: Supplier, Rate Volume, Hotel Name, City */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-semibold mb-1">Select Supplier Account</label>
                             <Select
@@ -1351,18 +1468,36 @@ const UmrahPackage = () => {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold mb-1">City</label>
-                            <select
-                              value={hotel.location.city || ""}
-                              onChange={(e) => updateHotel(index, { location: { ...hotel.location, city: e.target.value } })}
-                              className="border p-2 w-full rounded text-xs h-9 bg-white"
-                            >
-                              <option value="">Select City</option>
-                              <option value="Makkah">Makkah</option>
-                              <option value="Madinah">Madinah</option>
-                              <option value="Jeddah">Jeddah</option>
-                              <option value="Taif">Taif</option>
-                            </select>
+                            <label className="block text-xs font-semibold mb-1">Rate Volume</label>
+                            <Select
+                              options={rateVolumeOptions}
+                              value={
+                                selectedRateVolumeByHotel[index]
+                                  ? rateVolumeOptions.find((v) => v.value === selectedRateVolumeByHotel[index]) ?? null
+                                  : null
+                              }
+                              onChange={(option) => {
+                                if (!option) {
+                                  setSelectedRateVolumeByHotel((prev) => {
+                                    const next = { ...prev };
+                                    delete next[index];
+                                    return next;
+                                  });
+                                  return;
+                                }
+                                setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
+                                applyRateVolumeToHotel(index, hotel, option.data);
+                              }}
+                              placeholder="Select Volume"
+                              isClearable
+                              isSearchable
+                              className="text-xs"
+                              styles={{
+                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                              }}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs font-semibold mb-1">Hotel Name</label>
@@ -1387,6 +1522,24 @@ const UmrahPackage = () => {
                               }}
                               value={hotel.name ? { value: hotel.name, label: hotel.name } : null}
                               placeholder="Hotel Name"
+                              className="text-xs"
+                              styles={{
+                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold mb-1">City</label>
+                            <CreatableSelect
+                              options={cityOptions}
+                              value={hotel.location.city ? { value: hotel.location.city, label: hotel.location.city } : null}
+                              onChange={(option: any) => updateHotel(index, { location: { ...hotel.location, city: option?.value || "" } })}
+                              onCreateOption={(inputValue) => updateHotel(index, { location: { ...hotel.location, city: inputValue } })}
+                              placeholder="Select or type City"
+                              isClearable
+                              isSearchable
                               className="text-xs"
                               styles={{
                                 control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
@@ -1444,20 +1597,7 @@ const UmrahPackage = () => {
                             <input
                               type="number"
                               value={hotel.buyingPrice ?? ""}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : Number(e.target.value);
-                                const numVal = val || 0;
-                                const roe = hotel.buyingRoe || 1;
-                                const selling = parseFloat((numVal * roe).toFixed(2));
-                                updateHotel(index, {
-                                  buyingPrice: val,
-                                  sellingPrice: selling,
-                                  doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((numVal / 2).toFixed(2)), sellingPrice: parseFloat((selling / 2).toFixed(2)) },
-                                  tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((numVal / 3).toFixed(2)), sellingPrice: parseFloat((selling / 3).toFixed(2)) },
-                                  quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((numVal / 4).toFixed(2)), sellingPrice: parseFloat((selling / 4).toFixed(2)) },
-                                  sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((numVal / 5).toFixed(2)), sellingPrice: parseFloat((selling / 5).toFixed(2)) },
-                                });
-                              }}
+                              onChange={(e) => handleManualBuyingPrice(index, hotel, e.target.value)}
                               className="border p-2 w-full rounded text-xs h-9"
                               placeholder=""
                             />
@@ -1468,6 +1608,7 @@ const UmrahPackage = () => {
                               type="number"
                               value={hotel.buyingRoe ?? 1}
                               onChange={(e) => {
+                                clearSelectedRateVolume(index);
                                 const roe = Number(e.target.value || 1);
                                 const buying = hotel.buyingPrice || 0;
                                 const selling = parseFloat((buying * roe).toFixed(2));
@@ -1491,7 +1632,10 @@ const UmrahPackage = () => {
                             <Select
                               options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
                               value={hotel.buyingCurrency ? { value: hotel.buyingCurrency, label: hotel.buyingCurrency } : null}
-                              onChange={(opt) => updateHotel(index, { buyingCurrency: opt?.value || "PKR", sellingCurrency: opt?.value || "PKR" })}
+                              onChange={(opt) => {
+                                clearSelectedRateVolume(index);
+                                updateHotel(index, { buyingCurrency: opt?.value || "PKR", sellingCurrency: opt?.value || "PKR" });
+                              }}
                               placeholder="Currency"
                               isSearchable
                               className="text-xs"
@@ -1508,17 +1652,7 @@ const UmrahPackage = () => {
                               <input
                                 type="number"
                                 value={hotel.sellingPrice ?? ""}
-                                onChange={(e) => {
-                                  const val = e.target.value === "" ? undefined : Number(e.target.value);
-                                  const numVal = val || 0;
-                                  updateHotel(index, {
-                                    sellingPrice: val,
-                                    doubleRoom: { ...hotel.doubleRoom, sellingPrice: parseFloat((numVal / 2).toFixed(2)) },
-                                    tripleRoom: { ...hotel.tripleRoom, sellingPrice: parseFloat((numVal / 3).toFixed(2)) },
-                                    quadRoom: { ...hotel.quadRoom, sellingPrice: parseFloat((numVal / 4).toFixed(2)) },
-                                    sharedRoom: { ...hotel.sharedRoom, sellingPrice: parseFloat((numVal / 5).toFixed(2)) },
-                                  });
-                                }}
+                                onChange={(e) => handleManualSellingPrice(index, hotel, e.target.value)}
                                 className="border p-2 w-full rounded text-xs h-9"
                                 placeholder=""
                               />
@@ -1543,6 +1677,7 @@ const UmrahPackage = () => {
                               type="number"
                               value={hotel.sellingRoe ?? 1}
                               onChange={(e) => {
+                                clearSelectedRateVolume(index);
                                 const roe = Number(e.target.value || 1);
                                 updateHotel(index, {
                                   sellingRoe: roe,
@@ -1563,7 +1698,10 @@ const UmrahPackage = () => {
                             <Select
                               options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
                               value={hotel.sellingCurrency ? { value: hotel.sellingCurrency, label: hotel.sellingCurrency } : null}
-                              onChange={(opt) => updateHotel(index, { sellingCurrency: opt?.value || "PKR" })}
+                              onChange={(opt) => {
+                                clearSelectedRateVolume(index);
+                                updateHotel(index, { sellingCurrency: opt?.value || "PKR" });
+                              }}
                               placeholder="Currency"
                               isSearchable
                               className="text-xs"

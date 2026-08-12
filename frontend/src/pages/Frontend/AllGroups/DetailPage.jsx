@@ -130,7 +130,7 @@ export default function DetailPage() {
         {/* HEADER */}
         <div
           style={{
-            background: theme.colors.primary,
+            background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
             borderRadius: "20px",
             padding: isMobile ? "20px" : "35px",
             color: "white",
@@ -210,7 +210,7 @@ export default function DetailPage() {
               className="header-ref"
               style={{
                 textAlign: "right",
-                background: "rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.2)",
                 padding: "15px 25px",
                 borderRadius: "15px",
               }}
@@ -487,11 +487,10 @@ export default function DetailPage() {
                           style={{
                             padding: "12px",
                             borderRadius: "12px",
-                            border: `2px solid ${
-                              selectedRoom === room
+                            border: `2px solid ${selectedRoom === room
                                 ? theme.colors.primary
                                 : "#edf2f7"
-                            }`,
+                              }`,
                             background:
                               selectedRoom === room ? "#f0f7ff" : "white",
                             cursor: "pointer",

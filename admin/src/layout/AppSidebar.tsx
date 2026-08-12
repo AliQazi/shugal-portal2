@@ -52,6 +52,7 @@ const navItems: NavItem[] = [
       { name: "Hotels", path: "/hotel", permission: "view_hotels", pro: false },
       { name: "Transport", path: "/transport", permission: "view_transports", pro: false },
       { name: "Visa Management", path: "/visaManagement", permission: "view_visas", pro: false },
+      { name: "Rate Volumes", path: "/rate-volumes", permission: "view_hotels", pro: false },
       { name: "Create Umrah Package", path: "/create-package", permission: "create_umrah_package", pro: false },
       { name: "Manage Umrah Packages", path: "/manage-package", permission: "view_umrah_packages", pro: false },
     ],

@@ -80,6 +80,15 @@ const parsePassengers = (body) => {
 };
 
 /* ===========================
+   HELPER: Passenger type label for ledger/voucher descriptions
+   Shows whether a Child passenger was booked w/ Bed or w/o Bed
+=========================== */
+const getPaxTypeLabel = (pax) =>
+  pax.type === "Child"
+    ? `Child ${pax.childType === "withBed" ? "w/ Bed" : "w/o Bed"}`
+    : pax.type;
+
+/* ===========================
    CREATE UMRAH PACKAGE BOOKING
    
    - "local-db": Locally managed packages (stored in MongoDB)
@@ -1416,7 +1425,7 @@ export const updateOverallStatus = async (req, res) => {
         passengers.forEach((pax) => {
           const paxName =
             `${pax.title || ""} ${pax.givenName || ""} ${pax.surName || ""}`.trim();
-          const description = `Umrah Package (${supplierLabel}), ${paxName} (${pax.type}) - ${booking.bookingNumber}`;
+          const description = `Umrah Package (${supplierLabel}), ${paxName} (${getPaxTypeLabel(pax)}) - ${booking.bookingNumber}`;
           const baseSellingPrice = Math.round(
             (booking.pricing?.pricePerPerson || 0),
           );
@@ -1519,16 +1528,23 @@ export const updateOverallStatus = async (req, res) => {
       const adultSellingPerPax = Math.round(
         (packageTotals[roomKey] || 0) - incentive,
       );
-      const childSellingPerPax = Math.round(
+      const childWithoutBedSellingPerPax = Math.round(
         (packageTotals.childWithoutBed || 0) - incentive,
+      );
+      const childWithBedSellingPerPax = Math.round(
+        (packageTotals.childWithBed || 0) - incentive,
       );
       const infantSellingPerPax = Math.round(
         (packageTotals.infant || 0) - incentive,
       );
 
-      const getSellingPrice = (type) => {
-        if (type === "Child") return childSellingPerPax;
-        if (type === "Infant") return infantSellingPerPax;
+      const getSellingPrice = (pax) => {
+        if (pax.type === "Child") {
+          return pax.childType === "withBed"
+            ? childWithBedSellingPerPax
+            : childWithoutBedSellingPerPax;
+        }
+        if (pax.type === "Infant") return infantSellingPerPax;
         return adultSellingPerPax;
       };
 
@@ -1568,8 +1584,8 @@ export const updateOverallStatus = async (req, res) => {
       passengers.forEach((pax) => {
         const paxName =
           `${pax.title || ""} ${pax.givenName || ""} ${pax.surName || ""}`.trim();
-        const description = `Umrah Package, ${paxName} (${pax.type}), ${travelDate}, ${pnr} & ${sector}`;
-        const baseSellingPrice = getSellingPrice(pax.type);
+        const description = `Umrah Package, ${paxName} (${getPaxTypeLabel(pax)}), ${travelDate}, ${pnr} & ${sector}`;
+        const baseSellingPrice = getSellingPrice(pax);
         const discount = Math.max(0, Number(pax.discount) || 0);
         const debitAmount = Math.max(0, baseSellingPrice - discount);
         totalSellingPrice += debitAmount;
@@ -1705,7 +1721,7 @@ export const updateOverallStatus = async (req, res) => {
                   account: supplierId,
                   debit: 0,
                   credit: paxCost,
-                  description: `Ticket Expense - ${paxName} (${pax.type}) - ${booking.bookingNumber}`,
+                  description: `Ticket Expense - ${paxName} (${getPaxTypeLabel(pax)}) - ${booking.bookingNumber}`,
                 });
               }
             });

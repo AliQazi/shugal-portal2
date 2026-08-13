@@ -1878,13 +1878,20 @@ export default function UmrahBooking() {
                               .join(" ") || "Passenger"}
                           </p>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {[passenger.type, passenger.nationality]
+                            {[
+                              passenger.type === "Child"
+                                ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                                : passenger.type,
+                              passenger.nationality,
+                            ]
                               .filter(Boolean)
                               .join(" | ")}
                           </p>
                         </div>
                         <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">
-                          {passenger.type || "N/A"}
+                          {passenger.type === "Child"
+                            ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                            : passenger.type || "N/A"}
                         </span>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">

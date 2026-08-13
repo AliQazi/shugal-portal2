@@ -7,6 +7,7 @@ const PackageTotalsSchema = new mongoose.Schema(
     quad: { type: Number, default: 0 },
     shared: { type: Number, default: 0 },
     childWithoutBed: { type: Number, default: 0 },
+    childWithBed: { type: Number, default: 0 },
     infant: { type: Number, default: 0 },
     incentive: { type: Number, default: 0 },
   },

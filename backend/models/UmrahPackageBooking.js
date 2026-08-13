@@ -10,6 +10,13 @@ const PassengerDetailSchema = new mongoose.Schema(
       required: true,
       enum: ["Adult", "Child", "Infant"],
     },
+    // Only meaningful when type === "Child" - which pricing tier the child was
+    // booked under (occupying a bed in the room vs. sharing without an extra bed).
+    childType: {
+      type: String,
+      enum: ["withBed", "withoutBed"],
+      default: undefined,
+    },
     title: {
       type: String,
       required: true,

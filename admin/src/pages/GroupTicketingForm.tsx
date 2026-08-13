@@ -173,6 +173,7 @@ const GroupTicketingForm = () => {
         setCityOptions(options);
       })
       .catch(() => setCityOptions([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, copyId, canAccess]);
 
   const fetchSectors = async () => {
@@ -782,9 +783,9 @@ const GroupTicketingForm = () => {
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Dep Date</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Dep Time</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Sector From</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">From Terminal</th>
+                  {/* <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">From Terminal</th> */}
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Sector To</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">To Terminal</th>
+                  {/* <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">To Terminal</th> */}
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Class</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Arr Date</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Arr Time</th>
@@ -864,7 +865,7 @@ const GroupTicketingForm = () => {
                         menuPosition="fixed"
                       />
                     </td>
-                    <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
+                    {/* <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <input
                         type="text"
                         value={flight.fromTerminal}
@@ -872,7 +873,7 @@ const GroupTicketingForm = () => {
                         placeholder="Terminal"
                         className="w-full min-w-20 h-9 rounded border border-gray-300 px-2 text-xs outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                       />
-                    </td>
+                    </td> */}
                     {/* ✅ Sector To - automatically toTerminal bhi set karta hai */}
                     <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <AsyncSelect
@@ -903,7 +904,7 @@ const GroupTicketingForm = () => {
                         menuPosition="fixed"
                       />
                     </td>
-                    <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
+                    {/* <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <input
                         type="text"
                         value={flight.toTerminal}
@@ -911,7 +912,7 @@ const GroupTicketingForm = () => {
                         placeholder="Terminal"
                         className="w-full min-w-20 h-9 rounded border border-gray-300 px-2 text-xs outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                       />
-                    </td>
+                    </td> */}
                     <td className="px-2 py-2 border border-gray-300 dark:border-gray-600">
                       <select
                         value={flight.flightClass}
@@ -1106,7 +1107,7 @@ const GroupTicketingForm = () => {
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
             </div>
-            <div>
+            {/* <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Contact Person Phone</label>
               <input
                 type="tel"
@@ -1125,7 +1126,7 @@ const GroupTicketingForm = () => {
                 placeholder="Email Address"
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
-            </div>
+            </div> */}
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Internal Status</label>
               <select

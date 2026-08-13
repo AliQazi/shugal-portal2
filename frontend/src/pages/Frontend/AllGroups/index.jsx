@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FaRegCopy, FaCheck, FaBus } from "react-icons/fa";
-import { Menu, Package, Plane } from "lucide-react";
+import { Menu, Package, Plane, Download } from "lucide-react";
 import { FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 import MaskedDatePicker from "../../../components/MaskedDatePicker";
 import { theme } from "../../../theme/theme";
 import TopBar from "../../../components/TopBar/TopBar";
-import { generateUmrahPackagesPDF } from "../../../utils/umrahPDFGen";
+import { generateUmrahPackagesPDF, generateBatchPDF } from "../../../utils/umrahPDFGen";
 
 const MONTHS_TITLE = [
   "Jan",
@@ -189,6 +189,8 @@ const HotelCellLines = ({ pkg }) => {
 // each keeping its own flight legs, dates and (critically) its own
 // Group Ticket's seat availability for booking.
 const UmrahBatchCard = ({ batch, index, onBook }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const packages = batch.packages;
   const headerPkg = packages[0];
   const flights = headerPkg.flights || [];
@@ -196,6 +198,19 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
   // Transport can differ between the merged Group Tickets, so the header
   // shows the union (deduped by route + type) instead of just headerPkg's.
   const batchTransport = getBatchTransport(packages);
+
+  const handleBatchDownload = async (e) => {
+    e.stopPropagation();
+    setIsDownloading(true);
+    try {
+      await generateBatchPDF(batch);
+    } catch (error) {
+      console.log("Error generating batch PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div
@@ -244,7 +259,7 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
         <div className="flex-1 flex flex-wrap items-center justify-center sm:justify-end gap-1.5">
           {headerPkg.packageDuration && (
             <span
-              className="rounded-full border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
+              className="rounded-md border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
               style={{
                 borderColor: theme.colors.border,
                 background: theme.colors.background,
@@ -254,7 +269,7 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
               {headerPkg.packageDuration} Days
             </span>
           )}
-          {headerPkg.nightCount && (
+          {/* {headerPkg.nightCount && (
             <span
               className="rounded-full border px-2.5 py-1 text-xs font-bold whitespace-nowrap"
               style={{
@@ -265,7 +280,20 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
             >
               {headerPkg.nightCount} Nights
             </span>
-          )}
+          )} */}
+          <button
+            onClick={handleBatchDownload}
+            disabled={isDownloading}
+            className="flex items-center gap-1.5 px-2.5 py-1! text-xs rounded-md bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors"
+            title="Download this batch as PDF"
+          >
+            {isDownloading ? (
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-red-600 border-t-transparent" />
+            ) : (
+              <Download size={14} />
+            )}
+            <span className="text-xs font-bold">PDF</span>
+          </button>
           {/* {headerPkg.availableRooms !== "" &&
             headerPkg.availableRooms !== undefined && (
               <span

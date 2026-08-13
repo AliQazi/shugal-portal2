@@ -243,6 +243,8 @@ const defaultAdult = {
 const defaultChild = {
   type: "Child",
   title: "Child",
+  // "withoutBed" | "withBed" - which pricing tier this child was added under.
+  childType: "withoutBed",
   givenName: "",
   surName: "",
   passport: "",
@@ -276,6 +278,7 @@ export default function UmrahBookingPage({ user }) {
     packageData?.packageTotals?.childWithoutBed ||
     packageData?.rooms?.childWithoutPackage ||
     0;
+  const childWithBedPrice = packageData?.packageTotals?.childWithBed || 0;
   const infantPrice =
     packageData?.packageTotals?.infant ||
     packageData?.rooms?.InfantWithoutPackage ||
@@ -403,10 +406,10 @@ export default function UmrahBookingPage({ user }) {
       }));
   };
 
-  const addChild = () => {
+  const addChild = (childType = "withoutBed") => {
     setFormData((f) => ({
       ...f,
-      children: [...f.children, { ...defaultChild }],
+      children: [...f.children, { ...defaultChild, childType }],
     }));
   };
 
@@ -431,15 +434,21 @@ export default function UmrahBookingPage({ user }) {
     }));
   };
 
+  const getChildPrice = (p) =>
+    p.childType === "withBed" ? childWithBedPrice : childPrice;
+
   const getPaxPrice = (p) =>
     p.type === "Infant"
       ? infantPrice
       : p.type === "Child"
-        ? childPrice
+        ? getChildPrice(p)
         : pricePerPerson || 0;
 
   const adultTotal = formData.adults.length * (pricePerPerson || 0);
-  const childrenTotal = formData.children.length * childPrice;
+  const childrenTotal = formData.children.reduce(
+    (sum, p) => sum + getChildPrice(p),
+    0,
+  );
   const infantTotal = formData.infants.length * infantPrice;
   const totalPrice = () => adultTotal + childrenTotal + infantTotal;
 
@@ -623,6 +632,9 @@ export default function UmrahBookingPage({ user }) {
           "passportExpiry",
           "nationality",
         ].forEach((k) => fd.append(`passengers[${i}][${k}]`, p[k]));
+        if (p.type === "Child" && p.childType) {
+          fd.append(`passengers[${i}][childType]`, p.childType);
+        }
         if (p.passportFile)
           fd.append(
             `passportFile_${i}`,
@@ -667,7 +679,10 @@ export default function UmrahBookingPage({ user }) {
           <h4
             style={{ margin: 0, color, fontWeight: 600, fontSize: "0.85rem" }}
           >
-            {type.charAt(0).toUpperCase() + type.slice(1)} {i + 1}
+            {type === "child"
+              ? `Child (${pax.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+              : type.charAt(0).toUpperCase() + type.slice(1)}{" "}
+            {i + 1}
           </h4>
           <div style={{ display: "flex", gap: "6px" }}>
             <button
@@ -1603,11 +1618,20 @@ export default function UmrahBookingPage({ user }) {
               >
                 <button
                   type="button"
-                  onClick={addChild}
+                  onClick={() => addChild("withoutBed")}
                   style={s.btn("#3B82F6")}
                 >
-                  <Plus size={13} /> Child (PKR {childPrice.toLocaleString()})
+                  <Plus size={13} /> Child w/o Bed (PKR {childPrice.toLocaleString()})
                 </button>
+                {childWithBedPrice > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => addChild("withBed")}
+                    style={s.btn("#2563EB")}
+                  >
+                    <Plus size={13} /> Child w/ Bed (PKR {childWithBedPrice.toLocaleString()})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={addInfant}
@@ -1723,7 +1747,7 @@ export default function UmrahBookingPage({ user }) {
                 <span>Adult Price:</span>
                 <strong>PKR {pricePerPerson?.toLocaleString()}</strong>
               </div>
-              {formData.children.length > 0 && (
+              {formData.children.some((p) => p.childType !== "withBed") && (
                 <div
                   style={{
                     display: "flex",
@@ -1733,8 +1757,22 @@ export default function UmrahBookingPage({ user }) {
                     color: "#4a5568",
                   }}
                 >
-                  <span>Child Price:</span>
+                  <span>Child w/o Bed Price:</span>
                   <strong>PKR {childPrice.toLocaleString()}</strong>
+                </div>
+              )}
+              {formData.children.some((p) => p.childType === "withBed") && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "6px 0",
+                    fontSize: "0.8rem",
+                    color: "#4a5568",
+                  }}
+                >
+                  <span>Child w/ Bed Price:</span>
+                  <strong>PKR {childWithBedPrice.toLocaleString()}</strong>
                 </div>
               )}
               {formData.infants.length > 0 && (
@@ -1913,11 +1951,11 @@ export default function UmrahBookingPage({ user }) {
                         {p.givenName} {p.surName}
                       </strong>
                       <div style={{ fontSize: "0.68rem", marginTop: "1px" }}>
-                        Child | Passport: {p.passport || "Not provided"}
+                        Child ({p.childType === "withBed" ? "w/ Bed" : "w/o Bed"}) | Passport: {p.passport || "Not provided"}
                       </div>
                     </div>
                     <strong style={{ whiteSpace: "nowrap", color: "#3B82F6" }}>
-                      PKR {childPrice.toLocaleString()}
+                      PKR {getChildPrice(p).toLocaleString()}
                     </strong>
                   </div>
                 ))}

@@ -267,8 +267,8 @@ const UmrahPackage = () => {
   );
   const [profitBreakdown, setProfitBreakdown] = useState<ProfitBreakdown | null>(null);
   console.log(profitBreakdown)
-  const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0, incentive: 0 });
-  const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0 });
+  const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0, incentive: 0 });
+  const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0 });
   // Skips the packageTotals auto-sync effect for the renders triggered while a copied
   // package's data (and the umrahGroups list) are still arriving, so the copied totals
   // (including any manual incentive) aren't clobbered before the user sees them.
@@ -499,6 +499,7 @@ const UmrahPackage = () => {
             quad: (data.packageTotals.quad || 0) - inc,
             shared: (data.packageTotals.shared || 0) - inc,
             childWithoutBed: (data.packageTotals.childWithoutBed || 0) - inc,
+            childWithBed: (data.packageTotals.childWithBed || 0) - inc,
             infant: (data.packageTotals.infant || 0) - inc,
           };
           baseTotalsRef.current = base;
@@ -508,6 +509,7 @@ const UmrahPackage = () => {
             quad: data.packageTotals.quad || 0,
             shared: data.packageTotals.shared || 0,
             childWithoutBed: data.packageTotals.childWithoutBed || 0,
+            childWithBed: data.packageTotals.childWithBed || 0,
             infant: data.packageTotals.infant || 0,
             incentive: inc,
           });
@@ -1106,6 +1108,10 @@ const UmrahPackage = () => {
       quad: Math.round(flightSellingPrice + hotelTotals.quad + visaSellingPKR),
       shared: Math.round(flightSellingPrice + hotelTotals.shared + visaSellingPKR),
       childWithoutBed: Math.round(childSellingPrice + visaSellingPKR),
+      // Default assumption: a "with bed" child shares a double room, so the hotel's
+      // double-room selling price is added on top of the child fare + visa. Admin can
+      // still override this manually below.
+      childWithBed: Math.round(childSellingPrice + hotelTotals.double + visaSellingPKR),
       infant: Math.round(infantSellingPrice + visaSellingPKR),
     };
     baseTotalsRef.current = base;
@@ -1115,6 +1121,7 @@ const UmrahPackage = () => {
       quad: base.quad + prev.incentive,
       shared: base.shared + prev.incentive,
       childWithoutBed: base.childWithoutBed + prev.incentive,
+      childWithBed: base.childWithBed + prev.incentive,
       infant: base.infant + prev.incentive,
       incentive: prev.incentive,
     }));
@@ -2296,6 +2303,31 @@ const UmrahPackage = () => {
                           </div>
                         </div>
                       </div>
+                      {/* Child W/ Bed */}
+                      <div className="border rounded overflow-hidden">
+                        <div className="bg-fuchsia-500 text-white px-3 py-2">
+                          <span className="text-xs font-bold">Child W/ Bed Package Total</span>
+                        </div>
+                        <div className="p-3">
+                          <label className="block text-xs mb-1">Total Price (PKR)</label>
+                          <div className="flex items-center border rounded overflow-hidden h-9">
+                            <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
+                            <input
+                              type="number"
+                              value={packageTotals.childWithBed}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                baseTotalsRef.current = {
+                                  ...baseTotalsRef.current,
+                                  childWithBed: val + packageTotals.incentive,
+                                };
+                                setPackageTotals((prev) => ({ ...prev, childWithBed: val }));
+                              }}
+                              className="flex-1 p-2 text-xs bg-white outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
                       {/* Infant */}
                       <div className="border rounded overflow-hidden">
                         <div className="bg-pink-500 text-white px-3 py-2">
@@ -2342,6 +2374,7 @@ const UmrahPackage = () => {
                                   quad: base.quad + inc,
                                   shared: base.shared + inc,
                                   childWithoutBed: base.childWithoutBed + inc,
+                                  childWithBed: base.childWithBed + inc,
                                   infant: base.infant + inc,
                                   incentive: inc,
                                 });

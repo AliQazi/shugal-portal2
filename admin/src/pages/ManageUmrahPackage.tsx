@@ -85,6 +85,7 @@ interface PackageData {
     quad?: number;
     shared?: number;
     childWithoutBed?: number;
+    childWithBed?: number;
     infant?: number;
     incentive?: number;
   };
@@ -158,6 +159,78 @@ interface UmrahBookingStatusCounts {
   cancelled: number;
 }
 
+interface PackageTotalsForm {
+  double: number;
+  triple: number;
+  quad: number;
+  shared: number;
+  childWithoutBed: number;
+  childWithBed: number;
+  infant: number;
+  incentive: number;
+}
+
+const emptyPackageTotals: PackageTotalsForm = {
+  double: 0,
+  triple: 0,
+  quad: 0,
+  shared: 0,
+  childWithoutBed: 0,
+  childWithBed: 0,
+  infant: 0,
+  incentive: 0,
+};
+
+const pricingFieldsConfig: Array<{
+  key: keyof Omit<PackageTotalsForm, "incentive">;
+  label: string;
+  subLabel: string;
+  headerClass: string;
+}> = [
+  {
+    key: "double",
+    label: "Double Package Total (2 Pax)",
+    subLabel: "Total Price/Pax (PKR)",
+    headerClass: "bg-green-600",
+  },
+  {
+    key: "triple",
+    label: "Triple Package Total (3 Pax)",
+    subLabel: "Total Price/Pax (PKR)",
+    headerClass: "bg-teal-500",
+  },
+  {
+    key: "quad",
+    label: "Quad Package Total (4 Pax)",
+    subLabel: "Total Price/Pax (PKR)",
+    headerClass: "bg-blue-500",
+  },
+  {
+    key: "shared",
+    label: "Shared Package Total (5 Pax)",
+    subLabel: "Total Price (PKR)",
+    headerClass: "bg-yellow-500",
+  },
+  {
+    key: "childWithoutBed",
+    label: "Child W/O Bed Package Total",
+    subLabel: "Total Price (PKR)",
+    headerClass: "bg-violet-500",
+  },
+  {
+    key: "childWithBed",
+    label: "Child W/ Bed Package Total",
+    subLabel: "Total Price (PKR)",
+    headerClass: "bg-fuchsia-500",
+  },
+  {
+    key: "infant",
+    label: "Infant Package Total",
+    subLabel: "Total Price (PKR)",
+    headerClass: "bg-pink-500",
+  },
+];
+
 const formatDate = (date?: string) => {
   if (!date) return "N/A";
 
@@ -185,6 +258,14 @@ const formatMoney = (amount?: number) => {
   }
 
   return Number(amount).toLocaleString("en-PK");
+};
+
+const parseFormattedNumber = (value: string) => {
+  const cleaned = value.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return 0;
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const getDepartureRange = (flights: FlightData[]) => {
@@ -288,6 +369,23 @@ const ManageUmrahPackage = () => {
 
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [pricingPackage, setPricingPackage] = useState<PackageData | null>(
+    null
+  );
+  const [pricingTotals, setPricingTotals] =
+    useState<PackageTotalsForm>(emptyPackageTotals);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const pricingBaseTotalsRef = useRef({
+    double: 0,
+    triple: 0,
+    quad: 0,
+    shared: 0,
+    childWithoutBed: 0,
+    childWithBed: 0,
+    infant: 0,
+  });
 
   const hasFetched = useRef(false);
 
@@ -545,6 +643,104 @@ const ManageUmrahPackage = () => {
       "_blank",
       "noopener,noreferrer"
     );
+  };
+
+  const handleOpenPricingModal = (pkg: PackageData) => {
+    if (!canUseActions) {
+      toast.error("You don't have permission to manage Umrah packages");
+      return;
+    }
+
+    const totals = pkg.packageTotals || {};
+    const incentive = totals.incentive || 0;
+
+    pricingBaseTotalsRef.current = {
+      double: (totals.double || 0) - incentive,
+      triple: (totals.triple || 0) - incentive,
+      quad: (totals.quad || 0) - incentive,
+      shared: (totals.shared || 0) - incentive,
+      childWithoutBed: (totals.childWithoutBed || 0) - incentive,
+      childWithBed: (totals.childWithBed || 0) - incentive,
+      infant: (totals.infant || 0) - incentive,
+    };
+
+    setPricingTotals({
+      double: totals.double || 0,
+      triple: totals.triple || 0,
+      quad: totals.quad || 0,
+      shared: totals.shared || 0,
+      childWithoutBed: totals.childWithoutBed || 0,
+      childWithBed: totals.childWithBed || 0,
+      infant: totals.infant || 0,
+      incentive,
+    });
+
+    setPricingPackage(pkg);
+    setPricingModalOpen(true);
+  };
+
+  const handleClosePricingModal = () => {
+    setPricingModalOpen(false);
+    setPricingPackage(null);
+    setPricingTotals(emptyPackageTotals);
+  };
+
+  const handlePricingFieldChange = (
+    field: keyof Omit<PackageTotalsForm, "incentive">,
+    value: number
+  ) => {
+    pricingBaseTotalsRef.current = {
+      ...pricingBaseTotalsRef.current,
+      [field]: value + pricingTotals.incentive,
+    };
+    setPricingTotals((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePricingIncentiveChange = (value: number) => {
+    const base = pricingBaseTotalsRef.current;
+    setPricingTotals({
+      double: base.double + value,
+      triple: base.triple + value,
+      quad: base.quad + value,
+      shared: base.shared + value,
+      childWithoutBed: base.childWithoutBed + value,
+      childWithBed: base.childWithBed + value,
+      infant: base.infant + value,
+      incentive: value,
+    });
+  };
+
+  const handleSavePricing = async () => {
+    if (!pricingPackage) return;
+
+    setPricingSaving(true);
+
+    try {
+      const { data } = await axiosInstance.patch(
+        `/umrahpackages/${pricingPackage._id}/package-totals`,
+        { packageTotals: pricingTotals }
+      );
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to update pricing");
+      }
+
+      setPackages((prev) =>
+        prev.map((pkg) =>
+          pkg._id === pricingPackage._id
+            ? { ...pkg, packageTotals: { ...pricingTotals } }
+            : pkg
+        )
+      );
+
+      toast.success("Package pricing updated successfully");
+      handleClosePricingModal();
+    } catch (error) {
+      console.error("Error updating package pricing:", error);
+      toast.error("Failed to update package pricing");
+    } finally {
+      setPricingSaving(false);
+    }
   };
 
   const handleViewBookings = (pkg: PackageData) => {
@@ -908,7 +1104,22 @@ const ManageUmrahPackage = () => {
                       </TableCell>
 
                       <TableCell className="min-w-90 px-3 py-4">
-                        <div className="overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
+                        <div className="relative overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
+                          <button
+                            onClick={() =>
+                              canUseActions && handleOpenPricingModal(pkg)
+                            }
+                            disabled={!canUseActions}
+                            className="absolute right-1.5 top-1.5 z-10 flex items-center justify-center rounded-md bg-white p-1 text-blue-600 shadow-sm ring-1 ring-gray-200 transition hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:ring-white/10"
+                            title={
+                              canUseActions
+                                ? "Edit Pricing"
+                                : "You don't have permission to manage Umrah packages"
+                            }
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </button>
+
                           <table className="w-full border-collapse text-sm">
                             <thead>
                               <tr className="bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100">
@@ -924,7 +1135,7 @@ const ManageUmrahPackage = () => {
                                 <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
                                   Quad
                                 </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
+                                <th className="border-b border-gray-200 pl-3 pr-8 py-2 text-left font-extrabold dark:border-white/10">
                                   Shared
                                 </th>
                               </tr>
@@ -944,7 +1155,7 @@ const ManageUmrahPackage = () => {
                                 <td className="px-3 py-2 font-bold text-green-600">
                                   {formatMoney(pkg.packageTotals?.quad)}
                                 </td>
-                                <td className="px-3 py-2 font-bold text-green-600">
+                                <td className="pl-3 pr-8 py-2 font-bold text-green-600">
                                   {formatMoney(pkg.packageTotals?.shared)}
                                 </td>
                               </tr>
@@ -1335,6 +1546,133 @@ const ManageUmrahPackage = () => {
               </div>
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={pricingModalOpen}
+        onClose={handleClosePricingModal}
+        className="max-w-4xl"
+      >
+        <div className="max-h-[85vh] overflow-y-auto p-6">
+          <div className="mb-5 pr-12">
+            <p className="text-xs font-bold uppercase tracking-wide text-green-700">
+              Edit Pricing
+            </p>
+            <h3 className="mt-1 text-xl font-bold text-gray-900">
+              {pricingPackage?.packageName || "Package"}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Update the Package Totals (Selling) for this package.
+            </p>
+          </div>
+
+          <div className="border rounded-lg overflow-hidden shadow-sm">
+            <div className="bg-green-600 text-white px-4 py-2">
+              <h4 className="text-sm font-semibold">
+                Package Totals (Selling)
+              </h4>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {pricingFieldsConfig.map((field) => (
+                  <div
+                    key={field.key}
+                    className="border rounded overflow-hidden"
+                  >
+                    <div className={`${field.headerClass} text-white px-3 py-2`}>
+                      <span className="text-xs font-bold">{field.label}</span>
+                    </div>
+                    <div className="p-3">
+                      <label className="block text-xs mb-1">
+                        {field.subLabel}
+                      </label>
+                      <div className="flex items-center border rounded overflow-hidden h-9">
+                        <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">
+                          PKR
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pricingTotals[field.key].toLocaleString(
+                            "en-PK"
+                          )}
+                          onChange={(event) =>
+                            handlePricingFieldChange(
+                              field.key,
+                              parseFormattedNumber(event.target.value)
+                            )
+                          }
+                          className="flex-1 p-2 text-xs bg-white outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Incentive */}
+                <div className="border rounded overflow-hidden">
+                  <div className="bg-orange-500 text-white px-3 py-2">
+                    <span className="text-xs font-bold">Incentive</span>
+                  </div>
+                  <div className="p-3">
+                    <label className="block text-xs mb-1">
+                      Incentive Amount (PKR)
+                    </label>
+                    <div className="flex items-center border rounded overflow-hidden h-9">
+                      <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">
+                        PKR
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={pricingTotals.incentive.toLocaleString(
+                          "en-PK"
+                        )}
+                        onChange={(event) =>
+                          handlePricingIncentiveChange(
+                            parseFormattedNumber(event.target.value)
+                          )
+                        }
+                        className="flex-1 p-2 text-xs bg-white outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-dashed border-orange-300 pt-3">
+                <p className="text-xs text-orange-600 font-semibold mb-2">
+                  * Incentive (PKR {pricingTotals.incentive.toLocaleString()})
+                  is included in all room totals above
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={handleClosePricingModal}
+              disabled={pricingSaving}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSavePricing}
+              disabled={pricingSaving}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pricingSaving ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving...
+                </span>
+              ) : (
+                "Save Pricing"
+              )}
+            </button>
+          </div>
         </div>
       </Modal>
 

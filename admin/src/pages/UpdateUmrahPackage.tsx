@@ -261,8 +261,8 @@ const UpdateUmrahPackage = () => {
   const [profitBreakdown, setProfitBreakdown] = useState<ProfitBreakdown | null>(null);
   console.log(profitBreakdown)
   const [editableGroupPrice, setEditableGroupPrice] = useState<GroupTicketPrice | null>(null);
-  const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0, incentive: 0 });
-  const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, infant: 0 });
+  const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0, incentive: 0 });
+  const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0 });
   const originalGroupPriceRef = useRef<GroupTicketPrice | null>(null);
   const packageTotalsAutoSyncLockedRef = useRef(false);
   const [internalStatus, setInternalStatus] = useState<"Public" | "Private">("Public");
@@ -466,6 +466,10 @@ const UpdateUmrahPackage = () => {
       quad: Math.round(flightSellingPrice + hotelTotals.quad + visaSellingPKR),
       shared: Math.round(flightSellingPrice + hotelTotals.shared + visaSellingPKR),
       childWithoutBed: Math.round(childSellingPrice + visaSellingPKR),
+      // Default assumption: a "with bed" child shares a double room, so the hotel's
+      // double-room selling price is added on top of the child fare + visa. Admin can
+      // still override this manually below.
+      childWithBed: Math.round(childSellingPrice + hotelTotals.double + visaSellingPKR),
       infant: Math.round(infantSellingPrice + visaSellingPKR),
     };
 
@@ -476,6 +480,7 @@ const UpdateUmrahPackage = () => {
       quad: base.quad + prev.incentive,
       shared: base.shared + prev.incentive,
       childWithoutBed: prev.childWithoutBed === 0 ? prev.childWithoutBed : base.childWithoutBed + prev.incentive,
+      childWithBed: prev.childWithBed === 0 ? prev.childWithBed : base.childWithBed + prev.incentive,
       infant: prev.infant === 0 ? prev.infant : base.infant + prev.incentive,
       incentive: prev.incentive,
     }));
@@ -491,14 +496,23 @@ const UpdateUmrahPackage = () => {
       if (field === "sellingAdultPriceB2B") {
         recalculatePackageTotalsFromCurrentState(nextPrice);
       } else if (field === "sellingChildPriceB2B") {
-        setPackageTotals((prevTotals) =>
-          prevTotals.childWithoutBed === 0
-            ? prevTotals
-            : {
-                ...prevTotals,
-                childWithoutBed: Math.round(value + (formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : 0) + prevTotals.incentive),
-              },
-        );
+        const visaSellingPKR = formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : 0;
+        let hotelDoubleTotal = 0;
+        formik.values.hotels.forEach((hotel) => {
+          const nights = hotel.nights || 0;
+          hotelDoubleTotal += (hotel.doubleRoom.sellingPrice || 0) * (hotel.doubleRoom.sellingRoe || 1) * nights;
+        });
+        setPackageTotals((prevTotals) => ({
+          ...prevTotals,
+          childWithoutBed:
+            prevTotals.childWithoutBed === 0
+              ? prevTotals.childWithoutBed
+              : Math.round(value + visaSellingPKR + prevTotals.incentive),
+          childWithBed:
+            prevTotals.childWithBed === 0
+              ? prevTotals.childWithBed
+              : Math.round(value + hotelDoubleTotal + visaSellingPKR + prevTotals.incentive),
+        }));
       } else if (field === "sellingInfantPriceB2B") {
         setPackageTotals((prevTotals) =>
           prevTotals.infant === 0
@@ -693,6 +707,7 @@ const UpdateUmrahPackage = () => {
             quad: (data.packageTotals.quad || 0) - inc,
             shared: (data.packageTotals.shared || 0) - inc,
             childWithoutBed: (data.packageTotals.childWithoutBed || 0) - inc,
+            childWithBed: (data.packageTotals.childWithBed || 0) - inc,
             infant: (data.packageTotals.infant || 0) - inc,
           };
           baseTotalsRef.current = base;
@@ -702,6 +717,7 @@ const UpdateUmrahPackage = () => {
             quad: data.packageTotals.quad || 0,
             shared: data.packageTotals.shared || 0,
             childWithoutBed: data.packageTotals.childWithoutBed || 0,
+            childWithBed: data.packageTotals.childWithBed || 0,
             infant: data.packageTotals.infant || 0,
             incentive: inc,
           });
@@ -2267,6 +2283,35 @@ const UpdateUmrahPackage = () => {
                   </div>
                 </div>
 
+                {/* Child W/ Bed */}
+                <div className="border rounded overflow-hidden">
+                  <div className="bg-fuchsia-500 text-white px-3 py-2">
+                    <span className="text-xs font-bold">Child W/ Bed Package Total</span>
+                  </div>
+                  <div className="p-3">
+                    <label className="block text-xs mb-1">Total Price (PKR)</label>
+                    <div className="flex items-center border rounded overflow-hidden h-9">
+                      <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={packageTotals.childWithBed.toLocaleString()}
+                        onChange={(e) => {
+                          lockPackageTotalsAutoSync();
+                          const val = parseFormattedNumber(e.target.value);
+                          const inc = packageTotals.incentive;
+                          baseTotalsRef.current = {
+                            ...baseTotalsRef.current,
+                            childWithBed: val - inc
+                          };
+                          setPackageTotals((prev) => ({ ...prev, childWithBed: val }));
+                        }}
+                        className="flex-1 p-2 text-xs outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Infant */}
                 <div className="border rounded overflow-hidden">
                   <div className="bg-pink-500 text-white px-3 py-2">
@@ -2323,6 +2368,7 @@ const UpdateUmrahPackage = () => {
                               quad: base.quad + inc,
                               shared: base.shared + inc,
                               childWithoutBed: base.childWithoutBed + inc,
+                              childWithBed: base.childWithBed + inc,
                               infant: base.infant + inc,
                               incentive: inc,
                             });

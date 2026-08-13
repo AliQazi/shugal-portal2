@@ -7,6 +7,7 @@ import {
   deletePackage,
   createPackages,
   updatePackageInternalStatus,
+  updatePackageTotals,
 } from "../controllers/umrahPackge.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 
@@ -35,6 +36,7 @@ router.put(
 );
 
 router.patch("/:id/internal-status", protect, updatePackageInternalStatus);
+router.patch("/:id/package-totals", protect, updatePackageTotals);
 
 router.delete("/:id", protect, deletePackage);
 

@@ -27,6 +27,8 @@ interface Passenger {
     type: string; title: string; givenName: string; surName: string;
     passport: string; dateOfBirth: string; nationality: string;
     documentUrl?: string | null; discount?: number;
+    // Only meaningful when type === "Child" - which pricing tier this child was booked under.
+    childType?: "withBed" | "withoutBed";
 }
 
 interface UmrahPackageDetails {
@@ -38,7 +40,7 @@ interface UmrahPackageDetails {
     selectedGroupTicketId?: string;
     rooms?: Record<string, number>;
     packageTotals?: {
-        childWithoutBed?: number; infant?: number; double?: number;
+        childWithoutBed?: number; childWithBed?: number; infant?: number; double?: number;
         triple?: number; quad?: number; shared?: number; incentive?: number;
     };
     flights?: {
@@ -708,9 +710,13 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
     // const packageVisa = packageDetails?.visa;
     const adultPrice = booking.pricing?.pricePerPerson || 0;
     const childPrice = packageTotals?.childWithoutBed || 0;
+    const childWithBedPrice = packageTotals?.childWithBed || 0;
     const infantPrice = packageTotals?.infant || 0;
+    const getChildPrice = (p: any) => (p.childType === "withBed" ? childWithBedPrice : childPrice);
     const adultTotal = (booking.passengerCount?.adults || booking.passengers.filter((p: any) => p.type === "Adult").length) * adultPrice;
-    const childTotal = (booking.passengerCount?.children || booking.passengers.filter((p: any) => p.type === "Child").length) * childPrice;
+    const childTotal = booking.passengers
+        .filter((p: any) => p.type === "Child")
+        .reduce((sum: number, p: any) => sum + getChildPrice(p), 0);
     const infantTotal = (booking.passengerCount?.infants || booking.passengers.filter((p: any) => p.type === "Infant").length) * infantPrice;
     const totalPassengers = booking.passengerCount?.total || booking.passengers.length;
     const incentivePerPassenger = Number(packageTotals?.incentive) || 0;
@@ -852,13 +858,17 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                 {booking.passengers.map((p: any, i: number) => {
                                     let price = 0;
                                     if (p.type === "Adult") price = adultPrice;
-                                    else if (p.type === "Child") price = childPrice;
+                                    else if (p.type === "Child") price = getChildPrice(p);
                                     else if (p.type === "Infant") price = infantPrice;
+                                    const typeLabel =
+                                        p.type === "Child"
+                                            ? `Child (${p.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                                            : p.type;
                                     return (
                                         <div key={i} style={{ padding: "12px", background: "white", borderRadius: "9px", border: "1px solid #E2E8F0", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
                                             <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0F172A", marginBottom: "6px" }}>{p.title} {p.givenName} {p.surName}</div>
                                             <div style={{ display: "flex", gap: "10px", fontSize: "0.72rem", color: "#64748B", marginBottom: "10px", flexWrap: "wrap" }}>
-                                                <span style={{ background: "#EFF6FF", padding: "2px 7px", borderRadius: "5px", fontWeight: 700, color: "#2563EB" }}>{p.type}</span>
+                                                <span style={{ background: "#EFF6FF", padding: "2px 7px", borderRadius: "5px", fontWeight: 700, color: "#2563EB" }}>{typeLabel}</span>
                                                 <span>{p.passport}</span>
                                                 <span>{p.nationality}</span>
                                             </div>

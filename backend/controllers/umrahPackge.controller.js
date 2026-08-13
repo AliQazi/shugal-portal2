@@ -456,6 +456,69 @@ export const updatePackageInternalStatus = async (req, res) => {
   }
 };
 
+// Update only the Package Totals (Selling) pricing
+export const updatePackageTotals = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { packageTotals } = req.body;
+
+    const parsedPackageTotals =
+      typeof packageTotals === "string"
+        ? JSON.parse(packageTotals)
+        : packageTotals || {};
+
+    const allowedFields = [
+      "double",
+      "triple",
+      "quad",
+      "shared",
+      "childWithoutBed",
+      "childWithBed",
+      "infant",
+      "incentive",
+    ];
+
+    const sanitizedTotals = {};
+    allowedFields.forEach((field) => {
+      sanitizedTotals[field] = asNumber(parsedPackageTotals[field], 0);
+    });
+
+    const updatedPackage = await GroupTicketing.findByIdAndUpdate(
+      id,
+      { packageTotals: sanitizedTotals },
+      { new: true, runValidators: true },
+    );
+
+    if (!updatedPackage) {
+      return res.status(404).json({
+        success: false,
+        message: "Package not found",
+      });
+    }
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahPackage",
+      refModel: "umrahPackgemodel",
+      refId: updatedPackage._id,
+      description: `Umrah package "${updatedPackage.packageName}" pricing updated`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Package pricing updated",
+      package: updatedPackage,
+    });
+  } catch (error) {
+    console.error("Error updating package pricing:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating package pricing",
+      error: error.message,
+    });
+  }
+};
+
 // Delete a package
 export const deletePackage = async (req, res) => {
   try {

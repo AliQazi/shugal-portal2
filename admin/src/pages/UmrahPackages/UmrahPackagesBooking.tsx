@@ -295,6 +295,7 @@ export default function UmrahPackagesBooking() {
         return {
             ...source,
             _id: booking._id,
+            travelType: "Umrah Group",
             bookingReference:
                 booking.bookingNumber ||
                 groupTicket?.groupBookingId ||

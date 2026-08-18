@@ -16,7 +16,7 @@ import {
 import { IoSettingsOutline } from 'react-icons/io5'
 import { MdOutlineHistory } from 'react-icons/md'
 import { useSidebar } from "../context/SidebarContext";
-import { MoonIcon } from "lucide-react";
+// import { MoonIcon } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -83,16 +83,16 @@ const navItems: NavItem[] = [
     path: "/xo-report",
     permission: "view_bookings",
   },
-  {
-    icon: <MoonIcon />,
-    name: "Umrah Calculator",
-    subItems: [
-      { name: "Add New Visa", path: "/add-visa" },
-      { name: "Transfers Route Rates", path: "/transport-route-rates" },
-      { name: "Umrah Calculator Records", path: "/umrah-calculator", pro: false },
-      { name: "Umrah Booking Queries", path: "/umrah-booking-queries", pro: false },
-    ],
-  },
+  // {
+  //   icon: <MoonIcon />,
+  //   name: "Umrah Calculator",
+  //   subItems: [
+  //     { name: "Add New Visa", path: "/add-visa" },
+  //     { name: "Transfers Route Rates", path: "/transport-route-rates" },
+  //     { name: "Umrah Calculator Records", path: "/umrah-calculator", pro: false },
+  //     { name: "Umrah Booking Queries", path: "/umrah-booking-queries", pro: false },
+  //   ],
+  // },
   {
     icon: <TableIcon />,
     name: "Ledger",

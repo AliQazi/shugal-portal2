@@ -1,205 +1,193 @@
-// Shown on the ticket voucher when the issuing agency has no logo of its own
-// (Register.logo is empty). Point this at the default agency logo image.
-import defaultLogo from "../assets/images/logo.png";
-export const DEFAULT_AGENCY_LOGO = defaultLogo;
+import axiosInstance from "../api/axios";
 
-export const printGDSBooking = (booking) => {
-  // --- 1. Helper Functions ---
-  const formatFullDate = (dateStr) => {
+// Colors used across the printed Travel Itinerary template.
+const NAVY = "#163a63";
+const NAVY_SOFT = "#4b6584";
+const LIGHT_BLUE = "#eef4fb";
+const BORDER_BLUE = "#cddcee";
+const MUTED = "#8a94a3";
+const BODY_TEXT = "#1f2937";
+
+const ICON_MEAL = (color) =>
+  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 2 2v11"/><path d="M7 2v4M11 2v4"/><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10"/></svg>`;
+
+const ICON_BAGGAGE = (color) =>
+  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>`;
+
+const ICON_CLOCK = (color) =>
+  `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`;
+
+const ICON_PHONE = (color) =>
+  `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+
+const ICON_MAIL = (color) =>
+  `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>`;
+
+const ICON_PLANE = (color) =>
+  `<svg width="15" height="15" viewBox="0 0 24 24" fill="${color}"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>`;
+
+// Booking objects often carry an embedded airline snapshot whose logoUrl was
+// blank at the time the booking was made. Look the airline up fresh so a
+// logo added/updated afterwards is still picked up; falls back to "" so the
+// caller can show the airline name instead.
+const fetchAirlineLogo = async (airlineId) => {
+  if (!airlineId) return "";
+  try {
+    const res = await axiosInstance.get(`/airline/${airlineId}`);
+    return res?.data?.data?.logo || "";
+  } catch {
+    return "";
+  }
+};
+
+const STATUS_LABELS = {
+  "on hold": "On Hold",
+  pending: "On Hold",
+  confirmed: "Confirmed",
+  "partially confirmed": "Partially Confirmed",
+  cancelled: "Cancelled",
+  canceled: "Cancelled",
+};
+
+const formatStatusLabel = (status) => {
+  if (!status) return "N/A";
+  const key = status.toLowerCase().trim();
+  if (STATUS_LABELS[key]) return STATUS_LABELS[key];
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
+export const printGDSBooking = async (booking) => {
+  // "17-Aug-2026" style, timezone-safe for plain YYYY-MM-DD strings.
+  const formatDateOnly = (dateStr) => {
     if (!dateStr) return "";
-
-    // Handle YYYY-MM-DD safely without timezone shifting
-    if (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const [year, month, day] = dateStr.split("-").map(Number);
-      return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
+    let d;
+    if (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const [year, month, day] = dateStr.slice(0, 10).split("-").map(Number);
+      d = new Date(year, month - 1, day);
+    } else {
+      d = new Date(dateStr);
     }
+    if (isNaN(d.getTime())) return "";
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = d.toLocaleDateString("en-GB", { month: "short" });
+    return `${day}-${month}-${d.getFullYear()}`;
+  };
 
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+  const formatTimeOnly = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
     });
   };
 
-  // --- 2. Data Preparation (Preserving your logic + adding PDF specific helpers) ---
   const flight = booking.flights?.[0] || {};
-
-  // Booking Status
   const bookingStatus = (
     booking.status ||
     booking.bookingStatus ||
     "N/A"
   ).toUpperCase();
 
-  // Airline & Logos
   const airlineName = (
     booking.airline?.name ||
     flight.airlineName ||
+    flight.airline ||
     "AIRLINE"
   ).toUpperCase();
-  // Note: Ensure this path is accessible from the browser window, or use a Base64 string if possible
-  // const agencyLogo = "/src/assets/images/logo.webp";
-  const airlineLogo = booking.airline?.logoUrl || flight.airlineLogo || "";
-  const agencyLogo = getAgencyLogo(booking);
+  let airlineLogo =
+    booking.airline?.logoUrl ||
+    booking.airline?.logo ||
+    flight.airlineLogo ||
+    booking.flightLogo ||
+    "";
+  const airlineId = booking.airline?.id || booking.airline?._id || "";
+  if (!airlineLogo && airlineId) {
+    airlineLogo = await fetchAirlineLogo(airlineId);
+  }
 
-  // Booking Refs
   const pnr = booking.pnr || booking.bookingReference || "N/A";
-  // const bookingRef = booking.bookingReference || pnr;
-
-  // // Flight Details
-  // const flightNum = booking.flightNumber || flight.flightNo || "XX000";
-  // // Location Logic
-  // const origin = (
-  //     booking.origin ||
-  //     booking.originCity ||
-  //     flight.origin ||
-  //     ""
-  // ).toUpperCase();
-
-  // Try multiple sources for IATA / airport codes (flight, booking, sector fields)
-  let originCode = (
-    booking.originCode ||
-    flight.originCode ||
-    booking.originIata ||
-    flight.sectorFrom ||
-    ""
-  ).toUpperCase();
-
-  // const dest = (
-  //     booking.destination ||
-  //     booking.destinationCity ||
-  //     flight.destination ||
-  //     ""
-  // ).toUpperCase();
-
-  let destCode = (
-    booking.destinationCode ||
-    flight.destinationCode ||
-    booking.destinationIata ||
-    flight.sectorTo ||
-    ""
-  ).toUpperCase();
-
-  // If still missing, try parsing from booking.sector (e.g. "ISB-AUH")
-  if (
-    (!originCode || !originCode.trim() || originCode === "") &&
-    booking.sector
-  ) {
-    const sectorMatch = booking.sector.match(/([A-Z]{3})-([A-Z]{3})/);
-    if (sectorMatch) originCode = sectorMatch[1];
-  }
-  if ((!destCode || !destCode.trim() || destCode === "") && booking.sector) {
-    const sectorMatch = booking.sector.match(/([A-Z]{3})-([A-Z]{3})/);
-    if (sectorMatch) destCode = sectorMatch[2];
-  }
-
-  // Final fallback to show 'N/A' instead of a static hard-coded IATA
-  originCode = originCode || "N/A";
-  destCode = destCode || "N/A";
-
-  // Time Logic
-  // const depTime = flight.depTime || booking.depTime || "00:00";
-  // const arrTime = flight.arrTime || booking.arrTime || "00:00";
-  // const depDate = formatFullDate(booking.departureDate);
-  // const arrDate = formatFullDate(booking.arrivalDate || booking.departureDate);
-
-  // // Baggage & Sector
-  // const baggage = booking.baggageWeight || flight.baggage || "20KG";
-  // const sector = `${origin} (${originCode}) - ${dest} (${destCode})`;
-
-  // // Plane Icon (Base64 from your PDF code)
-  // const planeIconBase64 =
-  //     "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwMCIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBzdHlsZT0idHJhbnNmb3JtOiByb3RhdGUoOTBkZWcpOyI+PHBhdGggZD0iTTIxIDE2di0ybC04LTVWMy41YzAtLjgzLS42Ny0xLjUtMS41LTEuNVMxMCAyLjY3IDEwIDMuNVY5TDIgMTR2Mmw4LTIuNVYxOWwtMiAxLjVWMjJsMy41LTEgMy41IDF2LTEuNUwxMyAxOXYtNS41bDggMi41eiIvPjwvc3ZnPg==";
-
-  // Passengers (Logic adapted to handle array like the PDF, defaulting to your single passenger extract if needed)
-  const passengers =
-    booking.passengers && booking.passengers.length > 0
-      ? booking.passengers
-      : [
-          {
-            title: booking.passengers?.[0]?.title || "",
-            givenName: booking.passengers?.[0]?.givenName || "PASSENGER",
-            surName: booking.passengers?.[0]?.surName || "NAME",
-            passport: "N/A",
-          },
-        ];
-
-  // Frontend user fallback (safe parse)
-  // const storedFrontendUser = (() => {
-  //     try {
-  //         return JSON.parse(localStorage.getItem("frontend_user") || "{}");
-  //     } catch (e) {
-  //         return {};
-  //     }
-  // })();
-
-  // Dynamic fields (never static)
-  // const issuedBy =
-  //     booking.issuedBy ||
-  //     storedFrontendUser.companyName ||
-  //     storedFrontendUser.name ||
-  //     "N/A";
-
-  // const agencyName =
-  //     (booking.userId && booking.userId.companyName) ||
-  //     booking.agencyName ||
-  //     storedFrontendUser.companyName ||
-  //     "N/A";
-
-  // const phoneNumber =
-  //     (booking.userId && booking.userId.phone) ||
-  //     booking.phone ||
-  //     storedFrontendUser.phone ||
-  //     "N/A";
-
-  // --- 3. Build per-flight sections & passenger rows ---
   const bookingId =
     booking.bookingReference ||
     booking.bookingId ||
     booking.counter ||
     booking._id ||
     "N/A";
+
+  const passengers =
+    booking.passengers && booking.passengers.length > 0
+      ? booking.passengers
+      : [{ type: "Adult", title: "", givenName: "PASSENGER", surName: "NAME" }];
+
+  const travelType =
+    booking.groupType ||
+    booking.travelType ||
+    (booking.packageName
+      ? "Umrah Group"
+      : booking.groupTicketData || passengers.length > 1
+        ? "Group Booking"
+        : "Individual Booking");
+
   const flightsArr =
     booking.flights && booking.flights.length > 0 ? booking.flights : [flight];
 
-  const flightSectionsHTML = flightsArr
+  // Fallback leg codes parsed from the booking-level sector string, e.g.
+  // "LYP-JED-LYP" -> leg 0 is LYP->JED, leg 1 is JED->LYP.
+  const sectorLegCodes = (booking.sector || "")
+    .split("-")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const originCode = (
+    booking.originCode ||
+    booking.originIata ||
+    sectorLegCodes[0] ||
+    ""
+  ).toUpperCase();
+  const destCode = (
+    booking.destinationCode ||
+    booking.destinationIata ||
+    sectorLegCodes[sectorLegCodes.length - 1] ||
+    ""
+  ).toUpperCase();
+
+  // Pulls a 3-letter airport code out of either a dedicated code field or a
+  // "City (CODE)" string like "Faisalabad (LYP)".
+  const extractCode = (codeField, labelField) => {
+    if (codeField) return codeField.toUpperCase();
+    if (labelField) {
+      const m = labelField.match(/\(([A-Za-z]{3})\)/);
+      if (m) return m[1].toUpperCase();
+    }
+    return "";
+  };
+
+  const itineraryRowsHTML = flightsArr
     .map((f, index) => {
       const fNum = f.flightNo || booking.flightNumber || "XX000";
       const fAirline = (
         f.airlineName ||
+        f.airline ||
         booking.airline?.name ||
         "AIRLINE"
       ).toUpperCase();
-      const fBaggage = f.baggage || booking.baggageWeight || "20KG";
-      const fDepTime = f.depTime || booking.depTime || "00:00";
-      const fArrTime = f.arrTime || booking.arrTime || "00:00";
 
-      let fOriginCode = (f.originCode || f.sectorFrom || "").toUpperCase();
-      let fDestCode = (f.destinationCode || f.sectorTo || "").toUpperCase();
-      const fOriginCity = (f.origin || f.originCity || "").toUpperCase();
-      const fDestCity = (
-        f.destination ||
-        f.destinationCity ||
-        ""
-      ).toUpperCase();
+      let fOriginCode =
+        extractCode(f.originCode || f.sectorFrom, f.origin) ||
+        sectorLegCodes[index] ||
+        originCode;
+      let fDestCode =
+        extractCode(f.destinationCode || f.sectorTo, f.destination) ||
+        sectorLegCodes[index + 1] ||
+        destCode;
+      fOriginCode = fOriginCode || "N/A";
+      fDestCode = fDestCode || "N/A";
 
-      if (!fOriginCode && f.sector) {
-        const m = f.sector.match(/([A-Z]{3})-([A-Z]{3})/);
-        if (m) {
-          fOriginCode = m[1];
-          fDestCode = m[2];
-        }
-      }
-      fOriginCode = fOriginCode || originCode;
-      fDestCode = fDestCode || destCode;
+      const fDepTime = f.depTime || booking.depTime || "--:--";
+      const fArrTime = f.arrTime || booking.arrTime || "--:--";
 
-      const fDepDate = formatFullDate(
+      const fDepDate = formatDateOnly(
         f.departureDate ||
           f.depDate ||
           f.date ||
@@ -207,141 +195,196 @@ export const printGDSBooking = (booking) => {
             ? booking.departureDate
             : booking.returnDate || booking.arrivalDate),
       );
-      const fArrDate = formatFullDate(
-        f.arrivalDate ||
-          f.arrDate ||
-          f.arrival_date ||
-          f.departureDate ||
-          f.depDate ||
-          f.date ||
-          (index === 0
-            ? booking.departureDate
-            : booking.returnDate || booking.arrivalDate),
-      );
 
-      const fHeaderOrigin = fOriginCity || fOriginCode;
-      const fOriginLabel = fOriginCity
-        ? `${fOriginCity} (${fOriginCode})`
-        : fOriginCode;
-      const fHeaderDest = fDestCity || fDestCode;
-      const fDestLabel = fDestCity ? `${fDestCity} (${fDestCode})` : fDestCode;
+      const baggageRaw = (f.baggage || booking.baggageWeight || "20KG")
+        .toString()
+        .toUpperCase();
+      const baggageMatch = baggageRaw.match(/(\d+)\s*KG/);
+      const baggageLine1 = baggageMatch ? `${baggageMatch[1]} KG` : baggageRaw;
+
+      const mealRaw = f.meal ?? (f.mealIncluded === false ? "No" : "Yes");
+      const mealIncluded = !/^(no|false|0)$/i.test(String(mealRaw).trim());
 
       return `
-        <div class="flight-section">
-            <div class="flight-header">Flight ${index + 1} - ${fHeaderOrigin} (${fOriginCode}) to ${fHeaderDest} (${fDestCode})</div>
-            <table class="flight-table">
-                <thead>
-                    <tr>
-                        <th>AIRLINE NAME</th>
-                        <th>Flight #</th>
-                        <th>DEPARTURE</th>
-                        <th></th>
-                        <th>ARRIVAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${fAirline}</td>
-                        <td>${fNum}<br><span style="color:#999;font-size:10px;">Baggage</span><br>${fBaggage}</td>
-                        <td><strong style="font-size:14px;">${fDepTime}</strong><br>${fOriginLabel}<br><span style="color:#555;">${fDepDate}</span></td>
-                        <td style="text-align:center;font-size:22px;color:#333;">&#9992;</td>
-                        <td><strong style="font-size:14px;">${fArrTime}</strong><br>${fDestLabel}<br><span style="color:#555;">${fArrDate}</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>`;
+        <tr>
+            <td>${fDepDate}</td>
+            <td>${fAirline} / ${fNum}</td>
+            <td>${fOriginCode}</td>
+            <td>${fDepTime}</td>
+            <td>${fDestCode}</td>
+            <td>${fArrTime}</td>
+            <td>
+                <div class="cell-icon-row">
+                    ${ICON_MEAL(NAVY_SOFT)}
+                    <div class="cell-text"><div class="l1">Meal</div><div class="l2">${mealIncluded ? "Included" : "Not Included"}</div></div>
+                </div>
+            </td>
+            <td>
+                <div class="cell-icon-row">
+                    ${ICON_BAGGAGE(NAVY_SOFT)}
+                    <div class="cell-text"><div class="l1">${baggageLine1}</div><div class="l2">Checked</div></div>
+                </div>
+            </td>
+        </tr>`;
     })
     .join("");
 
+  const refundedIndices = booking.refundedPassengerIndices || [];
+
   const passengersHTML = passengers
-    .map(
-      (p, i) => `
+    .map((p, i) => {
+      const name = [p.title, p.givenName, p.surName].filter(Boolean).join(" ") || "PASSENGER NAME";
+      const type = (p.type || "Adult").toUpperCase();
+      const status = refundedIndices.includes(i)
+        ? "Cancelled"
+        : formatStatusLabel(p.status || booking.status || booking.bookingStatus);
+      return `
         <tr>
-            <td>${i + 1}</td>
-            <td>${[p.title, p.givenName, p.surName].filter(Boolean).join(" ")}</td>
-            <td>${p.passport || p.passportNumber || "N/A"}</td>
-            <td>${p.meal ? "Yes" : "N/A"}</td>
-            <td>${p.status || bookingStatus || "Confirmed"}</td>
-        </tr>`,
-    )
+            <td>${String(i + 1).padStart(2, "0")}</td>
+            <td>${name}</td>
+            <td>${type}</td>
+            <td>${p.ticketNumber || p.eTicketNumber || "–"}</td>
+            <td>${status}</td>
+        </tr>`;
+    })
     .join("");
 
-  // --- 4. Construct the HTML ---
+  const expiresAt = booking.expiresAt;
+  const isTicketed =
+    bookingStatus === "CONFIRMED" ||
+    bookingStatus === "ISSUED" ||
+    bookingStatus === "TICKETED";
+
+  const reservationBoxHTML =
+    expiresAt && !isTicketed
+      ? `
+        <div class="reservation-box">
+            <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
+            <div>
+                <div class="res-title">RESERVATION TIME LIMIT</div>
+                <div class="res-row">Date&nbsp;&nbsp;:&nbsp;&nbsp;${formatDateOnly(expiresAt)}</div>
+                <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)} (Local Time)</div>
+            </div>
+        </div>
+        <div class="note-text">Seats reserved until the above date &amp; time.</div>`
+      : `
+        <div class="reservation-box">
+            <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
+            <div>
+                <div class="res-title">RESERVATION TIME LIMIT</div>
+                <div class="res-row">Status&nbsp;&nbsp;:&nbsp;&nbsp;Ticket Issued / Confirmed</div>
+            </div>
+        </div>
+        <div class="note-text">This itinerary has been ticketed and confirmed.</div>`;
+
   const ticketHTML = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Electronic Ticket Voucher</title>
+    <title>Travel Itinerary</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
         @media print {
-            @page { margin: 10mm; size: A4 portrait; }
+            @page { margin: 1mm; size: A4 portrait; }
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
-        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 0; padding: 30px; background: #fff; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Roboto', Arial, Helvetica, sans-serif; font-size: 12px; color: ${BODY_TEXT}; margin: 0; padding: 28px; background: #fff; }
+        .doc { max-width: 800px; margin: 0 auto; }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .agency-logo { min-width: 80px; display: flex; align-items: center; justify-content: flex-start; }
-        .agency-logo img { max-height: 55px; max-width: 160px; object-fit: contain; }
-        .page-title { font-size: 26px; font-weight: bold; color: #1a5276; }
-        .airline-logo img { height: 55px; object-fit: contain; }
+        .top-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 14px; border-bottom: 2px solid ${NAVY}; margin-bottom: 8px; }
+        .brand-left img { max-height: 40px; max-width: 150px; width: auto; object-fit: contain; display: block; margin-bottom: 4px; }
+        .brand-left .airline-fallback { font-size: 20px; font-weight: 800; color: ${NAVY}; }
+        .brand-left .airline-name { font-size: 11px; color: ${NAVY_SOFT}; font-weight: 700; letter-spacing: 0.4px; }
+        .brand-right { text-align: right; }
+        .brand-right .agency-name { font-size: 15px; font-weight: 800; color: ${NAVY}; letter-spacing: 0.3px; }
+        .brand-right .agency-tag { font-size: 11px; color: ${NAVY}; margin-top: 2px; }
 
-        .info-box { background: #1a5276; color: #fff; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px; }
-        .info-box .info-row { margin-bottom: 4px; font-size: 13px; }
+        .doc-title { text-align: center; font-size: 30px; font-weight: 800; color: ${NAVY}; letter-spacing: 1px; margin: 0px 0 4px; }
+        .doc-subtitle { font-size: 11px; color: ${MUTED}; margin-bottom: 20px; }
 
-        .flight-section { margin-bottom: 20px; border-radius: 4px; overflow: hidden; border: 1px solid #eee; }
-        .flight-header { background: #d4ac0d; color: #fff; padding: 10px 15px; font-weight: bold; font-size: 14px; }
-        .flight-table { width: 100%; border-collapse: collapse; }
-        .flight-table th { text-align: left; padding: 10px 15px; font-size: 11px; color: #555; font-weight: bold; border-bottom: 1px solid #eee; background: #fff; }
-        .flight-table td { padding: 10px 15px; font-size: 12px; vertical-align: top; }
+        .info-box { display: flex; background: ${LIGHT_BLUE}; border: 1px solid ${BORDER_BLUE}; margin-bottom: 22px; overflow: hidden; }
+        .info-box .info-col { flex: 1; padding: 12px 20px; }
+        .info-box .info-col + .info-col { border-left: 1px solid ${BORDER_BLUE}; }
+        .info-box .info-label { font-size: 11px; font-weight: 700; color: ${NAVY}; margin-bottom: 4px; }
+        .info-box .info-value { font-size: 13px; color: ${BODY_TEXT}; font-weight: 600; }
 
-        .pax-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .pax-table thead tr { background: #1a5276; color: #fff; }
-        .pax-table th { padding: 10px 15px; text-align: left; font-size: 12px; }
-        .pax-table td { padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 12px; }
+        .section-title { font-size: 15px; font-weight: 800; color: ${NAVY}; letter-spacing: 0.5px; margin: 22px 0 10px; text-transform: uppercase; }
 
-        .terms-title { font-weight: bold; color: #1a5276; font-size: 14px; margin: 20px 0 8px; }
-        .terms-list { padding-left: 20px; margin: 0; }
-        .terms-list li { margin-bottom: 5px; font-size: 12px; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+        table.data-table thead tr { background: ${NAVY}; color: #fff; }
+        table.data-table th { padding: 9px 12px; text-align: left; font-size: 11.5px; font-weight: 700; }
+        table.data-table.itinerary-table th { text-transform: uppercase; letter-spacing: 0.3px; }
+        table.data-table td { padding: 9px 12px; font-size: 12px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+        table.data-table tbody tr:nth-child(even) { background: #f8fafc; }
+
+        .cell-icon-row { display: flex; align-items: center; gap: 8px; }
+        .cell-icon-row .cell-text { line-height: 1.3; }
+        .cell-icon-row .cell-text .l1 { font-weight: 600; }
+        .cell-icon-row .cell-text .l2 { color: ${MUTED}; font-size: 10.5px; }
+
+        .note-text { font-size: 11px; color: ${NAVY}; font-style: italic; margin: 8px 0 4px; }
+
+        .reservation-box { display: flex; align-items: center; gap: 16px; background: #f7fafc; border: 1px solid ${BORDER_BLUE}; padding: 16px 20px; }
+        .reservation-box .res-title { font-size: 13px; font-weight: 800; color: ${NAVY}; margin-bottom: 6px; letter-spacing: 0.3px; }
+        .reservation-box .res-row { font-size: 12px; color: ${BODY_TEXT}; margin-bottom: 2px; }
+
+        .terms-list { margin: 0; padding-left: 18px; }
+        .terms-list li { font-size: 12px; color: ${BODY_TEXT}; margin-bottom: 6px; line-height: 1.4; }
+
+        .issued-by .company-name { font-size: 13px; font-weight: 800; color: ${NAVY}; margin-bottom: 4px; }
+        .issued-by .addr-line { font-size: 12px; color: #374151; margin-bottom: 2px; }
+        .issued-by .contact-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #374151; margin-top: 6px; }
+        .issued-by .contact-row + .contact-row { margin-top: 4px; }
+
+        .footer { margin-top: 26px; padding-top: 14px; border-top: 2px solid ${NAVY}; text-align: center; }
+        .footer .thanks { font-size: 12px; color: ${NAVY}; font-weight: 600; font-style: italic; display: flex; align-items: center; justify-content: center; gap: 8px; }
     </style>
 </head>
 <body>
-    <div style="max-width: 800px; margin: 0 auto;">
-
-        <!-- Header -->
-        <div class="header">
-            <div class="agency-logo">
-                ${agencyLogo ? `<img src="${agencyLogo}" alt="${getAgencyName(booking)}" />` : ""}
-            </div>
-            <div class="page-title">Electronic Ticket Voucher</div>
-            <div class="airline-logo">
+    <div class="doc">
+        <div class="top-header">
+            <div class="brand-left">
                 ${
                   airlineLogo
-                    ? `<img src="${airlineLogo}" alt="${airlineName}" />`
-                    : `<span style="font-size:20px;font-weight:bold;color:#1a5276;">${airlineName}</span>`
+                    ? `<img src="${airlineLogo}" alt="${airlineName}" onerror="this.outerHTML='<span class=&quot;airline-fallback&quot;>${airlineName}</span>'" />`
+                    : `<span class="airline-fallback">${airlineName}</span>`
                 }
+                <!-- <div class="airline-name">${airlineName}</div> -->
+            </div>
+            <div class="brand-right">
+                <div class="agency-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
+                <div class="agency-tag">IATA Accredited Travel Agency</div>
             </div>
         </div>
 
-        <!-- Booking Info Box -->
+        <div class="doc-title">TRAVEL ITINERARY</div>
+
         <div class="info-box">
-            <div class="info-row">Booking Reference Number (PNR) :  ${pnr}</div>
-            <div class="info-row">Booking ID :  ${bookingId}</div>
-            <div class="info-row">Issued By :  ${getAgencyName(booking)}</div>
-            <div class="info-row">Agent Name :  ${getName(booking)}</div>
-            <div class="info-row">Contact :  ${getAgencyPhone(booking)}</div>
+            <div class="info-col">
+                <div class="info-label">Booking Reference</div>
+                <div class="info-value">${bookingId}</div>
+            </div>
+            <div class="info-col">
+                <div class="info-label">Airline PNR</div>
+                <div class="info-value">${pnr}</div>
+            </div>
+            <div class="info-col">
+                <div class="info-label">Travel Type</div>
+                <div class="info-value">${travelType}</div>
+            </div>
         </div>
 
-        <!-- Flight Sections -->
-        ${flightSectionsHTML}
-
-        <!-- Passengers -->
-        <table class="pax-table">
+        <div class="section-title">Passengers</div>
+        <table class="data-table">
             <thead>
                 <tr>
-                    <th>Sr#</th>
-                    <th>Passenger Name</th>
-                    <th>Passport#</th>
-                    <th>Meal</th>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Ticket Number</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -350,143 +393,103 @@ export const printGDSBooking = (booking) => {
             </tbody>
         </table>
 
-        <!-- Terms & Conditions -->
-        <div class="terms-title">Terms &amp; Conditions</div>
+        <div class="section-title">Itinerary</div>
+        <table class="data-table itinerary-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Airline / Flight</th>
+                    <th>From</th>
+                    <th>Depart</th>
+                    <th>To</th>
+                    <th>Arrive</th>
+                    <th>Meal</th>
+                    <th>Baggage</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itineraryRowsHTML}
+            </tbody>
+        </table>
+        <div class="note-text">Note: Meal and baggage allowance are as per airline policy and subject to change.</div>
+
+        <div class="section-title">Reserved &amp; Issued / Cancel Time</div>
+        ${reservationBoxHTML}
+
+        <div class="section-title">Travel Notes</div>
         <ul class="terms-list">
-            <li>Please Report Airline Check-In Counter 4 Hours Before Flight Departure.</li>
-            <li>All Visa and Travel Document are Traveler Own Responsibility.</li>
-            <li>Tickets are non refundable</li>
+            <li>Check-in and airport reporting requirements are determined by the operating airline.</li>
+            <li>Travel documents must be valid and available at check-in.</li>
+            <li>Flight times may change due to operational requirements.</li>
+            <li>Baggage allowance should be verified against the issued fare/ticket.</li>
+            <li>Itinerary is not valid for travel unless ticket is issued.</li>
         </ul>
 
+        <div class="section-title">Issued By</div>
+        <div class="issued-by">
+            <div class="company-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
+            <div class="addr-line">G2, Ch Arcade, Regency Road, Faisalabad</div>
+            <div class="addr-line">Opp. TMA Office, Faisalabad Road, Samundri</div>
+            <div class="contact-row">${ICON_PHONE(NAVY_SOFT)}<span>0300-7277854&nbsp;&nbsp;•&nbsp;&nbsp;0300-7298467&nbsp;&nbsp;•&nbsp;&nbsp;0349-4900118</span></div>
+            <div class="contact-row">${ICON_MAIL(NAVY_SOFT)}<span>abid_intl@msn.com&nbsp;&nbsp;•&nbsp;&nbsp;abidairtravels.com</span></div>
+        </div>
+
+        <div class="footer">
+            <div class="thanks">${ICON_PLANE(NAVY)}<span>Thank you for choosing Abid Air International.</span></div>
+        </div>
     </div>
 </body>
 </html>
 `;
-  // --- 5. The Iframe Trick ---
+
   const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
+  Object.assign(iframe.style, {
+    position: "fixed",
+    right: "0",
+    bottom: "0",
+    width: "0",
+    height: "0",
+    border: "0",
+  });
 
   document.body.appendChild(iframe);
 
-  const doc = iframe.contentWindow.document;
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+
   doc.open();
   doc.write(ticketHTML);
   doc.close();
 
   iframe.onload = () => {
-    try {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    } catch (e) {
-      console.error("Print failed", e);
-    } finally {
-      // Remove iframe after delay
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }
+    const iframeDoc = iframe.contentWindow?.document;
+    const images = Array.from(iframeDoc?.images || []);
+    const imageLoads = images.map((img) => {
+      if (img.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      });
+    });
+    // Give the Roboto webfont a chance to finish loading so it doesn't
+    // silently fall back to Arial on print.
+    const fontsReady = iframeDoc?.fonts?.ready
+      ? iframeDoc.fonts.ready.catch(() => undefined)
+      : Promise.resolve();
+
+    Promise.all([...imageLoads, fontsReady]).finally(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.error("Print failed", e);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }
+    });
   };
-};
-
-const getAgencyLogo = (booking) => {
-  const storedFrontendUser = getStoredFrontendUser();
-
-  if (typeof booking.userId === "object" && booking.userId?.logo) {
-    return booking.userId.logo;
-  }
-  if (booking.agencyLogo) {
-    return booking.agencyLogo;
-  }
-  if (storedFrontendUser.logo) {
-    return storedFrontendUser.logo;
-  }
-  return DEFAULT_AGENCY_LOGO;
-};
-
-const getAgencyName = (booking) => {
-  const storedFrontendUser = getStoredFrontendUser();
-
-  if (typeof booking.userId === "object" && booking.userId?.companyName) {
-    return booking.userId.companyName;
-  }
-  if (booking.agencyName) {
-    return booking.agencyName;
-  }
-  if (storedFrontendUser.companyName) {
-    return storedFrontendUser.companyName;
-  }
-  return "SUPRA TRAVEL & TOURS";
-};
-
-const getStoredFrontendUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem("frontend_user") || "{}");
-  } catch {
-    return {};
-  }
-};
-
-const getName = (booking) => {
-  const storedFrontendUser = getStoredFrontendUser();
-
-  if (typeof booking.userId === "object" && booking.userId?.name) {
-    return booking.userId.name;
-  }
-  if (booking.contactPersonName) {
-    return booking.contactPersonName;
-  }
-  if (booking.issuedBy) {
-    return booking.issuedBy;
-  }
-  if (storedFrontendUser.name) {
-    return storedFrontendUser.name;
-  }
-  if (storedFrontendUser.companyName) {
-    return storedFrontendUser.companyName;
-  }
-  return "SUPRA TRAVEL & TOURS";
-};
-
-// const getAgencyEmail = (booking) => {
-//     const storedFrontendUser = getStoredFrontendUser();
-
-//     if (typeof booking.userId === "object" && booking.userId?.email) {
-//         return booking.userId.email;
-//     }
-//     if (booking.email) {
-//         return booking.email;
-//     }
-//     if (booking.contactEmail) {
-//         return booking.contactEmail;
-//     }
-//     if (storedFrontendUser.email) {
-//         return storedFrontendUser.email;
-//     }
-//     return "N/A";
-// };
-
-const getAgencyPhone = (booking) => {
-  const storedFrontendUser = getStoredFrontendUser();
-
-  if (typeof booking.userId === "object" && booking.userId?.phone) {
-    return booking.userId.phone;
-  }
-  if (booking.phone) {
-    return booking.phone;
-  }
-  if (booking.contactPhone) {
-    return booking.contactPhone;
-  }
-  if (booking.contactNumber) {
-    return booking.contactNumber;
-  }
-  if (storedFrontendUser.phone) {
-    return storedFrontendUser.phone;
-  }
-  return "N/A";
 };

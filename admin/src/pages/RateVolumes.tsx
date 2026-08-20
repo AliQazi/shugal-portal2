@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Select from "react-select";
 import axiosInstance from "../Api/axios";
 import currency_list from "../data/currencies";
@@ -14,12 +14,26 @@ import {
     FiPackage,
     FiActivity,
     FiRefreshCw,
-    FiAlertCircle
+    FiAlertCircle,
+    FiHome,
+    FiMapPin,
+    FiCalendar
 } from "react-icons/fi";
+import dayjs from "dayjs";
+
+interface HotelRef {
+    _id: string;
+    hotelName: string;
+    city: string;
+}
 
 interface RateVolumeType {
     _id?: string;
     volumeName: string;
+    hotel: string | HotelRef | null;
+    city: string;
+    fromDate: string;
+    toDate: string;
     buyingPrice: number;
     buyingRoe: number;
     buyingCurrency: string;
@@ -32,6 +46,10 @@ interface RateVolumeType {
 
 const initialState: RateVolumeType = {
     volumeName: "",
+    hotel: "",
+    city: "",
+    fromDate: "",
+    toDate: "",
     buyingPrice: 0,
     buyingRoe: 1,
     buyingCurrency: "PKR",
@@ -39,6 +57,27 @@ const initialState: RateVolumeType = {
     sellingRoe: 1,
     sellingCurrency: "PKR",
     isActive: true,
+};
+
+// Extract the hotel id whether `hotel` is a populated object or a plain id string
+const getHotelId = (hotel: RateVolumeType["hotel"]): string => {
+    if (!hotel) return "";
+    return typeof hotel === "string" ? hotel : hotel._id;
+};
+
+const getHotelName = (hotel: RateVolumeType["hotel"], hotels: HotelRef[]): string => {
+    if (!hotel) return "-";
+    if (typeof hotel === "string") {
+        return hotels.find((h) => h._id === hotel)?.hotelName || "-";
+    }
+    return hotel.hotelName || "-";
+};
+
+const formatDate = (date?: string): string => {
+    if (!date) return "-";
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString();
 };
 
 const currencyOptions = currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
@@ -72,10 +111,19 @@ const customSelectStyles = {
 
 export default function RateVolumes() {
     const [volumes, setVolumes] = useState<RateVolumeType[]>([]);
+    const [hotels, setHotels] = useState<HotelRef[]>([]);
     const [formData, setFormData] = useState<RateVolumeType>(initialState);
     const [loading, setLoading] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const fromDateRef = useRef<HTMLInputElement>(null);
+    const toDateRef = useRef<HTMLInputElement>(null);
+
+    // The site-wide stylesheet hides the native calendar icon on date inputs,
+    // so open the picker explicitly via the input's showPicker() API instead.
+    const openDatePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
+        ref.current?.showPicker?.();
+    };
 
     // ================= FETCH VOLUMES =================
     const fetchVolumes = async () => {
@@ -87,9 +135,34 @@ export default function RateVolumes() {
         }
     };
 
+    // ================= FETCH HOTELS =================
+    const fetchHotels = async () => {
+        try {
+            const res = await axiosInstance.get("/hotels/all");
+            setHotels(res.data.data || []);
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
     useEffect(() => {
         fetchVolumes();
+        fetchHotels();
     }, []);
+
+    // Cities derived purely from the hotels that exist
+    const cityOptions = useMemo(() => {
+        const cities = Array.from(new Set(hotels.map((h) => h.city).filter(Boolean)));
+        return cities.sort().map((c) => ({ value: c, label: c }));
+    }, [hotels]);
+
+    // Hotels narrowed down to the currently selected city (all hotels if no city chosen yet)
+    const hotelOptions = useMemo(() => {
+        const filtered = formData.city
+            ? hotels.filter((h) => h.city === formData.city)
+            : hotels;
+        return filtered.map((h) => ({ value: h._id, label: h.hotelName }));
+    }, [hotels, formData.city]);
 
     // ================= HANDLE CHANGE =================
     const handleChange = (
@@ -105,6 +178,34 @@ export default function RateVolumes() {
         }));
     };
 
+    // ================= HOTEL / CITY HANDLERS =================
+    // Selecting a hotel autofills its city
+    const handleHotelChange = (opt: { value: string; label: string } | null) => {
+        const hotelId = opt?.value || "";
+        const selectedHotel = hotels.find((h) => h._id === hotelId);
+        setFormData((prev) => ({
+            ...prev,
+            hotel: hotelId,
+            city: selectedHotel ? selectedHotel.city : prev.city,
+        }));
+    };
+
+    // Changing the city re-filters the hotel dropdown; clear the hotel if it no longer matches
+    const handleCityChange = (opt: { value: string; label: string } | null) => {
+        const newCity = opt?.value || "";
+        setFormData((prev) => {
+            const currentHotelId = getHotelId(prev.hotel);
+            const stillValid = currentHotelId
+                ? hotels.find((h) => h._id === currentHotelId)?.city === newCity
+                : false;
+            return {
+                ...prev,
+                city: newCity,
+                hotel: stillValid ? prev.hotel : "",
+            };
+        });
+    };
+
     // ================= CREATE / UPDATE =================
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -114,14 +215,31 @@ export default function RateVolumes() {
             return;
         }
 
+        if (!getHotelId(formData.hotel)) {
+            alert("Please select a hotel");
+            return;
+        }
+
+        if (!formData.fromDate || !formData.toDate) {
+            alert("Please select a from date and to date");
+            return;
+        }
+
+        if (new Date(formData.fromDate) > new Date(formData.toDate)) {
+            alert("From date cannot be after to date");
+            return;
+        }
+
         try {
             setLoading(true);
 
+            const payload = { ...formData, hotel: getHotelId(formData.hotel) };
+
             if (editId) {
-                await axiosInstance.put(`/rate-volumes/update/${editId}`, formData);
+                await axiosInstance.put(`/rate-volumes/update/${editId}`, payload);
                 alert("Volume updated successfully");
             } else {
-                await axiosInstance.post("/rate-volumes/create", formData);
+                await axiosInstance.post("/rate-volumes/create", payload);
                 alert("Volume created successfully");
             }
 
@@ -141,6 +259,10 @@ export default function RateVolumes() {
     const handleEdit = (volume: RateVolumeType) => {
         setFormData({
             volumeName: volume.volumeName,
+            hotel: getHotelId(volume.hotel),
+            city: volume.city || "",
+            fromDate: volume.fromDate ? volume.fromDate.slice(0, 10) : "",
+            toDate: volume.toDate ? volume.toDate.slice(0, 10) : "",
             buyingPrice: volume.buyingPrice,
             buyingRoe: volume.buyingRoe,
             buyingCurrency: volume.buyingCurrency,
@@ -268,6 +390,107 @@ export default function RateVolumes() {
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* ================= HOTEL / CITY / DATE RANGE ================= */}
+                            <div className="border-2 border-blue-200 rounded-xl p-5 bg-linear-to-br from-blue-50 to-blue-50/50">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="p-1.5 bg-blue-100 rounded-lg">
+                                        <FiHome className="w-4 h-4 text-blue-600" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-blue-700">Hotel & Date Range</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label className="block mb-1.5 text-xs font-semibold text-gray-600">
+                                            Hotel <span className="text-red-500">*</span>
+                                        </label>
+                                        <Select
+                                            options={hotelOptions}
+                                            value={
+                                                getHotelId(formData.hotel)
+                                                    ? hotelOptions.find((o) => o.value === getHotelId(formData.hotel)) || null
+                                                    : null
+                                            }
+                                            onChange={handleHotelChange}
+                                            placeholder="Select hotel"
+                                            isSearchable
+                                            isClearable
+                                            styles={customSelectStyles}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block mb-1.5 text-xs font-semibold text-gray-600">
+                                            City <span className="text-red-500">*</span>
+                                        </label>
+                                        <Select
+                                            options={cityOptions}
+                                            value={formData.city ? { value: formData.city, label: formData.city } : null}
+                                            onChange={handleCityChange}
+                                            placeholder="Select city"
+                                            isSearchable
+                                            isClearable
+                                            styles={customSelectStyles}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block mb-1.5 text-xs font-semibold text-gray-600">
+                                            From Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => openDatePicker(fromDateRef)}
+                                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"
+                                                tabIndex={-1}
+                                            >
+                                                <FiCalendar />
+                                            </button>
+                                            <input
+                                                ref={fromDateRef}
+                                                type="date"
+                                                name="fromDate"
+                                                value={formData.fromDate}
+                                                onChange={handleChange}
+                                                onClick={() => openDatePicker(fromDateRef)}
+                                                required
+                                                className="w-full bg-white pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block mb-1.5 text-xs font-semibold text-gray-600">
+                                            To Date <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => openDatePicker(toDateRef)}
+                                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer"
+                                                tabIndex={-1}
+                                            >
+                                                <FiCalendar />
+                                            </button>
+                                            <input
+                                                ref={toDateRef}
+                                                type="date"
+                                                name="toDate"
+                                                value={formData.toDate}
+                                                onChange={handleChange}
+                                                onClick={() => openDatePicker(toDateRef)}
+                                                min={formData.fromDate || undefined}
+                                                required
+                                                className="w-full bg-white pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                {formData.city && hotelOptions.length === 0 && (
+                                    <p className="mt-3 text-xs text-amber-600 flex items-center gap-1">
+                                        <FiAlertCircle className="w-3.5 h-3.5" />
+                                        No hotels found in {formData.city}. Add one on the Hotels page first.
+                                    </p>
+                                )}
                             </div>
 
                             {/* ================= PRICING SECTION ================= */}
@@ -438,15 +661,14 @@ export default function RateVolumes() {
                         <table className="w-full">
                             <thead>
                                 <tr className="bg-linear-to-r from-gray-50 to-gray-100">
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Volume Name</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Buying Price</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Buying ROE</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Buying Currency</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Selling Price</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Selling ROE</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Selling Currency</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Status</th>
-                                    <th className="text-left p-4 font-semibold text-gray-700 text-sm">Actions</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Volume Name</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Hotel</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">City</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Date Range</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Buying</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Selling</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Actions</th>
                                 </tr>
                             </thead>
 
@@ -458,39 +680,61 @@ export default function RateVolumes() {
                                             className={`border-b border-gray-50 hover:bg-blue-50/50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                                                 }`}
                                         >
-                                            <td className="p-4">
+                                            <td className="p-3">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                                        <FiPackage className="w-4 h-4 text-blue-600" />
+                                                    <div className="w-7 h-7 shrink-0 bg-blue-100 rounded-lg flex items-center justify-center">
+                                                        <FiPackage className="w-3.5 h-3.5 text-blue-600" />
                                                     </div>
-                                                    <span className="font-semibold text-gray-800">{volume.volumeName}</span>
+                                                    <span className="font-semibold text-gray-800 text-sm">{volume.volumeName}</span>
                                                 </div>
                                             </td>
-                                            <td className="p-4">
-                                                <span className="font-medium text-red-600">
-                                                    {volume.buyingPrice?.toLocaleString()}
-                                                </span>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-1.5 text-gray-700 text-sm whitespace-nowrap">
+                                                    <FiHome className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                                    {getHotelName(volume.hotel, hotels)}
+                                                </div>
                                             </td>
-                                            <td className="p-4 text-gray-700">{volume.buyingRoe}</td>
-                                            <td className="p-4">
-                                                <span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
-                                                    {volume.buyingCurrency}
-                                                </span>
+                                            <td className="p-3">
+                                                {volume.city ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-xs font-medium whitespace-nowrap">
+                                                        <FiMapPin className="w-3 h-3" />
+                                                        {volume.city}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">-</span>
+                                                )}
                                             </td>
-                                            <td className="p-4">
-                                                <span className="font-medium text-green-600">
-                                                    {volume.sellingPrice?.toLocaleString()}
-                                                </span>
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-1.5 text-gray-700 text-xs whitespace-nowrap">
+                                                    <FiCalendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                                    {dayjs(volume.fromDate).format("DD MMM YYYY")} - {dayjs(volume.toDate).format("DD MMM YYYY")}
+                                                </div>
                                             </td>
-                                            <td className="p-4 text-gray-700">{volume.sellingRoe}</td>
-                                            <td className="p-4">
-                                                <span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
-                                                    {volume.sellingCurrency}
-                                                </span>
+                                            <td className="p-3">
+                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+                                                    <span className="font-semibold text-red-600">
+                                                        {volume.buyingPrice?.toLocaleString()}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-red-50 rounded text-[11px] font-medium text-red-700">
+                                                        {volume.buyingCurrency}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-400 mt-0.5">ROE {volume.buyingRoe}</div>
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-3">
+                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+                                                    <span className="font-semibold text-green-600">
+                                                        {volume.sellingPrice?.toLocaleString()}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-green-50 rounded text-[11px] font-medium text-green-700">
+                                                        {volume.sellingCurrency}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-400 mt-0.5">ROE {volume.sellingRoe}</div>
+                                            </td>
+                                            <td className="p-3">
                                                 <span
-                                                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${volume.isActive
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${volume.isActive
                                                         ? "bg-green-100 text-green-700"
                                                         : "bg-gray-200 text-gray-600"
                                                         }`}
@@ -500,21 +744,21 @@ export default function RateVolumes() {
                                                     {volume.isActive ? "Active" : "Inactive"}
                                                 </span>
                                             </td>
-                                            <td className="p-4">
-                                                <div className="flex gap-2">
+                                            <td className="p-3">
+                                                <div className="flex gap-1.5">
                                                     <button
                                                         onClick={() => handleEdit(volume)}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-lg text-sm font-medium transition-all duration-200 border border-yellow-200 hover:border-yellow-300"
+                                                        title="Edit"
+                                                        className="inline-flex items-center justify-center p-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-lg transition-all duration-200 border border-yellow-200 hover:border-yellow-300"
                                                     >
                                                         <FiEdit2 className="w-3.5 h-3.5" />
-                                                        Edit
                                                     </button>
                                                     <button
                                                         onClick={() => handleDelete(volume._id)}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-sm font-medium transition-all duration-200 border border-red-200 hover:border-red-300"
+                                                        title="Delete"
+                                                        className="inline-flex items-center justify-center p-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-all duration-200 border border-red-200 hover:border-red-300"
                                                     >
                                                         <FiTrash2 className="w-3.5 h-3.5" />
-                                                        Delete
                                                     </button>
                                                 </div>
                                             </td>
@@ -522,7 +766,7 @@ export default function RateVolumes() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={9}>
+                                        <td colSpan={8}>
                                             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                                                 <FiAlertCircle className="w-12 h-12 mb-4 text-gray-300" />
                                                 <p className="text-lg font-medium text-gray-500">No volumes found</p>

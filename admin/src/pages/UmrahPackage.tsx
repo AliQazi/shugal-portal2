@@ -80,6 +80,14 @@ interface RoomPricing {
 
 interface HotelForm {
   name: string;
+  // References the Hotel document this row was picked from (via Hotel Name or Rate
+  // Volume selection) - used to look up Rate Volumes scoped to this hotel and to
+  // auto-match one by check-in/check-out date range. Empty for freehand-typed hotels.
+  hotelId?: string;
+  // Name of the Rate Volume that was applied to produce the buying/selling rates below.
+  // Persisted so an edit form can hint "these rates came from X" even though the Rate
+  // Volume dropdown itself stays unselected until the admin picks one in this session.
+  rateVolumeName?: string;
   supplier: SupplierAccount;
   location: {
     city: string;
@@ -174,6 +182,11 @@ interface VisaOption {
 
 interface RateVolumeData {
   volumeName: string;
+  // The hotel this rate volume applies to, and the stay-date window it's valid for.
+  hotelId?: string;
+  city?: string;
+  fromDate?: string;
+  toDate?: string;
   buyingPrice: number;
   buyingRoe: number;
   buyingCurrency: string;
@@ -326,19 +339,29 @@ const UmrahPackage = () => {
     axiosInstance.get("/rate-volumes/all", { params: { isActive: true } }).then((res) => {
       if (res.data.success) {
         setRateVolumeOptions(
-          (res.data.data || []).map((v: any) => ({
-            value: v._id,
-            label: `${v.volumeName} (Buy ${v.buyingPrice} ${v.buyingCurrency} / Sell ${v.sellingPrice} ${v.sellingCurrency})`,
-            data: {
-              volumeName: v.volumeName,
-              buyingPrice: v.buyingPrice || 0,
-              buyingRoe: v.buyingRoe || 1,
-              buyingCurrency: v.buyingCurrency || "PKR",
-              sellingPrice: v.sellingPrice || 0,
-              sellingRoe: v.sellingRoe || 1,
-              sellingCurrency: v.sellingCurrency || "PKR",
-            },
-          }))
+          (res.data.data || []).map((v: any) => {
+            const hotelId = typeof v.hotel === "string" ? v.hotel : v.hotel?._id;
+            const hotelName = typeof v.hotel === "object" ? v.hotel?.hotelName : undefined;
+            const fromLabel = v.fromDate ? new Date(v.fromDate).toLocaleDateString("en-GB") : "";
+            const toLabel = v.toDate ? new Date(v.toDate).toLocaleDateString("en-GB") : "";
+            return {
+              value: v._id,
+              label: `${v.volumeName}${hotelName ? ` - ${hotelName}` : ""}${fromLabel && toLabel ? ` (${fromLabel} - ${toLabel})` : ""}`,
+              data: {
+                volumeName: v.volumeName,
+                hotelId,
+                city: v.city,
+                fromDate: v.fromDate,
+                toDate: v.toDate,
+                buyingPrice: v.buyingPrice || 0,
+                buyingRoe: v.buyingRoe || 1,
+                buyingCurrency: v.buyingCurrency || "PKR",
+                sellingPrice: v.sellingPrice || 0,
+                sellingRoe: v.sellingRoe || 1,
+                sellingCurrency: v.sellingCurrency || "PKR",
+              },
+            };
+          })
         );
       }
     }).catch(() => { });
@@ -430,6 +453,8 @@ const UmrahPackage = () => {
 
         const formattedHotels = (data.hotels || []).map((h: any) => ({
           name: h.name || "",
+          hotelId: h.hotelId || "",
+          rateVolumeName: h.rateVolumeName || "",
           supplier: {
             _id: h.supplier?._id || "",
             name: h.supplier?.name || (typeof h.supplier === "string" ? h.supplier : ""),
@@ -966,6 +991,99 @@ const UmrahPackage = () => {
     return dateToISO(outDate);
   };
 
+  // True when a volume's [fromDate, toDate] window fully covers the [checkIn, checkOut]
+  // stay. Used both to auto-match a volume as dates change and to validate a manually
+  // picked volume against whatever dates are already selected.
+  const isStayWithinVolumeRange = (
+    checkIn: string,
+    checkOut: string,
+    fromDate?: string,
+    toDate?: string
+  ): boolean => {
+    if (!checkIn || !checkOut || !fromDate || !toDate) return false;
+    const checkInDate = parseISODate(checkIn);
+    const checkOutDate = parseISODate(checkOut);
+    if (!checkInDate || !checkOutDate) return false;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    from.setHours(0, 0, 0, 0);
+    to.setHours(0, 0, 0, 0);
+    return from.getTime() <= checkInDate.getTime() && to.getTime() >= checkOutDate.getTime();
+  };
+
+  // Finds the Rate Volume (if any) for `hotelId` whose from/to date range fully covers
+  // the given check-in/check-out stay. Used to auto-apply pricing as dates change.
+  const findMatchingRateVolume = (
+    hotelId: string | undefined,
+    checkIn: string,
+    checkOut: string
+  ): RateVolumeOption | undefined => {
+    if (!hotelId || !checkIn || !checkOut) return undefined;
+    return rateVolumeOptions.find(
+      (opt) => opt.data.hotelId === hotelId && isStayWithinVolumeRange(checkIn, checkOut, opt.data.fromDate, opt.data.toDate)
+    );
+  };
+
+  // Builds the hotel-row fields (name/city/distance/rating + buying/selling incl. the
+  // per-room-type breakdown) implied by a Rate Volume - pulling the hotel's own details
+  // (distance, rating, map URL) from the already-loaded Hotel list via its hotelId.
+  const computeVolumeFields = (hotel: HotelForm, volume: RateVolumeData): Partial<HotelForm> => {
+    const buying = volume.buyingPrice || 0;
+    const buyingRoe = volume.buyingRoe || 1;
+    const selling = volume.sellingPrice || 0;
+    const sellingRoe = volume.sellingRoe || 1;
+
+    const fields: Partial<HotelForm> = {
+      rateVolumeName: volume.volumeName,
+      buyingPrice: buying,
+      buyingRoe,
+      buyingCurrency: volume.buyingCurrency,
+      sellingPrice: selling,
+      sellingRoe,
+      sellingCurrency: volume.sellingCurrency,
+      doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((buying / 2).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 2).toFixed(2)), sellingRoe },
+      tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((buying / 3).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 3).toFixed(2)), sellingRoe },
+      quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((buying / 4).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 4).toFixed(2)), sellingRoe },
+      sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((buying / 5).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 5).toFixed(2)), sellingRoe },
+    };
+
+    const matchedHotelOption = volume.hotelId ? hotelOptions.find((h) => h.value === volume.hotelId) : undefined;
+    if (matchedHotelOption) {
+      fields.hotelId = matchedHotelOption.value;
+      fields.name = matchedHotelOption.data?.hotelName || matchedHotelOption.label;
+      fields.location = {
+        city: matchedHotelOption.data?.city || volume.city || hotel.location.city,
+        distance: matchedHotelOption.data?.distance != null ? String(matchedHotelOption.data.distance) : hotel.location.distance,
+        mapUrl: matchedHotelOption.data?.mapUrl || hotel.location.mapUrl,
+      };
+      fields.rating = Number(matchedHotelOption.data?.rating || 0);
+    } else if (volume.hotelId) {
+      // Hotel list hasn't loaded yet - at least keep the id/city so matching still works.
+      fields.hotelId = volume.hotelId;
+      if (volume.city) {
+        fields.location = { ...hotel.location, city: volume.city };
+      }
+    }
+
+    return fields;
+  };
+
+  // Resets a hotel row's buying/selling fields (and per-room breakdown) back to blank -
+  // used when a previously-applied Rate Volume no longer covers the stay dates.
+  const emptyRateFields = (): Partial<HotelForm> => ({
+    rateVolumeName: "",
+    buyingPrice: undefined,
+    buyingRoe: 1,
+    buyingCurrency: "PKR",
+    sellingPrice: undefined,
+    sellingRoe: 1,
+    sellingCurrency: "PKR",
+    doubleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+    tripleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+    quadRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+    sharedRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+  });
+
   const updateHotel = (index: number, fields: Partial<HotelForm>) => {
     const updated = [...formik.values.hotels];
     updated[index] = { ...updated[index], ...fields };
@@ -996,7 +1114,64 @@ const UmrahPackage = () => {
       }
     }
 
+    // Whenever the stay dates change, auto-apply the Rate Volume (if any) for this
+    // hotel whose date range covers the (possibly just-recalculated) check-in/check-out.
+    const datesChanged =
+      Object.prototype.hasOwnProperty.call(fields, "checkIn") ||
+      Object.prototype.hasOwnProperty.call(fields, "checkOut") ||
+      Object.prototype.hasOwnProperty.call(fields, "nights");
+    if (datesChanged && row.hotelId && row.checkIn && row.checkOut) {
+      const match = findMatchingRateVolume(row.hotelId, row.checkIn, row.checkOut);
+      if (match) {
+        Object.assign(row, computeVolumeFields(row, match.data));
+        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.value }));
+      } else {
+        // A Rate Volume was active for this hotel but its date range no longer covers
+        // the new stay - the rates it filled in are stale, so clear them instead of
+        // silently leaving prices on screen that don't correspond to any picked volume.
+        if (index in selectedRateVolumeByHotel) {
+          const previousVolumeName = row.rateVolumeName;
+          Object.assign(row, emptyRateFields());
+          toast.error(
+            `The selected Rate Volume "${previousVolumeName}" doesn't cover ${formatFlightDate(row.checkIn)} - ${formatFlightDate(row.checkOut)}. Buying/Selling rates were cleared - pick a Rate Volume that covers these dates or enter rates manually.`
+          );
+        }
+        setSelectedRateVolumeByHotel((prev) => {
+          if (!(index in prev)) return prev;
+          const next = { ...prev };
+          delete next[index];
+          return next;
+        });
+      }
+    }
+
+    updated[index] = row;
     formik.setFieldValue("hotels", updated);
+  };
+
+  // Applies a manually-picked Hotel Name (not via Rate Volume) - fills its details and,
+  // if check-in/check-out are already set, also auto-applies a matching Rate Volume.
+  const applyHotelSelection = (index: number, hotel: HotelForm, selected: HotelOption) => {
+    const baseFields: Partial<HotelForm> = {
+      hotelId: selected.value,
+      name: selected.data?.hotelName || selected.label,
+      location: {
+        city: selected.data?.city || hotel.location.city,
+        distance: selected.data?.distance != null ? String(selected.data.distance) : "",
+        mapUrl: selected.data?.mapUrl || "",
+      },
+      rating: Number(selected.data?.rating || 0),
+    };
+
+    if (hotel.checkIn && hotel.checkOut) {
+      const match = findMatchingRateVolume(selected.value, hotel.checkIn, hotel.checkOut);
+      if (match) {
+        Object.assign(baseFields, computeVolumeFields({ ...hotel, ...baseFields } as HotelForm, match.data));
+        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.value }));
+      }
+    }
+
+    updateHotel(index, baseFields);
   };
 
   // Deselects the "Rate Volume" dropdown for a hotel row once any of the 6 pricing
@@ -1011,25 +1186,11 @@ const UmrahPackage = () => {
     });
   };
 
-  // Fill Buying + Selling price/ROE/currency (and the per-room-type breakdown) from a
-  // saved Rate Volume, triggered by the "Rate Volume" dropdown next to the supplier.
+  // Fill Hotel Name/City/Distance + Buying/Selling price/ROE/currency (and the
+  // per-room-type breakdown) from a saved Rate Volume, triggered by the "Rate Volume"
+  // dropdown. Check-in/check-out are left untouched.
   const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
-    const buying = volume.buyingPrice || 0;
-    const buyingRoe = volume.buyingRoe || 1;
-    const selling = volume.sellingPrice || 0;
-    const sellingRoe = volume.sellingRoe || 1;
-    updateHotel(index, {
-      buyingPrice: buying,
-      buyingRoe,
-      buyingCurrency: volume.buyingCurrency,
-      sellingPrice: selling,
-      sellingRoe,
-      sellingCurrency: volume.sellingCurrency,
-      doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((buying / 2).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 2).toFixed(2)), sellingRoe },
-      tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((buying / 3).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 3).toFixed(2)), sellingRoe },
-      quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((buying / 4).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 4).toFixed(2)), sellingRoe },
-      sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((buying / 5).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 5).toFixed(2)), sellingRoe },
-    });
+    updateHotel(index, computeVolumeFields(hotel, volume));
   };
 
   // Manual entry for Buying Price/Room (used when no Rate Volume is picked) - mirrors
@@ -1492,6 +1653,18 @@ const UmrahPackage = () => {
                                   });
                                   return;
                                 }
+                                // If a stay is already selected, only apply the volume when its
+                                // date range actually covers that stay - otherwise the rate would
+                                // silently apply to dates it was never priced for.
+                                if (hotel.checkIn && hotel.checkOut) {
+                                  const rangeOk = isStayWithinVolumeRange(hotel.checkIn, hotel.checkOut, option.data.fromDate, option.data.toDate);
+                                  if (!rangeOk) {
+                                    toast.error(
+                                      `"${option.data.volumeName}" is only valid ${formatFlightDate(option.data.fromDate)} - ${formatFlightDate(option.data.toDate)}, which doesn't cover the selected stay (${formatFlightDate(hotel.checkIn)} - ${formatFlightDate(hotel.checkOut)}). Pick a volume that covers these dates, or change Check-in/Check-out first.`
+                                    );
+                                    return;
+                                  }
+                                }
                                 setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
                                 applyRateVolumeToHotel(index, hotel, option.data);
                               }}
@@ -1510,22 +1683,23 @@ const UmrahPackage = () => {
                             <label className="block text-xs font-semibold mb-1">Hotel Name</label>
                             <CreatableSelect
                               options={hotelOptions}
-                              onCreateOption={(inputValue) => updateHotel(index, { name: inputValue })}
+                              onCreateOption={(inputValue) => {
+                                clearSelectedRateVolume(index);
+                                updateHotel(index, { name: inputValue, hotelId: "" });
+                              }}
                               onChange={(option: any) => {
                                 const selected = option as HotelOption;
                                 if (!selected) {
-                                  updateHotel(index, { name: "", location: { city: hotel.location.city, distance: "", mapUrl: "" }, rating: 0 });
+                                  clearSelectedRateVolume(index);
+                                  updateHotel(index, { name: "", hotelId: "", location: { city: hotel.location.city, distance: "", mapUrl: "" }, rating: 0 });
                                   return;
                                 }
                                 if (selected.data) {
-                                  updateHotel(index, {
-                                    name: selected.data.hotelName || selected.label,
-                                    location: { city: selected.data.city || hotel.location.city, distance: String(selected.data.distance ?? ""), mapUrl: selected.data.mapUrl || "" },
-                                    rating: Number(selected.data.rating || 0),
-                                  });
+                                  applyHotelSelection(index, hotel, selected);
                                   return;
                                 }
-                                updateHotel(index, { name: selected.label || "" });
+                                clearSelectedRateVolume(index);
+                                updateHotel(index, { name: selected.label || "", hotelId: "" });
                               }}
                               value={hotel.name ? { value: hotel.name, label: hotel.name } : null}
                               placeholder="Hotel Name"

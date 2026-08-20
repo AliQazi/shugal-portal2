@@ -10,6 +10,26 @@ const rateVolumeSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Hotel this rate volume applies to
+    hotel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Hotel",
+    },
+
+    // City is denormalized from the hotel for easy filtering/display
+    city: {
+      type: String,
+      trim: true,
+    },
+
+    // Date range this buying/selling rate is valid for
+    fromDate: {
+      type: Date,
+    },
+    toDate: {
+      type: Date,
+    },
+
     // Buying side
     buyingPrice: {
       type: Number,

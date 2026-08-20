@@ -7,6 +7,10 @@ export const createRateVolume = async (req, res) => {
   try {
     const {
       volumeName,
+      hotel,
+      city,
+      fromDate,
+      toDate,
       buyingPrice,
       buyingRoe,
       buyingCurrency,
@@ -23,8 +27,26 @@ export const createRateVolume = async (req, res) => {
       });
     }
 
+    if (!hotel) {
+      return res.status(400).json({
+        success: false,
+        message: "Hotel is required",
+      });
+    }
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({
+        success: false,
+        message: "From date and to date are required",
+      });
+    }
+
     const rateVolume = await RateVolume.create({
       volumeName,
+      hotel,
+      city: city || "",
+      fromDate,
+      toDate,
       buyingPrice: buyingPrice || 0,
       buyingRoe: buyingRoe || 1,
       buyingCurrency: buyingCurrency || "PKR",
@@ -33,6 +55,8 @@ export const createRateVolume = async (req, res) => {
       sellingCurrency: sellingCurrency || "PKR",
       isActive: isActive !== undefined ? isActive : true,
     });
+
+    await rateVolume.populate("hotel", "hotelName city");
 
     res.status(201).json({
       success: true,
@@ -60,7 +84,8 @@ export const getAllRateVolumes = async (req, res) => {
 
     const rateVolumes = await RateVolume.find(filter)
       .sort({ createdAt: -1 })
-      .select("-__v");
+      .select("-__v")
+      .populate("hotel", "hotelName city");
 
     res.status(200).json({
       success: true,
@@ -79,7 +104,9 @@ export const getAllRateVolumes = async (req, res) => {
 // GET SINGLE RATE VOLUME
 export const getSingleRateVolume = async (req, res) => {
   try {
-    const rateVolume = await RateVolume.findById(req.params.id).select("-__v");
+    const rateVolume = await RateVolume.findById(req.params.id)
+      .select("-__v")
+      .populate("hotel", "hotelName city");
 
     if (!rateVolume) {
       return res.status(404).json({
@@ -106,6 +133,10 @@ export const updateRateVolume = async (req, res) => {
   try {
     const {
       volumeName,
+      hotel,
+      city,
+      fromDate,
+      toDate,
       buyingPrice,
       buyingRoe,
       buyingCurrency,
@@ -117,6 +148,10 @@ export const updateRateVolume = async (req, res) => {
 
     const updateData = {
       ...(volumeName !== undefined && { volumeName }),
+      ...(hotel !== undefined && { hotel }),
+      ...(city !== undefined && { city }),
+      ...(fromDate !== undefined && { fromDate }),
+      ...(toDate !== undefined && { toDate }),
       ...(buyingPrice !== undefined && { buyingPrice }),
       ...(buyingRoe !== undefined && { buyingRoe }),
       ...(buyingCurrency !== undefined && { buyingCurrency }),
@@ -129,7 +164,9 @@ export const updateRateVolume = async (req, res) => {
     const rateVolume = await RateVolume.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
-    }).select("-__v");
+    })
+      .select("-__v")
+      .populate("hotel", "hotelName city");
 
     if (!rateVolume) {
       return res.status(404).json({

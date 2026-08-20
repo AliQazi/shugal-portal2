@@ -103,6 +103,13 @@ const GroupTicketingSchema = new mongoose.Schema(
     hotels: [
       {
         name: { type: String, required: true },
+        // References the Hotel document this row was picked from (via Hotel Name or
+        // Rate Volume selection) - kept so editing the package can re-match Rate
+        // Volumes by check-in/check-out date range. Empty for freehand-typed hotels.
+        hotelId: { type: String, default: "" },
+        // Name of the Rate Volume that was applied to produce the buying/selling rates
+        // below, shown as a hint when editing since the dropdown itself isn't restored.
+        rateVolumeName: { type: String, default: "" },
         supplier: { type: SupplierSchema, default: () => ({}) },
         location: {
           city: { type: String },

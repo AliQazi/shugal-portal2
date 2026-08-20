@@ -73,13 +73,6 @@ const getHotelName = (hotel: RateVolumeType["hotel"], hotels: HotelRef[]): strin
     return hotel.hotelName || "-";
 };
 
-const formatDate = (date?: string): string => {
-    if (!date) return "-";
-    const d = new Date(date);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString();
-};
-
 const currencyOptions = currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
 
 // Custom styles for react-select

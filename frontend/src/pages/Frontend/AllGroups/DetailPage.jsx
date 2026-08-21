@@ -11,7 +11,7 @@ import {
   FaStar,
   FaMapMarkedAlt,
 } from "react-icons/fa";
-import { Ticket, ClipboardCheck, Info } from "lucide-react";
+import { Ticket, Info } from "lucide-react";
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "N/A";
@@ -73,12 +73,12 @@ export default function DetailPage() {
     return (
       <div
         style={{
-          padding: "100px",
+          padding: "60px",
           textAlign: "center",
           color: theme.colors.textSecondary,
         }}
       >
-        <Info size={48} style={{ marginBottom: "10px", opacity: 0.5 }} />
+        <Info size={40} style={{ marginBottom: "8px", opacity: 0.5 }} />
         <h2>No package data found.</h2>
       </div>
     );
@@ -102,19 +102,20 @@ export default function DetailPage() {
     hotelsByCity[city].push(hotel);
   });
 
+  const includesList = ["Visa", "Tickets", "Hotel", "Transport"];
+
   return (
     <div
       style={{
         backgroundColor: "#f4f7fe",
         minHeight: "100vh",
-        padding: isMobile ? "15px 12px" : "30px 20px",
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
       <style>{`
         @media (max-width: 768px) {
           .detail-grid { grid-template-columns: 1fr !important; }
-          .hotel-grid { grid-template-columns: 1fr !important; }
+          .hotel-grid { grid-template-columns: 1fr 1fr !important; }
           .room-grid { grid-template-columns: 1fr 1fr !important; }
           .header-inner { flex-direction: column !important; align-items: flex-start !important; }
           .header-ref { text-align: left !important; }
@@ -122,20 +123,20 @@ export default function DetailPage() {
         }
 
         @media (max-width: 480px) {
-          .header-title { font-size: 1.5rem !important; }
+          .header-title { font-size: 1.2rem !important; }
         }
       `}</style>
 
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+      <div className="max-w-6xl mx-auto">
         {/* HEADER */}
         <div
           style={{
             background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-            borderRadius: "20px",
-            padding: isMobile ? "20px" : "35px",
+            borderRadius: "14px",
+            padding: isMobile ? "14px" : "16px 22px",
             color: "white",
-            marginBottom: "30px",
-            boxShadow: "0 10px 20px rgba(0,0,0,0.08)",
+            marginBottom: "12px",
+            boxShadow: "0 6px 14px rgba(0,0,0,0.08)",
           }}
         >
           <div
@@ -145,7 +146,7 @@ export default function DetailPage() {
               justifyContent: "space-between",
               alignItems: "center",
               flexWrap: "wrap",
-              gap: "20px",
+              gap: "12px",
             }}
           >
             <div>
@@ -153,31 +154,30 @@ export default function DetailPage() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "8px",
+                  gap: "8px",
+                  marginBottom: "2px",
                 }}
               >
-                <Ticket size={20} />
+                <Ticket size={16} />
+                <h1
+                  className="header-title"
+                  style={{
+                    margin: 0,
+                    fontSize: "1.5rem",
+                    fontWeight: 800,
+                  }}
+                >
+                  {group.packageName}
+                </h1>
               </div>
-
-              <h1
-                className="header-title"
-                style={{
-                  margin: "0 0 10px 0",
-                  fontSize: "2.2rem",
-                  fontWeight: 800,
-                }}
-              >
-                {group.packageName}
-              </h1>
 
               <div
                 style={{
                   display: "flex",
-                  gap: "15px",
+                  gap: "12px",
                   alignItems: "center",
                   opacity: 0.9,
-                  fontSize: "0.95rem",
+                  fontSize: "0.82rem",
                   flexWrap: "wrap",
                 }}
               >
@@ -185,7 +185,7 @@ export default function DetailPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "5px",
                   }}
                 >
                   <FaPlaneDeparture /> {group.flights?.[0]?.flightNo || "N/A"}
@@ -197,7 +197,7 @@ export default function DetailPage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "5px",
                   }}
                 >
                   <FaMapMarkerAlt /> {group.flights?.[0]?.sectorFrom} -{" "}
@@ -211,23 +211,23 @@ export default function DetailPage() {
               style={{
                 textAlign: "right",
                 background: "rgba(255,255,255,0.2)",
-                padding: "15px 25px",
-                borderRadius: "15px",
+                padding: "8px 16px",
+                borderRadius: "10px",
               }}
             >
-              <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.9 }}>
+              <p style={{ margin: 0, fontSize: "0.7rem", opacity: 0.9 }}>
                 Available Rooms
               </p>
 
-              <h3 style={{ margin: 0, fontWeight: 700 }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>
                 {group.availableRooms}
               </h3>
 
               {group.availableRooms === 0 && (
                 <p
                   style={{
-                    margin: "4px 0 0",
-                    fontSize: "0.75rem",
+                    margin: "2px 0 0",
+                    fontSize: "0.7rem",
                     color: "#fca5a5",
                     fontWeight: 600,
                   }}
@@ -237,6 +237,37 @@ export default function DetailPage() {
               )}
             </div>
           </div>
+
+          {/* PACKAGE INCLUDES */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px",
+              marginTop: "10px",
+              paddingTop: "10px",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+            }}
+          >
+            {includesList.map((item) => (
+              <div
+                key={item}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  color: "white",
+                  background: "rgba(255,255,255,0.15)",
+                  padding: "4px 10px",
+                  borderRadius: "999px",
+                }}
+              >
+                <FaCheckCircle size={10} /> {item}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* MAIN CONTENT */}
@@ -245,7 +276,7 @@ export default function DetailPage() {
           style={{
             display: "grid",
             gridTemplateColumns: isMobile ? "1fr" : "1.3fr 1fr",
-            gap: "30px",
+            gap: "12px",
           }}
         >
           {/* LEFT COLUMN */}
@@ -253,15 +284,15 @@ export default function DetailPage() {
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "25px",
+              gap: "12px",
             }}
           >
             <div
               style={{
-                borderRadius: "20px",
+                borderRadius: "12px",
                 overflow: "hidden",
-                height: isMobile ? "220px" : "400px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                height: isMobile ? "140px" : "180px",
+                boxShadow: "0 3px 8px rgba(0,0,0,0.08)",
               }}
             >
               <img
@@ -277,7 +308,7 @@ export default function DetailPage() {
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "contain",
+                  objectFit: "cover",
                 }}
               />
             </div>
@@ -288,7 +319,7 @@ export default function DetailPage() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
+                gap: "10px",
               }}
             >
               {Object.entries(hotelsByCity).map(([city, hotels]) => {
@@ -314,32 +345,28 @@ export default function DetailPage() {
               })}
             </div>
 
-            <IncludesCard />
-            <div style={{ marginTop: "10px" }}>
-              <div style={cardStyle}>
-                <h3
-                  style={{
-                    ...cardTitleStyle,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <FaBus size={18} /> Transport Details
-                </h3>
+            <div style={cardStyle}>
+              <h3
+                style={{
+                  ...cardTitleStyle,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <FaBus size={14} /> Transport Details
+              </h3>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "10px",
-                  }}
-                >
-                  {group?.transport?.map((item, index) => (
-                    <TransportPill key={index} transport={item} />
-                  ))}
-                </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                {group?.transport?.map((item, index) => (
+                  <TransportPill key={index} transport={item} />
+                ))}
               </div>
             </div>
           </div>
@@ -349,102 +376,12 @@ export default function DetailPage() {
             className="sticky-col"
             style={{
               position: isMobile ? "static" : "sticky",
-              top: "20px",
+              top: "12px",
               display: "flex",
               flexDirection: "column",
-              gap: "25px",
+              gap: "12px",
             }}
           >
-            {/* Flight Schedule */}
-            <div style={cardStyle}>
-              <h3 style={cardTitleStyle}>Flight Schedule</h3>
-
-              {group.flights && group.flights.length > 0 ? (
-                <>
-                  {group.flights.map((flight, index) => (
-                    <React.Fragment key={index}>
-                      {index > 0 && (
-                        <div
-                          style={{
-                            height: "1px",
-                            background: "#edf2f7",
-                            margin: "15px 0",
-                          }}
-                        />
-                      )}
-
-                      <FlightInfo
-                        label={
-                          index === 0 ? "Departure" : `Flight ${index + 1}`
-                        }
-                        data={flight}
-                        icon={<FaPlaneDeparture color={theme.colors.primary} />}
-                      />
-                    </React.Fragment>
-                  ))}
-                </>
-              ) : (
-                <div>No Flights Available</div>
-              )}
-            </div>
-
-            {/* TRANSPORTS */}
-            {group.transports?.length > 0 && (
-              <div style={cardStyle}>
-                <h3 style={cardTitleStyle}>Transport Details</h3>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "15px",
-                  }}
-                >
-                  {group.transports.map((transport, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        padding: "12px",
-                        border: "1px solid #edf2f7",
-                        borderRadius: "12px",
-                        background: "#f8fafc",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          marginBottom: "5px",
-                          color: "#2d3748",
-                        }}
-                      >
-                        {transport.route}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "#718096",
-                        }}
-                      >
-                        {transport.transportType} • {transport.supplier}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "#a0aec0",
-                          marginTop: "5px",
-                        }}
-                      >
-                        {formatDate(transport.startDate)} -{" "}
-                        {formatDate(transport.endDate)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Price Selection */}
             <div style={cardStyle}>
               <h3 style={cardTitleStyle}>Select Room & Book</h3>
@@ -467,7 +404,7 @@ export default function DetailPage() {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: "10px",
+                      gap: "8px",
                     }}
                   >
                     {filteredRooms.map((room, index) => {
@@ -485,11 +422,11 @@ export default function DetailPage() {
                           key={room}
                           onClick={() => setSelectedRoom(room)}
                           style={{
-                            padding: "12px",
-                            borderRadius: "12px",
+                            padding: "8px 10px",
+                            borderRadius: "10px",
                             border: `2px solid ${selectedRoom === room
-                                ? theme.colors.primary
-                                : "#edf2f7"
+                              ? theme.colors.primary
+                              : "#edf2f7"
                               }`,
                             background:
                               selectedRoom === room ? "#f0f7ff" : "white",
@@ -501,7 +438,7 @@ export default function DetailPage() {
                         >
                           <div
                             style={{
-                              fontSize: "0.75rem",
+                              fontSize: "0.68rem",
                               textTransform: "uppercase",
                               color: "#718096",
                               fontWeight: 700,
@@ -513,6 +450,7 @@ export default function DetailPage() {
                           <div
                             style={{
                               fontWeight: 700,
+                              fontSize: "0.88rem",
                               color: "#2d3748",
                             }}
                           >
@@ -527,16 +465,16 @@ export default function DetailPage() {
 
               <div
                 style={{
-                  marginTop: "20px",
-                  padding: "15px",
+                  marginTop: "10px",
+                  padding: "10px",
                   background: "#f8fafc",
-                  borderRadius: "12px",
+                  borderRadius: "10px",
                   textAlign: "center",
                 }}
               >
                 <span
                   style={{
-                    fontSize: "0.85rem",
+                    fontSize: "0.75rem",
                     color: "#718096",
                   }}
                 >
@@ -545,7 +483,7 @@ export default function DetailPage() {
 
                 <div
                   style={{
-                    fontSize: "1.8rem",
+                    fontSize: "1.4rem",
                     fontWeight: 800,
                     color: theme.colors.success,
                   }}
@@ -558,8 +496,8 @@ export default function DetailPage() {
               <div
                 style={{
                   display: "flex",
-                  gap: "10px",
-                  marginTop: "20px",
+                  gap: "8px",
+                  marginTop: "10px",
                 }}
               >
                 <button
@@ -591,6 +529,97 @@ export default function DetailPage() {
                 </button>
               </div>
             </div>
+
+            {/* Flight Schedule */}
+            <div style={cardStyle}>
+              <h3 style={cardTitleStyle}>Flight Schedule</h3>
+
+              {group.flights && group.flights.length > 0 ? (
+                <>
+                  {group.flights.map((flight, index) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && (
+                        <div
+                          style={{
+                            height: "1px",
+                            background: "#edf2f7",
+                            margin: "8px 0",
+                          }}
+                        />
+                      )}
+
+                      <FlightInfo
+                        label={
+                          index === 0 ? "Departure" : `Flight ${index + 1}`
+                        }
+                        data={flight}
+                        icon={<FaPlaneDeparture color={theme.colors.primary} />}
+                      />
+                    </React.Fragment>
+                  ))}
+                </>
+              ) : (
+                <div>No Flights Available</div>
+              )}
+            </div>
+
+            {/* TRANSPORTS */}
+            {group.transports?.length > 0 && (
+              <div style={cardStyle}>
+                <h3 style={cardTitleStyle}>Transport Details</h3>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  {group.transports.map((transport, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: "8px 10px",
+                        border: "1px solid #edf2f7",
+                        borderRadius: "10px",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.85rem",
+                          marginBottom: "2px",
+                          color: "#2d3748",
+                        }}
+                      >
+                        {transport.route}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "#718096",
+                        }}
+                      >
+                        {transport.transportType} • {transport.supplier}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "0.72rem",
+                          color: "#a0aec0",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {formatDate(transport.startDate)} -{" "}
+                        {formatDate(transport.endDate)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -620,19 +649,17 @@ function HotelCard({ hotel, city }) {
   const cardStyle = {
     position: "relative",
     width: "100%",
-    maxWidth: "320px", // chota aur clean
     background: "white",
-    borderRadius: "16px",
+    borderRadius: "10px",
     overflow: "hidden",
-    boxShadow: "0 10px 20px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.05)",
-    transition: "all 0.3s ease",
+    boxShadow: "0 3px 8px rgba(0,0,0,0.06)",
+    transition: "all 0.2s ease",
     cursor: "pointer",
     border: "1px solid #f1f1f1",
   };
 
   const hoverStyle = {
-    transform: "translateY(-6px)",
-    boxShadow: "0 20px 25px rgba(0,0,0,0.12), 0 8px 10px rgba(0,0,0,0.08)",
+    boxShadow: "0 8px 14px rgba(0,0,0,0.1)",
   };
 
   return (
@@ -653,50 +680,42 @@ function HotelCard({ hotel, city }) {
           rel="noopener noreferrer"
           style={{
             position: "absolute",
-            top: "12px",
-            right: "12px",
+            top: "6px",
+            right: "6px",
             background: "white",
-            width: "36px",
-            height: "36px",
+            width: "24px",
+            height: "24px",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
             zIndex: 10,
             color: "#1e88e5",
             textDecoration: "none",
             transition: "all 0.2s ease",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.1)";
-            e.currentTarget.style.background = "#f0f7ff";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-            e.currentTarget.style.background = "white";
-          }}
         >
-          <FaMapMarkedAlt size={18} />
+          <FaMapMarkedAlt size={12} />
         </a>
       )}
 
       {/* City Image + Name */}
-      <div style={{ padding: "16px 16px 12px" }}>
+      <div style={{ padding: "8px 10px" }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
-            marginBottom: "12px",
+            gap: "6px",
+            marginBottom: "6px",
           }}
         >
           <img
             style={{
-              height: 48,
-              width: 48,
+              height: 26,
+              width: 26,
               objectFit: "contain",
-              borderRadius: "10px",
+              borderRadius: "6px",
               background: "#f8fafc",
             }}
             src={getCityImage()}
@@ -705,7 +724,7 @@ function HotelCard({ hotel, city }) {
           <h3
             style={{
               margin: 0,
-              fontSize: "1.1rem",
+              fontSize: "0.82rem",
               fontWeight: 700,
               color: "#1e2937",
             }}
@@ -718,10 +737,10 @@ function HotelCard({ hotel, city }) {
         <div
           style={{
             fontWeight: 700,
-            fontSize: "1.05rem",
-            lineHeight: "1.3",
+            fontSize: "0.8rem",
+            lineHeight: "1.25",
             color: "#0f172a",
-            marginBottom: "10px",
+            marginBottom: "6px",
           }}
         >
           {hotel?.name}
@@ -732,59 +751,42 @@ function HotelCard({ hotel, city }) {
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: "0.85rem",
+            gap: "8px",
+            fontSize: "0.72rem",
+            flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px 12px",
-                borderRadius: "999px",
-                background: "linear-gradient(135deg, #ff6b6b, #ff8787)",
-                color: "#fff",
-                fontWeight: "600",
-                fontSize: "14px",
-                boxShadow: "0 2px 8px rgba(255, 107, 107, 0.3)",
-                width: "fit-content",
-              }}
-            >
-              <FaMapMarkerAlt size={14} />
-              {hotel?.distance} m
-            </span>
-
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                color: "#64748b",
-              }}
-            >
-              <FaStar color="#facc15" size={15} />
-              <span style={{ fontWeight: 600, color: "#1e2937" }}>
-                {hotel.rating}.0
-              </span>
-            </span>
-          </div>
-
-          {/* Premium Badge */}
-          {/* <div
+          <span
             style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              padding: "3px 10px",
-              background: "linear-gradient(90deg, #1e88e5, #3b82f6)",
-              color: "white",
-              borderRadius: "9999px",
-              letterSpacing: "0.5px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "2px 7px",
+              borderRadius: "999px",
+              background: "linear-gradient(135deg, #ff6b6b, #ff8787)",
+              color: "#fff",
+              fontWeight: "600",
+              fontSize: "0.6rem",
+              width: "fit-content",
             }}
           >
-            PREMIUM
-          </div> */}
+            <FaMapMarkerAlt size={10} />
+            {hotel?.distance} m
+          </span>
+
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
+              color: "#64748b",
+            }}
+          >
+            <FaStar color="#facc15" size={11} />
+            <span style={{ fontWeight: 600, color: "#1e2937" }}>
+              {hotel.rating}.0
+            </span>
+          </span>
         </div>
       </div>
     </div>
@@ -794,13 +796,13 @@ function HotelCard({ hotel, city }) {
 /* ==================== FLIGHT INFO ==================== */
 function FlightInfo({ label, data, icon }) {
   return (
-    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-      <div style={{ marginTop: "4px" }}>{icon}</div>
+    <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+      <div style={{ marginTop: "3px" }}>{icon}</div>
 
       <div style={{ flex: 1 }}>
         <div
           style={{
-            fontSize: "0.7rem",
+            fontSize: "0.65rem",
             fontWeight: 700,
             color: "#a0aec0",
             textTransform: "uppercase",
@@ -818,15 +820,15 @@ function FlightInfo({ label, data, icon }) {
             gap: "4px",
           }}
         >
-          <span style={{ fontWeight: 700, color: "#2d3748" }}>
+          <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#2d3748" }}>
             {formatDate(data?.depDate)}
           </span>
 
           <span
             style={{
-              fontSize: "0.8rem",
+              fontSize: "0.72rem",
               background: "#edf2f7",
-              padding: "2px 8px",
+              padding: "1px 6px",
               borderRadius: "4px",
             }}
           >
@@ -834,15 +836,15 @@ function FlightInfo({ label, data, icon }) {
           </span>
         </div>
 
-        <div style={{ fontSize: "0.85rem", color: "#718096" }}>
+        <div style={{ fontSize: "0.78rem", color: "#718096" }}>
           {formatTime(data?.depTime)} • {data?.sectorFrom} to {data?.sectorTo}
         </div>
 
         <div
           style={{
-            fontSize: "0.8rem",
+            fontSize: "0.72rem",
             color: "#a0aec0",
-            marginTop: "4px",
+            marginTop: "2px",
           }}
         >
           Arrival: {formatDate(data?.arrDate)} {formatTime(data?.arrTime)}
@@ -850,9 +852,9 @@ function FlightInfo({ label, data, icon }) {
 
         <div
           style={{
-            fontSize: "0.8rem",
+            fontSize: "0.72rem",
             color: "#718096",
-            marginTop: "5px",
+            marginTop: "3px",
           }}
         >
           {data?.flightClass} • {data?.baggage}KG • Meal: {data?.meal}
@@ -862,50 +864,10 @@ function FlightInfo({ label, data, icon }) {
   );
 }
 
-function IncludesCard() {
-  const list = ["Visa", "Tickets", "Hotel", "Transport"];
-
-  return (
-    <div style={cardStyle}>
-      <h3
-        style={{
-          ...cardTitleStyle,
-          display: "flex",
-          alignItems: "space-betweeen",
-          gap: "13px",
-        }}
-      >
-        <ClipboardCheck size={18} /> Package Includes
-      </h3>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-        {list.map((item) => (
-          <div
-            key={item}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "0.85rem",
-              color: "#4a5568",
-              background: "#f7fafc",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              border: "1px solid #edf2f7",
-            }}
-          >
-            <FaCheckCircle color={theme.colors.success} size={12} /> {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 const cardStyle = {
   background: "white",
-  padding: "20px",
-  borderRadius: "16px",
+  padding: "12px 14px",
+  borderRadius: "12px",
   boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
   border: "1px solid #e2e8f0",
 };
@@ -915,8 +877,8 @@ function TransportPill({ transport }) {
 
   const getTransportIcon = (type) => {
     const t = type?.toLowerCase() || "";
-    if (t.includes("car")) return <FaCar size={20} />;
-    return <FaBus size={20} />;
+    if (t.includes("car")) return <FaCar size={16} />;
+    return <FaBus size={16} />;
   };
 
   return (
@@ -924,12 +886,12 @@ function TransportPill({ transport }) {
       style={{
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
-        borderRadius: "12px",
-        padding: "10px 14px",
+        borderRadius: "10px",
+        padding: "7px 10px",
         display: "flex",
         alignItems: "center",
-        gap: "10px",
-        minWidth: "195px",
+        gap: "8px",
+        minWidth: "160px",
         transition: "all 0.2s ease",
       }}
       onMouseEnter={(e) => {
@@ -943,10 +905,10 @@ function TransportPill({ transport }) {
     >
       <div
         style={{
-          width: "38px",
-          height: "38px",
+          width: "28px",
+          height: "28px",
           background: "white",
-          borderRadius: "8px",
+          borderRadius: "7px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -957,10 +919,10 @@ function TransportPill({ transport }) {
       </div>
 
       <div>
-        <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e2937" }}>
+        <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e2937" }}>
           {transport.route}
         </div>
-        <div style={{ fontSize: "0.82rem", color: "#64748b" }}>
+        <div style={{ fontSize: "0.72rem", color: "#64748b" }}>
           {transport.transportType} • Private Transport
         </div>
       </div>
@@ -970,8 +932,8 @@ function TransportPill({ transport }) {
 
 const cardTitleStyle = {
   marginTop: 0,
-  marginBottom: "15px",
-  fontSize: "1rem",
+  marginBottom: "8px",
+  fontSize: "0.9rem",
   color: "#1a202c",
   fontWeight: 700,
 };
@@ -981,8 +943,9 @@ const priBtn = {
   background: theme.colors.primary,
   color: "white",
   border: "none",
-  padding: "12px",
-  borderRadius: "10px",
+  padding: "9px",
+  borderRadius: "8px",
   fontWeight: 600,
+  fontSize: "0.85rem",
   cursor: "pointer",
 };

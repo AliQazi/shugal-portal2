@@ -188,7 +188,8 @@ const HotelCellLines = ({ pkg }) => {
 // of the underlying Group Tickets — becomes one row of the table below,
 // each keeping its own flight legs, dates and (critically) its own
 // Group Ticket's seat availability for booking.
-const UmrahBatchCard = ({ batch, index, onBook }) => {
+const UmrahBatchCard = ({ batch, index }) => {
+  const navigate = useNavigate();
   const [isDownloading, setIsDownloading] = useState(false);
 
   const packages = batch.packages;
@@ -358,6 +359,9 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
                   {col.label}
                 </th>
               ))}
+              <th className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap">
+                Book
+              </th>
             </tr>
           </thead>
           <tbody
@@ -420,36 +424,35 @@ const UmrahBatchCard = ({ batch, index, onBook }) => {
                     return (
                       <td key={col.key} className="px-3 py-4 text-center">
                         {price ? (
-                          <button
-                            onClick={() => onBook(pkg, col.key, price)}
-                            className="group relative inline-flex w-fit flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg px-4 py-2 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                          <span
+                            className="text-sm font-bold whitespace-nowrap"
+                            style={{ color: theme.colors.textPrimary }}
                           >
-                            {/* Gradient layer only shows on hover — the price
-                                stays plain text otherwise */}
-                            <span
-                              className="absolute inset-0 rounded-lg opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                              style={{
-                                background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-                              }}
-                            />
-                            <span
-                              className="relative text-sm font-bold whitespace-nowrap transition-colors duration-200 group-hover:text-white"
-                            >
-                              {fmt(price)}
-                            </span>
-                            {/* Space is always reserved so hovering never shifts row height */}
-                            <span className="relative text-[10px] font-black uppercase tracking-wide text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                              Book Now
-                            </span>
-                          </button>
+                            {fmt(price)}
+                          </span>
                         ) : (
-                          <span className="flex min-h-14 items-center justify-center text-gray-300">
+                          <span className="flex min-h-8 items-center justify-center text-gray-300">
                             —
                           </span>
                         )}
                       </td>
                     );
                   })}
+                  <td className="px-3 py-4 text-center">
+                    <button
+                      onClick={() =>
+                        navigate("/dashboard/pkg-detail", {
+                          state: { group: pkg },
+                        })
+                      }
+                      className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-xs! font-bold uppercase tracking-wide text-white whitespace-nowrap transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
+                      }}
+                    >
+                      Book Now
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -550,7 +553,6 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
   //   );
   // };
 
-  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
@@ -1175,28 +1177,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             ) : (
               <div className="space-y-3">
                 {groupedPackageCards.map((batch, idx) => (
-                  <UmrahBatchCard
-                    key={batch.key}
-                    batch={batch}
-                    index={idx}
-                    onBook={(pkg, roomKey, price) => {
-                      // A specific price cell was clicked ⇒ book that exact
-                      // room; the generic "Book Now" button falls back to
-                      // the first priced room, same default DetailPage used
-                      // to pick before we cut it out of the booking flow.
-                      const selection =
-                        roomKey && price
-                          ? { room: roomKey, price }
-                          : getDefaultRoomSelection(pkg);
-                      navigate("/dashboard/book-umrah", {
-                        state: {
-                          packageData: pkg,
-                          selectedRoom: selection.room,
-                          pricePerPerson: selection.price,
-                        },
-                      });
-                    }}
-                  />
+                  <UmrahBatchCard key={batch.key} batch={batch} index={idx} />
                 ))}
               </div>
             )}

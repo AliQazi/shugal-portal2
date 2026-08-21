@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect, useRef, createContext } from "react";
+import { useState, useMemo, useEffect, useRef, createContext } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -8,15 +8,15 @@ import {
   LayoutDashboard,
   Users,
   CalendarCheck,
-  Building2,
+  // Building2,
   CreditCard,
-  FileText,
+  // FileText,
   UserCircle,
   Lock,
-  Bell,
-  List,
-  Moon,
-  Ticket,
+  // Bell,
+  // List,
+  // // Moon,
+  // Ticket,
 } from "lucide-react";
 import logo from "../../assets/images/logo.png";
 import { theme } from "../../theme/theme";
@@ -85,8 +85,15 @@ const RippleButton = ({ children, style, onClick, className, to }) => {
 /* ─── Layout ─────────────────────────────────────────────── */
 export const DashboardUIContext = createContext();
 
+// ✅ FIX: sidebar is now a drawer used only below the "large" breakpoint.
+// On large screens and up the sidebar is removed entirely and its links
+// move into the top bar as a horizontal nav (with a Finance dropdown).
+const LARGE_BREAKPOINT = 1024;
+
 const DashboardLayout = ({ user, handleLogout }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Drawer starts closed — it's only ever shown below the large breakpoint,
+  // opened via the hamburger toggle in the top bar.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ✅ FIX: ek single boolean ki jagah ab object hai
   // har submenu apna alag key (menuKey) use karta hai isliye
@@ -94,17 +101,23 @@ const DashboardLayout = ({ user, handleLogout }) => {
   const [expandedMenus, setExpandedMenus] = useState({});
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= LARGE_BREAKPOINT : true,
+  );
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [financeDropdownOpen, setFinanceDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const financeRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 769;
-      setIsMobile(mobile);
-      setSidebarOpen(!mobile);
+      const large = window.innerWidth >= LARGE_BREAKPOINT;
+      setIsLargeScreen(large);
+      // The drawer only exists below the large breakpoint — keep it closed
+      // once we cross into large-screen territory (top nav takes over).
+      if (large) setSidebarOpen(false);
     };
 
     handleResize();
@@ -114,28 +127,29 @@ const DashboardLayout = ({ user, handleLogout }) => {
 
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === "Escape" && sidebarOpen && isMobile) {
+      if (e.key === "Escape" && sidebarOpen && !isLargeScreen) {
         setSidebarOpen(false);
       }
     };
     document.addEventListener("keydown", handleEsc);
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [sidebarOpen, isMobile]);
+  }, [sidebarOpen, isLargeScreen]);
 
   useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setUserDropdownOpen(false);
       }
+      if (financeRef.current && !financeRef.current.contains(e.target)) {
+        setFinanceDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-  const handleMenuClick = () => {
-    if (isMobile) setSidebarOpen(false);
-  };
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const handleMenuClick = () => setSidebarOpen(false);
 
   // ✅ FIX: toggle function ab menuKey ke hisaab se sirf usi item ko toggle karta hai
   const toggleSubMenu = (menuKey) => {
@@ -145,6 +159,7 @@ const DashboardLayout = ({ user, handleLogout }) => {
     }));
   };
 
+  // Used by the drawer (below the large breakpoint).
   const menuItems = [
     {
       path: "/dashboard",
@@ -162,82 +177,108 @@ const DashboardLayout = ({ user, handleLogout }) => {
       label: "All Groups",
       icon: <Users size={18} />,
     },
+    // {
+    //   path: "/dashboard/groups?group_type=UMRAH%20GROUP",
+    //   label: "Umrah Seats",
+    //   icon: <Ticket size={18} />,
+    // },
+    // {
+    //   path: "/dashboard/umrah-booking",
+    //   label: "Umrah Package Bookings",
+    //   icon: <List size={18} />,
+    // },
+    // {
+    //   label: "My Bookings",
+    //   icon: <CalendarCheck size={18} />,
+    //   hasSubMenu: true,
+    //   menuKey: "bookings",
+    //   subItems: [
+    //     { path: "/dashboard/my-bookings?status=on%20hold", label: "On Hold" },
+    //     { path: "/dashboard/my-bookings?status=confirmed", label: "Confirmed" },
+    //     { path: "/dashboard/my-bookings?status=cancelled", label: "Cancelled" },
+    //     { path: "/dashboard/my-bookings", label: "All Bookings" },
+    //   ],
+    // },
     {
-      path: "/dashboard/groups?group_type=UMRAH%20GROUP",
-      label: "Umrah Seats",
-      icon: <Ticket size={18} />,
-    },
-    {
-      path: "/dashboard/umrah-booking",
-      label: "Umrah Package Bookings",
-      icon: <List size={18} />,
-    },
-    {
+      path: "/dashboard/my-bookings",
       label: "My Bookings",
       icon: <CalendarCheck size={18} />,
-      hasSubMenu: true,
-      menuKey: "bookings",
-      subItems: [
-        { path: "/dashboard/my-bookings?status=on%20hold", label: "On Hold" },
-        { path: "/dashboard/my-bookings?status=confirmed", label: "Confirmed" },
-        { path: "/dashboard/my-bookings?status=cancelled", label: "Cancelled" },
-        { path: "/dashboard/my-bookings", label: "All Bookings" },
-      ],
     },
+    // {
+    //   path: "/dashboard/umrah-calculator",
+    //   label: "Umrah Calculator",
+    //   icon: <Moon size={18} />,
+    // },
+    // {
+    //   path: "/dashboard/my-umrah-calculator",
+    //   icon: <Ticket size={20} />,
+    //   label: "Umrah Calculator",
+    //   hasSubMenu: true,
+    //   // ✅ FIX: alag menuKey diya gaya hai is submenu ke liye
+    //   menuKey: "umrahCalculator",
+    //   subItems: [
+    //     {
+    //       path: "/dashboard/my-umrah-calculator?status=pending",
+    //       label: "Pending Ticket",
+    //     },
+    //     {
+    //       path: "/dashboard/my-umrah-calculator?status=confirm",
+    //       label: "Confirmed Ticket",
+    //     },
+    //     {
+    //       path: "/dashboard/my-umrah-calculator?status=cancel",
+    //       label: "Cancelled Ticket",
+    //     },
+    //     { path: "/dashboard/my-umrah-calculator", label: "All Bookings" },
+    //     { path: "/dashboard/my-umrah-calculator-q", label: "Queries" },
+    //   ],
+    // },
     {
-      path: "/dashboard/umrah-calculator",
-      label: "Umrah Calculator",
-      icon: <Moon size={18} />,
-    },
-    {
-      path: "/dashboard/my-umrah-calculator",
-      icon: <Ticket size={20} />,
-      label: "Umrah Calculator",
-      hasSubMenu: true,
-      // ✅ FIX: alag menuKey diya gaya hai is submenu ke liye
-      menuKey: "umrahCalculator",
-      subItems: [
-        {
-          path: "/dashboard/my-umrah-calculator?status=pending",
-          label: "Pending Ticket",
-        },
-        {
-          path: "/dashboard/my-umrah-calculator?status=confirm",
-          label: "Confirmed Ticket",
-        },
-        {
-          path: "/dashboard/my-umrah-calculator?status=cancel",
-          label: "Cancelled Ticket",
-        },
-        { path: "/dashboard/my-umrah-calculator", label: "All Bookings" },
-        { path: "/dashboard/my-umrah-calculator-q", label: "Queries" },
-      ],
-    },
-    { path: "/dashboard/banks", label: "Bank", icon: <Building2 size={18} /> },
-    {
-      path: "/dashboard/payment",
-      label: "Payment",
+      label: "Finance",
       icon: <CreditCard size={18} />,
+      hasSubMenu: true,
+      menuKey: "finance",
+      subItems: [
+        { path: "/dashboard/ledger", label: "Ledger" },
+        { path: "/dashboard/banks", label: "Bank" },
+        { path: "/dashboard/payment", label: "Payment" },
+      ],
     },
-    {
-      path: "/dashboard/ledger",
-      label: "Ledger",
-      icon: <FileText size={18} />,
-    },
-    {
-      path: "/dashboard/profile",
-      label: "My Profile",
-      icon: <UserCircle size={18} />,
-    },
+    // {
+    //   path: "/dashboard/profile",
+    //   label: "My Profile",
+    //   icon: <UserCircle size={18} />,
+    // },
     {
       path: "/dashboard/team-contacts",
       label: "Team Contacts",
       icon: <Users size={18} />,
     },
+    // {
+    //   path: "/dashboard/change-password",
+    //   label: "Change Password",
+    //   icon: <Lock size={18} />,
+    // },
+  ];
+
+  // Used by the top bar (large screens and up) — Dashboard, Umrah Packages,
+  // All Groups, My Bookings, Team Contacts, then a Finance dropdown holding
+  // Ledger / Bank / Payment.
+  const topNavItems = [
+    { path: "/dashboard", label: "Dashboard", exact: true },
+    { path: "/dashboard/all-groups", label: "Umrah Packages" },
+    { path: "/dashboard/groups", label: "All Groups" },
+    { path: "/dashboard/my-bookings", label: "My Bookings" },
+    { path: "/dashboard/team-contacts", label: "Team Contacts" },
     {
-      path: "/dashboard/change-password",
-      label: "Change Password",
-      icon: <Lock size={18} />,
+      label: "Finance",
+      hasSubMenu: true,
+      menuKey: "finance",
+      subItems: [
+        { path: "/dashboard/ledger", label: "Ledger" },
+        { path: "/dashboard/banks", label: "Bank" },
+        { path: "/dashboard/payment", label: "Payment" },
+      ],
     },
   ];
 
@@ -249,9 +290,23 @@ const DashboardLayout = ({ user, handleLogout }) => {
         item.label.toLowerCase().includes(q) ||
         item.subItems?.some((s) => s.label.toLowerCase().includes(q)),
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
-  const isActive = (path) => location.pathname + location.search === path;
+  // ✅ FIX: items with a query string (submenu links) still match exactly;
+  // plain top-level links (e.g. My Bookings) match by pathname only, so they
+  // stay highlighted even when the page adds its own query params (filters/tabs).
+  const isActive = (path) => {
+    const [itemPath, itemQuery] = path.split("?");
+    if (itemQuery) {
+      return location.pathname === itemPath && location.search === `?${itemQuery}`;
+    }
+    return location.pathname === itemPath;
+  };
+
+  const financeActive = topNavItems
+    .find((i) => i.menuKey === "finance")
+    .subItems.some((s) => isActive(s.path));
 
   return (
     <DashboardUIContext.Provider
@@ -297,8 +352,8 @@ const DashboardLayout = ({ user, handleLogout }) => {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             border-left: 3px solid transparent !important;
           }
-          .menu-link:hover { 
-            background: rgba(92, 186, 230, 0.15) !important; 
+          .menu-link:hover {
+            background: rgba(92, 186, 230, 0.15) !important;
             color: #09B0FF !important;
             border-left: 3px solid #09B0FF !important;
           }
@@ -324,8 +379,8 @@ const DashboardLayout = ({ user, handleLogout }) => {
           }
 
           /* Search focus boxy style */
-          .db-search:focus { 
-            border-color: #FF7A00 !important; 
+          .db-search:focus {
+            border-color: #FF7A00 !important;
             box-shadow: 0 0 0 2px rgba(255,122,0,0.15) !important;
             background: #fff !important;
           }
@@ -336,24 +391,63 @@ const DashboardLayout = ({ user, handleLogout }) => {
           .dd-item-danger:hover { background: #fff1f2 !important; color: #be123c !important; }
 
           .db-sidebar {
-            transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
-            will-change: width;
             position: fixed !important;
-            top: 0; left: 0; height: 100vh; z-index: 200;
+            top: 0; left: 0; height: 100vh; z-index: 999;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: transform;
           }
 
           /* Active sub-item orange cube indicators */
           .sub-active-dot {
             width: 5px; height: 5px;
-            background: #FF7A00; 
+            background: #FF7A00;
             border-radius: 0px; /* Rigid Boxy design */
             flex-shrink: 0;
             box-shadow: 0 0 6px #FF7A00;
           }
 
-          @media (max-width: 768px) {
-            .db-main   { margin-left: 0 !important; }
-            .sidebar-close-btn { display: flex !important; }
+          /* ── Top bar horizontal nav (large screens and up) ── */
+          .top-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+          }
+
+          .top-nav-link, .top-nav-link-active {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-decoration: none;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+          .top-nav-link {
+            background: transparent;
+            color: #475569;
+            font-weight: 500;
+          }
+          .top-nav-link:hover {
+            background: rgba(9, 176, 255, 0.12);
+            color: #09B0FF;
+          }
+          .top-nav-link-active {
+            background: ${theme.colors.primary};
+            color: #fff;
+            font-weight: 600;
+          }
+
+          /* User profile box — shrink gracefully on small screens */
+          @media (max-width: 480px) {
+            .db-header { padding: 0 12px !important; }
+            .user-menu-btn { padding: 6px !important; gap: 0 !important; }
+            .user-info-text { display: none !important; }
+            .user-menu-chevron { display: none !important; }
           }
         `}</style>
 
@@ -361,8 +455,8 @@ const DashboardLayout = ({ user, handleLogout }) => {
           className="db-layout"
           style={{ display: "flex", minHeight: "100vh", background: "#f4f5f8" }}
         >
-          {/* Mobile overlay */}
-          {sidebarOpen && isMobile && (
+          {/* Drawer overlay — only below the large breakpoint */}
+          {sidebarOpen && !isLargeScreen && (
             <div
               onClick={toggleSidebar}
               style={{
@@ -376,69 +470,58 @@ const DashboardLayout = ({ user, handleLogout }) => {
             />
           )}
 
-          {/* ── Sidebar (Polished Dark Minimalist Structure) ── */}
-          <aside
-            className="db-sidebar"
-            style={{
-              width: isMobile ? "280px" : sidebarOpen ? "260px" : "68px",
-              background: "#ffffff",
-              borderRight: "1px solid #e2e8f0",
-              display: "flex",
-              flexDirection: "column",
-              flexShrink: 0,
-              boxShadow: isMobile ? "12px 0 40px rgba(0,0,0,0.15)" : "none",
-              overflow: "hidden",
-              position: "fixed",
-              top: 0,
-              left: 0,
-              height: "100vh",
-              zIndex: 999,
-              transform:
-                isMobile && !sidebarOpen
-                  ? "translateX(-100%)"
-                  : "translateX(0)",
-              transition: isMobile
-                ? "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)"
-                : "width 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
-          >
-            {/* Logo Wrapper */}
-            <div
+          {/* ── Sidebar drawer — removed entirely on large screens ── */}
+          {!isLargeScreen && (
+            <aside
+              className="db-sidebar"
               style={{
-                padding: "24px 16px",
-                borderBottom: "1px solid #f1f5f9",
+                width: "280px",
+                background: "#ffffff",
+                borderRight: "1px solid #e2e8f0",
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                flexDirection: "column",
+                flexShrink: 0,
+                boxShadow: "12px 0 40px rgba(0,0,0,0.15)",
+                overflow: "hidden",
+                height: "100vh",
+                transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
               }}
             >
+              {/* Logo Wrapper */}
               <div
-                onClick={() => navigate("/dashboard")}
                 style={{
-                  cursor: "pointer",
+                  padding: "24px 16px",
+                  borderBottom: "1px solid #f1f5f9",
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
-                  overflow: "hidden",
-                  width: "100%",
-                  justifyContent: sidebarOpen ? "flex-start" : "center",
+                  justifyContent: "space-between",
                 }}
               >
-                <img
-                  src={user?.logo || logo}
-                  alt="Logo"
-                  style={{
-                    width: sidebarOpen ? "200px" : "32px",
-                    // height: "36px",
-                    objectFit: "contain",
-                    transition: "width 0.2s ease-in-out",
-                    flexShrink: 0,
+                <div
+                  onClick={() => {
+                    navigate("/dashboard");
+                    setSidebarOpen(false);
                   }}
-                />
-              </div>
-              {sidebarOpen && isMobile && (
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    overflow: "hidden",
+                    width: "100%",
+                  }}
+                >
+                  <img
+                    src={user?.logo || logo}
+                    alt="Logo"
+                    style={{
+                      width: "200px",
+                      objectFit: "contain",
+                      flexShrink: 0,
+                    }}
+                  />
+                </div>
                 <button
-                  className="sidebar-close-btn"
                   onClick={toggleSidebar}
                   style={{
                     background: "#f1f5f9",
@@ -447,15 +530,14 @@ const DashboardLayout = ({ user, handleLogout }) => {
                     padding: "6px",
                     cursor: "pointer",
                     display: "flex",
+                    flexShrink: 0,
                   }}
                 >
                   <X size={16} color="#475569" />
                 </button>
-              )}
-            </div>
+              </div>
 
-            {/* Sharp Search Bar */}
-            {sidebarOpen && (
+              {/* Sharp Search Bar */}
               <div style={{ padding: "16px 14px 6px" }}>
                 <div style={{ position: "relative" }}>
                   <Search
@@ -488,185 +570,174 @@ const DashboardLayout = ({ user, handleLogout }) => {
                   />
                 </div>
               </div>
-            )}
 
-            {/* Nav Links */}
-            <nav className="sidebar-nav">
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                }}
-              >
-                {filteredMenu.map((item, index) => {
-                  // ✅ FIX: ab har item apne menuKey se apni expanded state nikalta hai
-                  const isExpanded = item.menuKey
-                    ? !!expandedMenus[item.menuKey]
-                    : false;
+              {/* Nav Links */}
+              <nav className="sidebar-nav">
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  {filteredMenu.map((item, index) => {
+                    // ✅ FIX: ab har item apne menuKey se apni expanded state nikalta hai
+                    const isExpanded = item.menuKey
+                      ? !!expandedMenus[item.menuKey]
+                      : false;
 
-                  return (
-                    <li key={index}>
-                      {item.hasSubMenu ? (
-                        <>
-                          <RippleButton
-                            onClick={() =>
-                              sidebarOpen && toggleSubMenu(item.menuKey)
-                            }
-                            className="menu-link"
-                            style={{
-                              alignItems: "center",
-                              gap: "12px",
-                              padding: sidebarOpen ? "12px 14px" : "12px 0",
-                              justifyContent: sidebarOpen
-                                ? "flex-start"
-                                : "center",
-                              borderRadius: "4px" /* Boxy */,
-                              color: "#000",
-                              fontWeight: "500",
-                              fontSize: "14px",
-                              cursor: "pointer",
-                              textDecoration: "none",
-                            }}
-                          >
-                            <span
-                              className="icon-box"
-                              style={{
-                                flexShrink: 0,
-                                color: "#000",
-                                display: "flex",
-                              }}
-                            >
-                              {item.icon}
-                            </span>
-                            {sidebarOpen && (
-                              <>
-                                <span style={{ flex: 1 }}>{item.label}</span>
-                                <ChevronDown
-                                  size={14}
-                                  style={{
-                                    transform: isExpanded
-                                      ? "rotate(180deg)"
-                                      : "rotate(0deg)",
-                                    transition: "transform 0.2s ease",
-                                    color: "#94a3b8",
-                                  }}
-                                />
-                              </>
-                            )}
-                          </RippleButton>
-
-                          {/* Submenu Area */}
-                          <div
-                            style={{
-                              maxHeight:
-                                isExpanded && sidebarOpen ? "300px" : "0px",
-                              overflow: "hidden",
-                              transition:
-                                "max-height 0.25s cubic-bezier(0, 0, 0.2, 1)",
-                            }}
-                          >
-                            <ul
-                              style={{
-                                listStyle: "none",
-                                padding: "4px 0 4px 16px",
-                                margin: 0,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "2px",
-                                borderLeft: "1px dashed #cbd5e1",
-                                marginLeft: "22px",
-                                marginTop: "2px",
-                              }}
-                            >
-                              {item.subItems.map((sub, sIdx) => {
-                                const active = isActive(sub.path);
-                                return (
-                                  <li key={sIdx}>
-                                    <RippleButton
-                                      to={sub.path}
-                                      onClick={handleMenuClick}
-                                      className={active ? "" : "menu-link"}
-                                      style={{
-                                        padding: "8px 12px",
-                                        borderRadius: "2px",
-                                        fontSize: "13px",
-                                        fontWeight: active ? "600" : "400",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                        background: active
-                                          ? "rgba(255, 122, 0, 0.08)"
-                                          : "transparent",
-                                        color: active ? "#FF7A00" : "#627d98",
-                                        textDecoration: "none",
-                                        animation: isExpanded
-                                          ? `subMenuSlide 0.2s ease ${sIdx * 30}ms both`
-                                          : "none",
-                                      }}
-                                    >
-                                      {active ? (
-                                        <span className="sub-active-dot" />
-                                      ) : (
-                                        <div style={{ width: 5 }} />
-                                      )}
-                                      {sub.label}
-                                    </RippleButton>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        </>
-                      ) : (
-                        (() => {
-                          const active = isActive(item.path);
-                          return (
+                    return (
+                      <li key={index}>
+                        {item.hasSubMenu ? (
+                          <>
                             <RippleButton
-                              to={item.path}
-                              onClick={handleMenuClick}
-                              className={
-                                active ? "menu-link-active" : "menu-link"
-                              }
+                              onClick={() => toggleSubMenu(item.menuKey)}
+                              className="menu-link"
                               style={{
                                 alignItems: "center",
                                 gap: "12px",
-                                padding: sidebarOpen ? "12px 14px" : "12px 0",
-                                justifyContent: sidebarOpen
-                                  ? "flex-start"
-                                  : "center",
-                                borderRadius: "4px" /* Solid Boxy Shape */,
-                                color: active ? "#fff" : "#475569",
-                                fontWeight: active ? "600" : "500",
+                                padding: "12px 14px",
+                                justifyContent: "flex-start",
+                                borderRadius: "4px" /* Boxy */,
+                                color: "#000",
+                                fontWeight: "500",
                                 fontSize: "14px",
+                                cursor: "pointer",
                                 textDecoration: "none",
                               }}
                             >
                               <span
-                                className={!active ? "icon-box" : ""}
+                                className="icon-box"
                                 style={{
                                   flexShrink: 0,
-                                  color: active
-                                    ? "#fff"
-                                    : "#000" /* Icons glow premium orange when active */,
+                                  color: "#000",
                                   display: "flex",
                                 }}
                               >
                                 {item.icon}
                               </span>
-                              {sidebarOpen && <span>{item.label}</span>}
+                              <span style={{ flex: 1 }}>{item.label}</span>
+                              <ChevronDown
+                                size={14}
+                                style={{
+                                  transform: isExpanded
+                                    ? "rotate(180deg)"
+                                    : "rotate(0deg)",
+                                  transition: "transform 0.2s ease",
+                                  color: "#94a3b8",
+                                }}
+                              />
                             </RippleButton>
-                          );
-                        })()
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-          </aside>
+
+                            {/* Submenu Area */}
+                            <div
+                              style={{
+                                maxHeight: isExpanded ? "300px" : "0px",
+                                overflow: "hidden",
+                                transition:
+                                  "max-height 0.25s cubic-bezier(0, 0, 0.2, 1)",
+                              }}
+                            >
+                              <ul
+                                style={{
+                                  listStyle: "none",
+                                  padding: "4px 0 4px 16px",
+                                  margin: 0,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "2px",
+                                  borderLeft: "1px dashed #cbd5e1",
+                                  marginLeft: "22px",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                {item.subItems.map((sub, sIdx) => {
+                                  const active = isActive(sub.path);
+                                  return (
+                                    <li key={sIdx}>
+                                      <RippleButton
+                                        to={sub.path}
+                                        onClick={handleMenuClick}
+                                        className={active ? "" : "menu-link"}
+                                        style={{
+                                          padding: "8px 12px",
+                                          borderRadius: "2px",
+                                          fontSize: "13px",
+                                          fontWeight: active ? "600" : "400",
+                                          alignItems: "center",
+                                          gap: "8px",
+                                          background: active
+                                            ? "rgba(255, 122, 0, 0.08)"
+                                            : "transparent",
+                                          color: active ? "#FF7A00" : "#627d98",
+                                          textDecoration: "none",
+                                          animation: isExpanded
+                                            ? `subMenuSlide 0.2s ease ${sIdx * 30}ms both`
+                                            : "none",
+                                        }}
+                                      >
+                                        {active ? (
+                                          <span className="sub-active-dot" />
+                                        ) : (
+                                          <div style={{ width: 5 }} />
+                                        )}
+                                        {sub.label}
+                                      </RippleButton>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          </>
+                        ) : (
+                          (() => {
+                            const active = isActive(item.path);
+                            return (
+                              <RippleButton
+                                to={item.path}
+                                onClick={handleMenuClick}
+                                className={
+                                  active ? "menu-link-active" : "menu-link"
+                                }
+                                style={{
+                                  alignItems: "center",
+                                  gap: "12px",
+                                  padding: "12px 14px",
+                                  justifyContent: "flex-start",
+                                  borderRadius: "4px" /* Solid Boxy Shape */,
+                                  color: active ? "#fff" : "#475569",
+                                  fontWeight: active ? "600" : "500",
+                                  fontSize: "14px",
+                                  textDecoration: "none",
+                                }}
+                              >
+                                <span
+                                  className={!active ? "icon-box" : ""}
+                                  style={{
+                                    flexShrink: 0,
+                                    color: active
+                                      ? "#fff"
+                                      : "#000" /* Icons glow premium orange when active */,
+                                    display: "flex",
+                                  }}
+                                >
+                                  {item.icon}
+                                </span>
+                                <span>{item.label}</span>
+                              </RippleButton>
+                            );
+                          })()
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            </aside>
+          )}
 
           {/* ── Main Dashboard Window ── */}
           <div
@@ -676,12 +747,11 @@ const DashboardLayout = ({ user, handleLogout }) => {
               display: "flex",
               flexDirection: "column",
               minWidth: 0,
-              marginLeft: isMobile ? 0 : sidebarOpen ? "260px" : "68px",
-              transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             {/* Header Area */}
             <header
+              className="db-header"
               style={{
                 background: "#fff",
                 padding: "0 24px",
@@ -689,43 +759,184 @@ const DashboardLayout = ({ user, handleLogout }) => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                gap: "16px",
                 borderBottom: "1px solid #e2e8f0",
                 position: "sticky",
                 top: 0,
                 zIndex: 100,
               }}
             >
-              {/* Boxy Menu Toggle Button */}
-              <button
-                onClick={toggleSidebar}
+              <div
                 style={{
-                  cursor: "pointer",
-                  border: "1px solid #cbd5e1",
-                  background: "#f8fafc",
-                  borderRadius: "4px" /* Boxy UI match */,
-                  padding: "8px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f1f5f9";
-                  e.currentTarget.style.borderColor = "#94a3b8";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#f8fafc";
-                  e.currentTarget.style.borderColor = "#cbd5e1";
+                  gap: "16px",
+                  minWidth: 0,
+                  flex: 1,
                 }}
               >
-                <Menu size={18} color="#334155" />
-              </button>
+                {/* Hamburger toggle — only below the large breakpoint */}
+                {!isLargeScreen && (
+                  <button
+                    onClick={toggleSidebar}
+                    style={{
+                      cursor: "pointer",
+                      border: "1px solid #cbd5e1",
+                      background: "#f8fafc",
+                      borderRadius: "4px" /* Boxy UI match */,
+                      padding: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.15s ease",
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f1f5f9";
+                      e.currentTarget.style.borderColor = "#94a3b8";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#f8fafc";
+                      e.currentTarget.style.borderColor = "#cbd5e1";
+                    }}
+                  >
+                    <Menu size={18} color="#334155" />
+                  </button>
+                )}
+
+                <img
+                  src={user?.logo || logo}
+                  alt="Logo"
+                  onClick={() => navigate("/dashboard")}
+                  style={{
+                    height: "34px",
+                    objectFit: "contain",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                />
+
+                {/* Top bar horizontal nav — large screens and up */}
+                {isLargeScreen && (
+                  <nav className="top-nav">
+                    {topNavItems.map((item, idx) => {
+                      if (item.hasSubMenu) {
+                        return (
+                          <div
+                            key={idx}
+                            ref={financeRef}
+                            style={{ position: "relative", flexShrink: 0 }}
+                          >
+                            <button
+                              onClick={() =>
+                                setFinanceDropdownOpen((prev) => !prev)
+                              }
+                              className={
+                                financeActive
+                                  ? "top-nav-link-active"
+                                  : "top-nav-link"
+                              }
+                              style={{
+                                background:
+                                  !financeActive && financeDropdownOpen
+                                    ? "rgba(9, 176, 255, 0.12)"
+                                    : undefined,
+                                color:
+                                  !financeActive && financeDropdownOpen
+                                    ? "#09B0FF"
+                                    : undefined,
+                              }}
+                            >
+                              {item.label}
+                              <ChevronDown
+                                size={14}
+                                style={{
+                                  transform: financeDropdownOpen
+                                    ? "rotate(180deg)"
+                                    : "rotate(0deg)",
+                                  transition: "transform 0.2s ease",
+                                }}
+                              />
+                            </button>
+
+                            {financeDropdownOpen && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(100% + 6px)",
+                                  left: 0,
+                                  background: "#fff",
+                                  border: "1px solid #cbd5e1",
+                                  borderRadius: "6px",
+                                  minWidth: "170px",
+                                  boxShadow:
+                                    "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                                  zIndex: 1000,
+                                  overflow: "hidden",
+                                  padding: "4px",
+                                  animation:
+                                    "dropdownReveal 0.18s cubic-bezier(0.16, 1, 0.3, 1) both",
+                                  transformOrigin: "top left",
+                                }}
+                              >
+                                {item.subItems.map((sub, sIdx) => {
+                                  const subActive = isActive(sub.path);
+                                  return (
+                                    <Link
+                                      key={sIdx}
+                                      to={sub.path}
+                                      onClick={() =>
+                                        setFinanceDropdownOpen(false)
+                                      }
+                                      className="dd-item"
+                                      style={{
+                                        display: "block",
+                                        padding: "9px 12px",
+                                        fontSize: "13px",
+                                        fontWeight: subActive ? "600" : "500",
+                                        color: subActive
+                                          ? "#FF7A00"
+                                          : "#334155",
+                                        textDecoration: "none",
+                                      }}
+                                    >
+                                      {sub.label}
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      const active = isActive(item.path);
+                      return (
+                        <Link
+                          key={idx}
+                          to={item.path}
+                          className={
+                            active ? "top-nav-link-active" : "top-nav-link"
+                          }
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </nav>
+                )}
+              </div>
 
               <div
-                style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  flexShrink: 0,
+                }}
               >
-                {/* Notification Bell */}
-                <button
+                {/* Notification Bell — hidden per request */}
+                {/* <button
                   style={{
                     background: "#f8fafc",
                     border: "1px solid #e2e8f0",
@@ -744,16 +955,16 @@ const DashboardLayout = ({ user, handleLogout }) => {
                       right: "6px",
                       width: "6px",
                       height: "6px",
-                      background:
-                        "#FF7A00" /* Alerts now feature the secondary orange brand tone */,
+                      background: "#FF7A00",
                       borderRadius: "50%",
                     }}
                   />
-                </button>
+                </button> */}
 
                 {/* User Info Container */}
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <button
+                    className="user-menu-btn"
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                     style={{
                       display: "flex",
@@ -765,6 +976,7 @@ const DashboardLayout = ({ user, handleLogout }) => {
                       borderRadius: "4px" /* Uniform Boxy */,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
+                      minWidth: 0,
                     }}
                   >
                     {/* Avatar Container */}
@@ -788,23 +1000,45 @@ const DashboardLayout = ({ user, handleLogout }) => {
                       {!user?.logo && (user?.name?.[0]?.toUpperCase() || "U")}
                     </div>
 
-                    <div style={{ textAlign: "left", lineHeight: 1.2 }}>
+                    <div
+                      className="user-info-text"
+                      style={{
+                        textAlign: "left",
+                        lineHeight: 1.2,
+                        minWidth: 0,
+                        overflow: "hidden",
+                      }}
+                    >
                       <div
                         style={{
                           fontSize: "13px",
                           fontWeight: "600",
                           color: "#1e293b",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: "140px",
                         }}
                       >
                         {user?.name || "User"}
                       </div>
-                      <div style={{ fontSize: "11px", color: "#64748b" }}>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "#64748b",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: "140px",
+                        }}
+                      >
                         {user?.email || ""}
                       </div>
                     </div>
 
                     <ChevronDown
                       size={14}
+                      className="user-menu-chevron"
                       style={{
                         color: "#94a3b8",
                         transition: "transform 0.2s ease",

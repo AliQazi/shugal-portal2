@@ -4,7 +4,7 @@ import axiosInstance from "../../../api/axios";
 import { printGDSBooking } from "../../../utils/bookingPDFService";
 import {
   Search,
-  RefreshCw,
+  // RefreshCw,
   Filter,
   X,
   Plus,
@@ -740,10 +740,10 @@ export default function UmrahBooking() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-5 font-sans sm:px-6">
+    <div className="min-h-screen pt-1 font-sans">
       <div className="mx-auto max-w-[1600px]">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
+        {/* <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-950">
               My Umrah Bookings
@@ -760,11 +760,11 @@ export default function UmrahBooking() {
             <RefreshCw className="w-4 h-4 text-emerald-600" />
             Refresh
           </button>
-        </div>
+        </div> */}
 
         {/* Stats Cards */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="border border-slate-200 bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               Total Bookings
             </p>
@@ -772,7 +772,7 @@ export default function UmrahBooking() {
               {totalBookings}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="border border-slate-200 bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               Total Spent
             </p>
@@ -780,7 +780,7 @@ export default function UmrahBooking() {
               PKR {totalSpent.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="border border-slate-200 bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               Active Bookings
             </p>
@@ -798,7 +798,7 @@ export default function UmrahBooking() {
         </div>
 
         {/* Filters & Search */}
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 border border-slate-200 bg-white p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-end">
             {/* Search */}
             <div className="flex-1 relative w-full">
@@ -871,7 +871,7 @@ export default function UmrahBooking() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden border border-slate-200 bg-white">
           <div className="overflow-x-auto">
             <table className="w-full min-w-295 text-sm">
               {/* HEADER */}

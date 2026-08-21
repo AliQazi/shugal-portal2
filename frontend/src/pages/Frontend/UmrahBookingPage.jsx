@@ -7,22 +7,22 @@ import {
   Scan,
   AlertTriangle,
   Upload,
-  Plane,
-  Hotel,
-  Calendar,
-  Clock,
-  MapPin,
-  Luggage,
+  // Plane,
+  // Hotel,
+  // Calendar,
+  // Clock,
+  // MapPin,
+  // Luggage,
   ArrowLeft,
   CheckCircle,
 } from "lucide-react";
 import {
-  FaPlaneDeparture,
-  FaPlaneArrival,
-  FaHotel,
+  // FaPlaneDeparture,
+  // FaPlaneArrival,
+  // FaHotel,
   FaCheckCircle,
-  FaMapMarkerAlt,
-  FaStar as FaStarIcon,
+  // FaMapMarkerAlt,
+  // FaStar as FaStarIcon,
 } from "react-icons/fa";
 import { theme } from "../../theme/theme";
 import { createUmrahBooking } from "../../api/umrahBookingApi";
@@ -39,11 +39,11 @@ const formatDate = (dateStr) => {
   });
 };
 
-const formatTime = (dateStr) => {
-  if (!dateStr) return "N/A";
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-};
+// const formatTime = (dateStr) => {
+//   if (!dateStr) return "N/A";
+//   const d = new Date(dateStr);
+//   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+// };
 
 const s = {
   label: {
@@ -63,8 +63,8 @@ const s = {
     boxSizing: "border-box",
   },
   paxCard: {
-    marginBottom: "12px",
-    padding: "10px",
+    marginBottom: "10px",
+    padding: "8px",
     border: "1.5px solid #e2e8f0",
     borderRadius: "8px",
     background: "#f8fafc",
@@ -73,7 +73,7 @@ const s = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "8px",
+    marginBottom: "6px",
     flexWrap: "wrap",
     gap: "6px",
   },
@@ -108,7 +108,7 @@ const s = {
     opacity: disabled ? 0.6 : 1,
   }),
   primary: {
-    padding: "10px 20px",
+    padding: "9px 18px",
     background: theme.colors.primary,
     color: "white",
     border: "none",
@@ -118,7 +118,7 @@ const s = {
     fontSize: "0.85rem",
   },
   secondary: {
-    padding: "8px 20px",
+    padding: "7px 18px",
     background: "white",
     color: "#2d3748",
     border: "2px solid #e2e8f0",
@@ -134,7 +134,7 @@ const s = {
     borderRadius: "6px",
     fontSize: "0.75rem",
     outline: "none",
-    minHeight: "50px",
+    minHeight: "45px",
     resize: "vertical",
     boxSizing: "border-box",
   },
@@ -437,12 +437,12 @@ export default function UmrahBookingPage({ user }) {
   const getChildPrice = (p) =>
     p.childType === "withBed" ? childWithBedPrice : childPrice;
 
-  const getPaxPrice = (p) =>
-    p.type === "Infant"
-      ? infantPrice
-      : p.type === "Child"
-        ? getChildPrice(p)
-        : pricePerPerson || 0;
+  // const getPaxPrice = (p) =>
+  //   p.type === "Infant"
+  //     ? infantPrice
+  //     : p.type === "Child"
+  //       ? getChildPrice(p)
+  //       : pricePerPerson || 0;
 
   const adultTotal = formData.adults.length * (pricePerPerson || 0);
   const childrenTotal = formData.children.reduce(
@@ -475,17 +475,17 @@ export default function UmrahBookingPage({ user }) {
     return null;
   };
 
-  const calcAge = (dob) => {
-    if (!dob) return "Adult";
-    const b = dob instanceof Date ? dob : new Date(dob),
-      today = new Date();
-    let age = today.getFullYear() - b.getFullYear();
-    const md = today.getMonth() - b.getMonth(),
-      dd = today.getDate() - b.getDate();
-    if (md < 0 || (md === 0 && dd < 0)) age--;
-    const months = age * 12 + md + (dd >= 0 ? 0 : -1);
-    return months < 24 ? "Infant" : age < 12 ? "Child" : "Adult";
-  };
+  // const calcAge = (dob) => {
+  //   if (!dob) return "Adult";
+  //   const b = dob instanceof Date ? dob : new Date(dob),
+  //     today = new Date();
+  //   let age = today.getFullYear() - b.getFullYear();
+  //   const md = today.getMonth() - b.getMonth(),
+  //     dd = today.getDate() - b.getDate();
+  //   if (md < 0 || (md === 0 && dd < 0)) age--;
+  //   const months = age * 12 + md + (dd >= 0 ? 0 : -1);
+  //   return months < 24 ? "Infant" : age < 12 ? "Child" : "Adult";
+  // };
 
   const fmtDate = (d) =>
     d instanceof Date && !isNaN(d) ? d.toISOString().split("T")[0] : "";
@@ -549,7 +549,7 @@ export default function UmrahBookingPage({ user }) {
     e.preventDefault();
 
     // Validate that all passengers have uploaded passport files
-    const allPassengers = getAllPassengers();
+    // const allPassengers = getAllPassengers();
     // const missingPassports = allPassengers.filter((p) => !p.passportFile);
     // if (missingPassports.length > 0) {
     //   toast.error("Please upload passport files for all passengers");
@@ -828,7 +828,7 @@ export default function UmrahBookingPage({ user }) {
     return (
       <div
         style={{
-          padding: "100px",
+          padding: "60px",
           textAlign: "center",
           color: theme.colors.textSecondary,
         }}
@@ -836,7 +836,7 @@ export default function UmrahBookingPage({ user }) {
         <h2>No package data found.</h2>
         <button
           onClick={() => navigate(-1)}
-          style={{ ...s.secondary, marginTop: "20px" }}
+          style={{ ...s.secondary, marginTop: "16px" }}
         >
           Go Back
         </button>
@@ -844,7 +844,7 @@ export default function UmrahBookingPage({ user }) {
     );
   }
 
-  const flights = packageData?.flights || [];
+  // const flights = packageData?.flights || [];
   const hotels = packageData?.hotels || [];
   const pkgName =
     packageData?.packageName || packageData?.title || packageData?.name;
@@ -860,44 +860,69 @@ export default function UmrahBookingPage({ user }) {
   });
 
   // Calculate available seats
-  const availableFlightSeats =
-    flights && flights.length > 0 ? flights[0]?.availableSeats || "N/A" : "N/A";
+  // const availableFlightSeats =
+  //   flights && flights.length > 0 ? flights[0]?.availableSeats || "N/A" : "N/A";
 
   // Calculate duration
-  const calculateDuration = () => {
-    if (packageData?.days) {
-      return `${packageData.days} Days`;
-    }
-    if (flights && flights.length >= 2) {
-      const departure = new Date(flights[0]?.depDate);
-      const returnFlight = new Date(flights[1]?.depDate);
-      const days = Math.ceil(
-        (returnFlight - departure) / (1000 * 60 * 60 * 24),
-      );
-      return days > 0 ? `${days} Days` : "N/A";
-    }
-    return "N/A";
-  };
+  // const calculateDuration = () => {
+  //   if (packageData?.days) {
+  //     return `${packageData.days} Days`;
+  //   }
+  //   if (flights && flights.length >= 2) {
+  //     const departure = new Date(flights[0]?.depDate);
+  //     const returnFlight = new Date(flights[1]?.depDate);
+  //     const days = Math.ceil(
+  //       (returnFlight - departure) / (1000 * 60 * 60 * 24),
+  //     );
+  //     return days > 0 ? `${days} Days` : "N/A";
+  //   }
+  //   return "N/A";
+  // };
+
+  // Compact "Package Summary" line items (label/value pairs sized to their
+  // own content rather than stretched across the full card width).
+  // const summaryItems = [
+  //   { label: "Package", value: pkgName, capitalize: true },
+  //   { label: "Room Type", value: selectedRoom, capitalize: true },
+  //   { label: "Adult Price", value: `PKR ${pricePerPerson?.toLocaleString()}` },
+  //   ...(formData.children.some((p) => p.childType !== "withBed")
+  //     ? [{ label: "Child w/o Bed", value: `PKR ${childPrice.toLocaleString()}` }]
+  //     : []),
+  //   ...(formData.children.some((p) => p.childType === "withBed")
+  //     ? [{ label: "Child w/ Bed", value: `PKR ${childWithBedPrice.toLocaleString()}` }]
+  //     : []),
+  //   ...(formData.infants.length > 0
+  //     ? [{ label: "Infant Price", value: `PKR ${infantPrice.toLocaleString()}` }]
+  //     : []),
+  //   {
+  //     label: "Total Passengers",
+  //     value:
+  //       formData.adults.length +
+  //       formData.children.length +
+  //       formData.infants.length,
+  //   },
+  // ];
+
+  const totalPax =
+    formData.adults.length + formData.children.length + formData.infants.length;
 
   return (
     <div
       style={{
+        paddingBottom: "16px",
         backgroundColor: "#f4f7fe",
-        minHeight: "100vh",
-        padding: "30px 20px",
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1300px", margin: "0 auto" }}>
         {/* Header */}
         <div
           style={{
             background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`,
-            borderRadius: "20px",
-            padding: "40px 30px",
+            borderRadius: "14px",
+            padding: "16px 20px",
             color: "white",
-            marginBottom: "30px",
-            boxShadow: "0 10px 20px rgba(0,0,0,0.08)",
+            boxShadow: "0 6px 14px rgba(0,0,0,0.08)",
             textAlign: "center",
             position: "relative",
           }}
@@ -906,30 +931,32 @@ export default function UmrahBookingPage({ user }) {
             onClick={() => navigate(-1)}
             style={{
               position: "absolute",
-              top: "20px",
-              right: "20px",
+              top: "10px",
+              right: "10px",
               ...s.closeBtn,
               display: "flex",
-              gap: "8px",
+              gap: "6px",
               width: "auto",
-              padding: "10px 20px",
-              borderRadius: "10px",
+              height: "auto",
+              padding: "7px 12px",
+              borderRadius: "8px",
+              fontSize: "0.78rem",
             }}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={15} />
             Back
           </button>
           <h1
             style={{
-              margin: "0 0 8px 0",
-              fontSize: "2.2rem",
+              margin: "0 0 3px 0",
+              fontSize: "1.4rem",
               fontWeight: 800,
-              letterSpacing: "-0.5px",
+              letterSpacing: "-0.3px",
             }}
           >
             {packageData?.packageName || "Confirm Your Umrah Package"}
           </h1>
-          <p style={{ margin: "0 0 30px 0", opacity: 0.9, fontSize: "1rem" }}>
+          <p style={{ margin: "0 0 12px 0", opacity: 0.9, fontSize: "0.8rem" }}>
             Complete your booking details below
           </p>
 
@@ -937,32 +964,32 @@ export default function UmrahBookingPage({ user }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: "20px",
-              maxWidth: "900px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: "10px",
+              maxWidth: "760px",
               margin: "0 auto",
-              padding: "25px",
+              padding: "12px",
               background: "rgba(255, 255, 255, 0.15)",
-              borderRadius: "15px",
+              borderRadius: "12px",
               backdropFilter: "blur(10px)",
             }}
           >
             <div style={{ textAlign: "center" }}>
               <div
                 style={{
-                  fontSize: "1.8rem",
+                  fontSize: "1.15rem",
                   fontWeight: 800,
-                  marginBottom: "5px",
+                  marginBottom: "2px",
                 }}
               >
                 {packageData.availableRooms}
               </div>
               <div
                 style={{
-                  fontSize: "0.85rem",
+                  fontSize: "0.65rem",
                   opacity: 0.9,
                   textTransform: "uppercase",
-                  letterSpacing: "0.5px",
+                  letterSpacing: "0.4px",
                 }}
               >
                 Available Packages
@@ -972,19 +999,19 @@ export default function UmrahBookingPage({ user }) {
             <div style={{ textAlign: "center" }}>
               <div
                 style={{
-                  fontSize: "1.8rem",
+                  fontSize: "1.15rem",
                   fontWeight: 800,
-                  marginBottom: "5px",
+                  marginBottom: "2px",
                 }}
               >
                 {packageData.packageDuration}
               </div>
               <div
                 style={{
-                  fontSize: "0.85rem",
+                  fontSize: "0.65rem",
                   opacity: 0.9,
                   textTransform: "uppercase",
-                  letterSpacing: "0.5px",
+                  letterSpacing: "0.4px",
                 }}
               >
                 Duration
@@ -994,9 +1021,9 @@ export default function UmrahBookingPage({ user }) {
             <div style={{ textAlign: "center" }}>
               <div
                 style={{
-                  fontSize: "1.8rem",
+                  fontSize: "1.15rem",
                   fontWeight: 800,
-                  marginBottom: "5px",
+                  marginBottom: "2px",
                   textTransform: "capitalize",
                 }}
               >
@@ -1004,10 +1031,10 @@ export default function UmrahBookingPage({ user }) {
               </div>
               <div
                 style={{
-                  fontSize: "0.85rem",
+                  fontSize: "0.65rem",
                   opacity: 0.9,
                   textTransform: "uppercase",
-                  letterSpacing: "0.5px",
+                  letterSpacing: "0.4px",
                 }}
               >
                 Accommodation
@@ -1017,19 +1044,19 @@ export default function UmrahBookingPage({ user }) {
             <div style={{ textAlign: "center" }}>
               <div
                 style={{
-                  fontSize: "1.8rem",
+                  fontSize: "1.15rem",
                   fontWeight: 800,
-                  marginBottom: "5px",
+                  marginBottom: "2px",
                 }}
               >
                 PKR {pricePerPerson?.toLocaleString()}
               </div>
               <div
                 style={{
-                  fontSize: "0.85rem",
+                  fontSize: "0.65rem",
                   opacity: 0.9,
                   textTransform: "uppercase",
-                  letterSpacing: "0.5px",
+                  letterSpacing: "0.4px",
                 }}
               >
                 Per Person
@@ -1038,46 +1065,45 @@ export default function UmrahBookingPage({ user }) {
           </div>
         </div>
 
-        {/* Package Details - 2 Columns */}
+        {/* Package Details - 3 Columns */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
-            gap: "20px",
-            marginBottom: "30px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "10px",
+            marginBottom: "12px",
             alignItems: "start",
           }}
         >
           {/* Flight Details */}
-          <div
+          {/* <div
             style={{
               background: "white",
-              padding: "20px",
+              padding: "12px",
               height: "100%",
-              borderRadius: "16px",
+              borderRadius: "12px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               border: "1px solid #e2e8f0",
-              // height: "fit-content",
             }}
           >
             <h3
               style={{
-                margin: "0 0 18px 0",
-                fontSize: "1.2rem",
+                margin: "0 0 8px 0",
+                fontSize: "0.92rem",
                 color: "#1a202c",
                 fontWeight: 700,
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "6px",
               }}
             >
-              <FaPlaneDeparture color={theme.colors.primary} /> Flight Details
+              <FaPlaneDeparture color={theme.colors.primary} size={13} /> Flight Details
               {packageData?.flightLogo && (
                 <img
                   src={packageData.flightLogo}
                   alt="Flight Logo"
                   style={{
-                    height: "30px",
+                    height: "20px",
                     width: "auto",
                     objectFit: "contain",
                     marginLeft: "auto",
@@ -1090,19 +1116,18 @@ export default function UmrahBookingPage({ user }) {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                  gap: "15px",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "8px",
                 }}
               >
                 {flights.map((flight, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: "14px",
+                      padding: "10px",
                       background: "#f8fafc",
-                      borderRadius: "12px",
+                      borderRadius: "10px",
                       border: "1px solid #e2e8f0",
-                      minHeight: "150px",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
@@ -1111,12 +1136,12 @@ export default function UmrahBookingPage({ user }) {
                     <div>
                       <div
                         style={{
-                          fontSize: "0.72rem",
+                          fontSize: "0.62rem",
                           fontWeight: 700,
                           color: "#a0aec0",
                           textTransform: "uppercase",
-                          marginBottom: "8px",
-                          letterSpacing: "0.5px",
+                          marginBottom: "4px",
+                          letterSpacing: "0.4px",
                         }}
                       >
                         {index === 0 ? "Departure" : "Return"}
@@ -1127,15 +1152,15 @@ export default function UmrahBookingPage({ user }) {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          marginBottom: "10px",
-                          gap: "10px",
+                          marginBottom: "5px",
+                          gap: "6px",
                         }}
                       >
                         <span
                           style={{
                             fontWeight: 700,
                             color: "#2d3748",
-                            fontSize: "0.95rem",
+                            fontSize: "0.82rem",
                           }}
                         >
                           {formatDate(flight.depDate)}
@@ -1143,10 +1168,10 @@ export default function UmrahBookingPage({ user }) {
 
                         <span
                           style={{
-                            fontSize: "0.75rem",
+                            fontSize: "0.65rem",
                             background: "#edf2f7",
-                            padding: "4px 10px",
-                            borderRadius: "6px",
+                            padding: "2px 7px",
+                            borderRadius: "4px",
                             whiteSpace: "nowrap",
                             fontWeight: 600,
                           }}
@@ -1157,57 +1182,44 @@ export default function UmrahBookingPage({ user }) {
 
                       <div
                         style={{
-                          fontSize: "0.88rem",
+                          fontSize: "0.75rem",
                           color: "#4a5568",
-                          lineHeight: "1.5",
-                          marginBottom: "8px",
+                          lineHeight: "1.3",
+                          marginBottom: "4px",
                         }}
                       >
                         {flight.depTime} • {flight.sectorFrom} →{" "}
                         {flight.sectorTo}
                       </div>
 
-                      {(flight.fromTerminal || flight.toTerminal) && (
-                        <div
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#718096",
-                            marginBottom: "5px",
-                          }}
-                        >
-                          {flight.fromTerminal} → {flight.toTerminal}
-                        </div>
-                      )}
-
                       {flight.arrDate && (
                         <div
                           style={{
-                            fontSize: "0.82rem",
+                            fontSize: "0.68rem",
                             color: "#718096",
-                            marginTop: "5px",
+                            marginTop: "3px",
                           }}
                         >
                           Arrival: {formatDate(flight.arrDate)} {flight.arrTime}
                         </div>
                       )}
 
-                      {/* Flight Details: Class, Baggage, Meal */}
                       <div
                         style={{
                           display: "flex",
-                          gap: "8px",
-                          marginTop: "10px",
+                          gap: "4px",
+                          marginTop: "6px",
                           flexWrap: "wrap",
                         }}
                       >
                         {flight.flightClass && (
                           <span
                             style={{
-                              fontSize: "0.7rem",
+                              fontSize: "0.6rem",
                               background: "#EFF6FF",
                               color: "#1E40AF",
-                              padding: "3px 8px",
-                              borderRadius: "5px",
+                              padding: "2px 5px",
+                              borderRadius: "4px",
                               fontWeight: 600,
                             }}
                           >
@@ -1217,11 +1229,11 @@ export default function UmrahBookingPage({ user }) {
                         {flight.baggage && (
                           <span
                             style={{
-                              fontSize: "0.7rem",
+                              fontSize: "0.6rem",
                               background: "#F0FDF4",
                               color: "#166534",
-                              padding: "3px 8px",
-                              borderRadius: "5px",
+                              padding: "2px 5px",
+                              borderRadius: "4px",
                               fontWeight: 600,
                             }}
                           >
@@ -1231,11 +1243,11 @@ export default function UmrahBookingPage({ user }) {
                         {flight.meal && (
                           <span
                             style={{
-                              fontSize: "0.7rem",
+                              fontSize: "0.6rem",
                               background: "#FEF3C7",
                               color: "#92400E",
-                              padding: "3px 8px",
-                              borderRadius: "5px",
+                              padding: "2px 5px",
+                              borderRadius: "4px",
                               fontWeight: 600,
                             }}
                           >
@@ -1248,13 +1260,13 @@ export default function UmrahBookingPage({ user }) {
                     {flight.availableSeats !== undefined && (
                       <div
                         style={{
-                          fontSize: "0.82rem",
+                          fontSize: "0.68rem",
                           color: theme.colors.success,
-                          marginTop: "12px",
+                          marginTop: "6px",
                           fontWeight: 600,
                           background: "#f0fff4",
-                          padding: "6px 10px",
-                          borderRadius: "8px",
+                          padding: "3px 6px",
+                          borderRadius: "5px",
                           width: "fit-content",
                         }}
                       >
@@ -1265,43 +1277,43 @@ export default function UmrahBookingPage({ user }) {
                 ))}
               </div>
             ) : (
-              <p style={{ color: "#718096" }}>
+              <p style={{ color: "#718096", fontSize: "0.8rem" }}>
                 No flight information available
               </p>
             )}
-          </div>
+          </div> */}
 
           {/* Accommodation Details */}
-          <div
+          {/* <div
             style={{
               background: "white",
-              padding: "20px",
+              padding: "12px",
               height: "100%",
-              borderRadius: "16px",
+              borderRadius: "12px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               border: "1px solid #e2e8f0",
             }}
           >
             <h3
               style={{
-                margin: "0 0 18px 0",
-                fontSize: "1.2rem",
+                margin: "0 0 8px 0",
+                fontSize: "0.92rem",
                 color: "#1a202c",
                 fontWeight: 700,
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "6px",
               }}
             >
-              <FaHotel color={theme.colors.primary} /> Accommodation Details
+              <FaHotel color={theme.colors.primary} size={13} /> Accommodation Details
             </h3>
 
             {Object.entries(hotelsByCity).length > 0 ? (
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                  gap: "15px",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                  gap: "8px",
                 }}
               >
                 {Object.entries(hotelsByCity).map(([city, cityHotels]) => {
@@ -1323,11 +1335,10 @@ export default function UmrahBookingPage({ user }) {
                     <div
                       key={hotel._id || `${city}-${hotel.name || index}`}
                       style={{
-                        padding: "14px",
+                        padding: "8px",
                         background: "#f8fafc",
-                        borderRadius: "12px",
+                        borderRadius: "10px",
                         border: "1px solid #e2e8f0",
-                        minHeight: "140px",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
@@ -1338,14 +1349,14 @@ export default function UmrahBookingPage({ user }) {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "10px",
-                            marginBottom: "10px",
+                            gap: "6px",
+                            marginBottom: "5px",
                           }}
                         >
                           <img
                             style={{
-                              height: 45,
-                              width: 45,
+                              height: 26,
+                              width: 26,
                               objectFit: "contain",
                             }}
                             src={
@@ -1364,7 +1375,7 @@ export default function UmrahBookingPage({ user }) {
                           <h4
                             style={{
                               margin: 0,
-                              fontSize: "1rem",
+                              fontSize: "0.8rem",
                               fontWeight: 700,
                               color: "#2d3748",
                             }}
@@ -1376,10 +1387,10 @@ export default function UmrahBookingPage({ user }) {
                         <div
                           style={{
                             fontWeight: 700,
-                            fontSize: "0.92rem",
-                            marginBottom: "10px",
+                            fontSize: "0.76rem",
+                            marginBottom: "5px",
                             color: "#2d3748",
-                            lineHeight: "1.4",
+                            lineHeight: "1.25",
                           }}
                         >
                           {hotel.name}
@@ -1391,9 +1402,9 @@ export default function UmrahBookingPage({ user }) {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          gap: "10px",
+                          gap: "6px",
                           flexWrap: "wrap",
-                          fontSize: "0.82rem",
+                          fontSize: "0.68rem",
                           color: "#718096",
                         }}
                       >
@@ -1401,26 +1412,26 @@ export default function UmrahBookingPage({ user }) {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "4px",
+                            gap: "3px",
                             background: "#fff",
-                            padding: "5px 8px",
-                            borderRadius: "8px",
+                            padding: "3px 6px",
+                            borderRadius: "6px",
                           }}
                         >
-                          <FaMapMarkerAlt /> {hotel?.distance}m
+                          <FaMapMarkerAlt size={10} /> {hotel?.distance}m
                         </span>
 
                         <span
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "4px",
+                            gap: "3px",
                             background: "#fff",
-                            padding: "5px 8px",
-                            borderRadius: "8px",
+                            padding: "3px 6px",
+                            borderRadius: "6px",
                           }}
                         >
-                          <FaStarIcon color="#ecc94b" /> {hotel.rating}.0
+                          <FaStarIcon color="#ecc94b" size={10} /> {hotel.rating}.0
                         </span>
                       </div>
                     </div>
@@ -1428,19 +1439,19 @@ export default function UmrahBookingPage({ user }) {
                 })}
               </div>
             ) : (
-              <p style={{ color: "#718096" }}>
+              <p style={{ color: "#718096", fontSize: "0.8rem" }}>
                 No accommodation information available
               </p>
             )}
-          </div>
+          </div> */}
 
           {/* Transport Details */}
           {packageData?.transports && packageData.transports.length > 0 && (
             <div
               style={{
                 background: "white",
-                padding: "20px",
-                borderRadius: "16px",
+                padding: "12px",
+                borderRadius: "12px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                 border: "1px solid #e2e8f0",
                 height: "fit-content",
@@ -1448,41 +1459,40 @@ export default function UmrahBookingPage({ user }) {
             >
               <h3
                 style={{
-                  margin: "0 0 18px 0",
-                  fontSize: "1.2rem",
+                  margin: "0 0 8px 0",
+                  fontSize: "0.92rem",
                   color: "#1a202c",
                   fontWeight: 700,
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
+                  gap: "6px",
                 }}
               >
-                <FaCheckCircle color={theme.colors.primary} /> Transport Details
+                <FaCheckCircle color={theme.colors.primary} size={13} /> Transport Details
               </h3>
 
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                  gap: "15px",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                  gap: "8px",
                 }}
               >
                 {packageData.transports.map((transport, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: "14px",
+                      padding: "8px",
                       background: "#f8fafc",
-                      borderRadius: "12px",
+                      borderRadius: "10px",
                       border: "1px solid #e2e8f0",
-                      minHeight: "120px",
                     }}
                   >
                     <div
                       style={{
                         fontWeight: 700,
-                        fontSize: "0.92rem",
-                        marginBottom: "10px",
+                        fontSize: "0.76rem",
+                        marginBottom: "5px",
                         color: "#2d3748",
                       }}
                     >
@@ -1493,8 +1503,8 @@ export default function UmrahBookingPage({ user }) {
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "6px",
-                        fontSize: "0.8rem",
+                        gap: "3px",
+                        fontSize: "0.68rem",
                         color: "#718096",
                       }}
                     >
@@ -1509,8 +1519,8 @@ export default function UmrahBookingPage({ user }) {
                       {transport.startDate && transport.endDate && (
                         <div
                           style={{
-                            marginTop: "5px",
-                            fontSize: "0.75rem",
+                            marginTop: "3px",
+                            fontSize: "0.62rem",
                             color: "#718096",
                           }}
                         >
@@ -1531,11 +1541,11 @@ export default function UmrahBookingPage({ user }) {
           <div
             style={{
               background: "white",
-              padding: "20px",
-              borderRadius: "12px",
+              padding: "12px",
+              borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               border: "1px solid #e2e8f0",
-              marginBottom: "20px",
+              marginBottom: "10px",
             }}
           >
             {/* Adults Section */}
@@ -1544,15 +1554,15 @@ export default function UmrahBookingPage({ user }) {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "15px",
+                marginBottom: "8px",
                 flexWrap: "wrap",
-                gap: "10px",
+                gap: "8px",
               }}
             >
               <h3
                 style={{
                   margin: 0,
-                  fontSize: "1.1rem",
+                  fontSize: "0.92rem",
                   color: "#1a202c",
                   fontWeight: 700,
                 }}
@@ -1560,10 +1570,10 @@ export default function UmrahBookingPage({ user }) {
                 Adult Passengers ({formData.adults.length})
                 <span
                   style={{
-                    fontSize: "0.75rem",
+                    fontSize: "0.68rem",
                     fontWeight: 400,
                     color: "#718096",
-                    marginLeft: "8px",
+                    marginLeft: "6px",
                   }}
                 >
                   (
@@ -1592,15 +1602,15 @@ export default function UmrahBookingPage({ user }) {
             {/* Children/Infants Section */}
             <div
               style={{
-                marginTop: "25px",
-                paddingTop: "20px",
+                marginTop: "14px",
+                paddingTop: "10px",
                 borderTop: "2px solid #e2e8f0",
               }}
             >
               <h3
                 style={{
-                  margin: "0 0 12px 0",
-                  fontSize: "1rem",
+                  margin: "0 0 8px 0",
+                  fontSize: "0.85rem",
                   color: "#1a202c",
                   fontWeight: 700,
                 }}
@@ -1611,8 +1621,8 @@ export default function UmrahBookingPage({ user }) {
               <div
                 style={{
                   display: "flex",
-                  gap: "10px",
-                  marginBottom: "15px",
+                  gap: "8px",
+                  marginBottom: "10px",
                   flexWrap: "wrap",
                 }}
               >
@@ -1661,9 +1671,9 @@ export default function UmrahBookingPage({ user }) {
               )}
             </div>
 
-            <div style={{ marginTop: "15px" }}>
+            <div style={{ marginTop: "10px" }}>
               <label
-                style={{ ...s.label, fontSize: "0.75rem", marginBottom: "4px" }}
+                style={{ ...s.label, fontSize: "0.7rem", marginBottom: "3px" }}
               >
                 Special Requests (Optional)
               </label>
@@ -1685,144 +1695,94 @@ export default function UmrahBookingPage({ user }) {
           <div
             style={{
               background: "white",
-              padding: "20px",
-              borderRadius: "12px",
+              padding: "12px",
+              borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               border: "1px solid #e2e8f0",
-              marginBottom: "20px",
+              marginBottom: "10px",
             }}
           >
             <h3
               style={{
-                margin: "0 0 12px 0",
-                fontSize: "1.05rem",
+                margin: "0 0 8px 0",
+                fontSize: "0.9rem",
                 color: "#1a202c",
                 fontWeight: 700,
                 borderBottom: "1.5px solid #e2e8f0",
-                paddingBottom: "10px",
+                paddingBottom: "6px",
               }}
             >
               Package Summary
             </h3>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+
+            {/* Compact key/value chips - sized to content, not stretched */}
+            {/* <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                gap: "6px",
+                marginBottom: "8px",
+              }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  fontSize: "0.8rem",
-                  color: "#4a5568",
-                }}
-              >
-                <span>Package:</span>
-                <strong style={{ textTransform: "capitalize" }}>
-                  {pkgName}
-                </strong>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  fontSize: "0.8rem",
-                  color: "#4a5568",
-                }}
-              >
-                <span>Room Type:</span>
-                <strong style={{ textTransform: "capitalize" }}>
-                  {selectedRoom}
-                </strong>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  fontSize: "0.8rem",
-                  color: "#4a5568",
-                }}
-              >
-                <span>Adult Price:</span>
-                <strong>PKR {pricePerPerson?.toLocaleString()}</strong>
-              </div>
-              {formData.children.some((p) => p.childType !== "withBed") && (
+              {summaryItems.map((item, idx) => (
                 <div
+                  key={idx}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "6px 0",
-                    fontSize: "0.8rem",
-                    color: "#4a5568",
+                    background: "#f8fafc",
+                    padding: "6px 8px",
+                    borderRadius: "8px",
+                    border: "1px solid #edf2f7",
                   }}
                 >
-                  <span>Child w/o Bed Price:</span>
-                  <strong>PKR {childPrice.toLocaleString()}</strong>
+                  <div style={{ fontSize: "0.62rem", color: "#718096" }}>
+                    {item.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      color: "#2d3748",
+                      textTransform: item.capitalize ? "capitalize" : "none",
+                    }}
+                  >
+                    {item.value}
+                  </div>
                 </div>
-              )}
-              {formData.children.some((p) => p.childType === "withBed") && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "6px 0",
-                    fontSize: "0.8rem",
-                    color: "#4a5568",
-                  }}
-                >
-                  <span>Child w/ Bed Price:</span>
-                  <strong>PKR {childWithBedPrice.toLocaleString()}</strong>
-                </div>
-              )}
-              {formData.infants.length > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "6px 0",
-                    fontSize: "0.8rem",
-                    color: "#4a5568",
-                  }}
-                >
-                  <span>Infant Price:</span>
-                  <strong>PKR {infantPrice.toLocaleString()}</strong>
-                </div>
-              )}
+              ))}
+            </div> */}
+
+            {/* Left: Adult/Child/Infant totals · Right: Passenger list (top to bottom) */}
+            <style>{`
+              @media (max-width: 700px) {
+                .pkg-summary-cols { grid-template-columns: 1fr !important; }
+              }
+            `}</style>
+            <div
+              className="pkg-summary-cols"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(140px, 280px) 1fr",
+                gap: "8px",
+                marginBottom: "8px",
+                alignItems: "start",
+              }}
+            >
+              {/* Left side: totals stacked vertically */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  fontSize: "0.8rem",
-                  color: "#4a5568",
-                }}
-              >
-                <span>Total Passengers:</span>
-                <strong>
-                  {formData.adults.length +
-                    formData.children.length +
-                    formData.infants.length}
-                </strong>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: "10px",
-                  padding: "10px 0",
-                  marginTop: "8px",
-                  borderTop: "1px solid #e2e8f0",
+                  flexDirection: "column",
+                  gap: "6px",
                 }}
               >
                 <div
                   style={{
                     background: "#f8fafc",
-                    padding: "12px",
-                    borderRadius: "10px",
+                    padding: "8px",
+                    borderRadius: "8px",
                   }}
                 >
-                  <div style={{ color: "#4a5568", fontSize: "0.75rem" }}>
+                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
                     Adults
                   </div>
                   <div
@@ -1830,8 +1790,9 @@ export default function UmrahBookingPage({ user }) {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      marginTop: "6px",
+                      marginTop: "3px",
                       fontWeight: 700,
+                      fontSize: "0.78rem",
                       color: "#1f2937",
                     }}
                   >
@@ -1843,11 +1804,11 @@ export default function UmrahBookingPage({ user }) {
                 <div
                   style={{
                     background: "#f8fafc",
-                    padding: "12px",
-                    borderRadius: "10px",
+                    padding: "8px",
+                    borderRadius: "8px",
                   }}
                 >
-                  <div style={{ color: "#4a5568", fontSize: "0.75rem" }}>
+                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
                     Children
                   </div>
                   <div
@@ -1855,8 +1816,9 @@ export default function UmrahBookingPage({ user }) {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      marginTop: "6px",
+                      marginTop: "3px",
                       fontWeight: 700,
+                      fontSize: "0.78rem",
                       color: "#1f2937",
                     }}
                   >
@@ -1868,11 +1830,11 @@ export default function UmrahBookingPage({ user }) {
                 <div
                   style={{
                     background: "#f8fafc",
-                    padding: "12px",
-                    borderRadius: "10px",
+                    padding: "8px",
+                    borderRadius: "8px",
                   }}
                 >
-                  <div style={{ color: "#4a5568", fontSize: "0.75rem" }}>
+                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
                     Infants
                   </div>
                   <div
@@ -1880,8 +1842,9 @@ export default function UmrahBookingPage({ user }) {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      marginTop: "6px",
+                      marginTop: "3px",
                       fontWeight: 700,
+                      fontSize: "0.78rem",
                       color: "#1f2937",
                     }}
                   >
@@ -1891,133 +1854,190 @@ export default function UmrahBookingPage({ user }) {
                 </div>
               </div>
 
-              {/* Passenger Breakdown */}
+              {/* Right side: passenger breakdown, one row per passenger top to bottom */}
               <div
                 style={{
-                  marginTop: "8px",
-                  padding: "10px",
+                  padding: "8px",
                   background: "#f8fafc",
                   borderRadius: "8px",
                 }}
               >
                 <h4
                   style={{
-                    margin: "0 0 6px 0",
-                    fontSize: "0.8rem",
+                    margin: "0 0 5px 0",
+                    fontSize: "0.75rem",
                     fontWeight: 700,
                     color: "#2d3748",
                   }}
                 >
-                  Passengers
+                  Passengers ({totalPax})
                 </h4>
-                {formData.adults.map((p, i) => (
-                  <div
-                    key={`adult-${i}`}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "5px 0",
-                      fontSize: "0.75rem",
-                      color: "#718096",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: "#2d3748" }}>
-                        {i + 1}. {p.title}. {p.givenName} {p.surName}
-                      </strong>
-                      <div style={{ fontSize: "0.68rem", marginTop: "1px" }}>
-                        Adult | Passport: {p.passport || "Not provided"}
-                      </div>
-                    </div>
-                    <strong style={{ whiteSpace: "nowrap", color: "#2d3748" }}>
-                      PKR {pricePerPerson?.toLocaleString()}
-                    </strong>
-                  </div>
-                ))}
-                {formData.children.map((p, i) => (
-                  <div
-                    key={`child-${i}`}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "5px 0",
-                      fontSize: "0.75rem",
-                      color: "#718096",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: "#3B82F6" }}>
-                        {formData.adults.length + i + 1}. {p.title}.{" "}
-                        {p.givenName} {p.surName}
-                      </strong>
-                      <div style={{ fontSize: "0.68rem", marginTop: "1px" }}>
-                        Child ({p.childType === "withBed" ? "w/ Bed" : "w/o Bed"}) | Passport: {p.passport || "Not provided"}
-                      </div>
-                    </div>
-                    <strong style={{ whiteSpace: "nowrap", color: "#3B82F6" }}>
-                      PKR {getChildPrice(p).toLocaleString()}
-                    </strong>
-                  </div>
-                ))}
-                {formData.infants.map((p, i) => (
-                  <div
-                    key={`infant-${i}`}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "5px 0",
-                      fontSize: "0.75rem",
-                      color: "#718096",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: "#8B5CF6" }}>
-                        {formData.adults.length +
-                          formData.children.length +
-                          i +
-                          1}
-                        . {p.title}. {p.givenName} {p.surName}
-                      </strong>
-                      <div style={{ fontSize: "0.68rem", marginTop: "1px" }}>
-                        Infant | Passport: {p.passport || "Not provided"}
-                      </div>
-                    </div>
-                    <strong style={{ whiteSpace: "nowrap", color: "#8B5CF6" }}>
-                      PKR {infantPrice.toLocaleString()}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-
-              {/* Total */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px 0 0",
-                  marginTop: "10px",
-                  borderTop: "1.5px solid #e2e8f0",
-                }}
-              >
-                <span style={{ fontSize: "1rem", fontWeight: 600 }}>
-                  Total Amount:
-                </span>
-                <strong
+                <div
                   style={{
-                    fontSize: "1.3rem",
-                    color: theme.colors.success,
-                    fontWeight: 800,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
                   }}
                 >
-                  PKR {totalPrice().toLocaleString()}
-                </strong>
+                  {formData.adults.map((p, i) => (
+                    <div
+                      key={`adult-${i}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: "6px",
+                        padding: "3px 0",
+                        borderBottom: "1px dashed #e2e8f0",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <strong
+                          style={{
+                            color: "#2d3748",
+                            fontSize: "0.7rem",
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {i + 1}. {p.title}. {p.givenName} {p.surName}
+                        </strong>
+                        <div style={{ fontSize: "0.62rem", color: "#a0aec0" }}>
+                          Adult | {p.passport || "No passport"}
+                        </div>
+                      </div>
+                      <strong
+                        style={{
+                          whiteSpace: "nowrap",
+                          color: "#2d3748",
+                          fontSize: "0.68rem",
+                        }}
+                      >
+                        PKR {pricePerPerson?.toLocaleString()}
+                      </strong>
+                    </div>
+                  ))}
+                  {formData.children.map((p, i) => (
+                    <div
+                      key={`child-${i}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: "6px",
+                        padding: "3px 0",
+                        borderBottom: "1px dashed #e2e8f0",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <strong
+                          style={{
+                            color: "#3B82F6",
+                            fontSize: "0.7rem",
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formData.adults.length + i + 1}. {p.title}.{" "}
+                          {p.givenName} {p.surName}
+                        </strong>
+                        <div style={{ fontSize: "0.62rem", color: "#a0aec0" }}>
+                          Child ({p.childType === "withBed" ? "w/ Bed" : "w/o Bed"}) |{" "}
+                          {p.passport || "No passport"}
+                        </div>
+                      </div>
+                      <strong
+                        style={{
+                          whiteSpace: "nowrap",
+                          color: "#3B82F6",
+                          fontSize: "0.68rem",
+                        }}
+                      >
+                        PKR {getChildPrice(p).toLocaleString()}
+                      </strong>
+                    </div>
+                  ))}
+                  {formData.infants.map((p, i) => (
+                    <div
+                      key={`infant-${i}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: "6px",
+                        padding: "3px 0",
+                        borderBottom: "1px dashed #e2e8f0",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <strong
+                          style={{
+                            color: "#8B5CF6",
+                            fontSize: "0.7rem",
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formData.adults.length +
+                            formData.children.length +
+                            i +
+                            1}
+                          . {p.title}. {p.givenName} {p.surName}
+                        </strong>
+                        <div style={{ fontSize: "0.62rem", color: "#a0aec0" }}>
+                          Infant | {p.passport || "No passport"}
+                        </div>
+                      </div>
+                      <strong
+                        style={{
+                          whiteSpace: "nowrap",
+                          color: "#8B5CF6",
+                          fontSize: "0.68rem",
+                        }}
+                      >
+                        PKR {infantPrice.toLocaleString()}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
               </div>
+            </div>
+
+            {/* Total */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "8px 0 0",
+                marginTop: "8px",
+                borderTop: "1.5px solid #e2e8f0",
+              }}
+            >
+              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                Total Amount:
+              </span>
+              <strong
+                style={{
+                  fontSize: "1.05rem",
+                  color: theme.colors.success,
+                  fontWeight: 800,
+                }}
+              >
+                PKR {totalPrice().toLocaleString()}
+              </strong>
             </div>
           </div>
 
           {/* Submit Button */}
           <div
-            style={{ display: "flex", justifyContent: "center", gap: "12px" }}
+            style={{ display: "flex", justifyContent: "center", gap: "10px" }}
           >
             <button
               type="button"
@@ -2069,6 +2089,7 @@ export default function UmrahBookingPage({ user }) {
               <button
                 onClick={() => setMrzModal({ open: false, index: null })}
                 style={s.closeBtn}
+                className="p-0!"
               >
                 <X size={20} />
               </button>

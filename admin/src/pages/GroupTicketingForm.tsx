@@ -81,6 +81,22 @@ interface BookingData {
   contactPersonEmail?: string;
   internalStatus?: string;
   payments: Payment[];
+  advancePayment?: {
+    supplierAccount?: { name: string; _id: string };
+    dateOfPurchase?: string;
+    paidPercent?: number;
+    paidAmount?: number;
+    totalPayment?: number;
+    remainingPayment?: number;
+  };
+  finalPayment?: {
+    supplierAccount?: { name: string; _id: string };
+    dueDate?: string;
+    remainingPercent?: number;
+    remainingAmount?: number;
+    totalPayment?: number;
+    remainingPayment?: number;
+  };
 }
 
 const GroupTicketingForm = () => {
@@ -147,7 +163,23 @@ const GroupTicketingForm = () => {
     contactPersonPhone: "",
     contactPersonEmail: "",
     internalStatus: "Draft",
-    payments: [] as Payment[]
+    payments: [] as Payment[],
+    advancePayment: {
+      supplierAccount: { name: "", _id: "" },
+      dateOfPurchase: "",
+      paidPercent: 0,
+      paidAmount: 0,
+      totalPayment: 0,
+      remainingPayment: 0
+    },
+    finalPayment: {
+      supplierAccount: { name: "", _id: "" },
+      dueDate: "",
+      remainingPercent: 0,
+      remainingAmount: 0,
+      totalPayment: 0,
+      remainingPayment: 0
+    }
   });
 
   useEffect(() => {
@@ -175,6 +207,34 @@ const GroupTicketingForm = () => {
       .catch(() => setCityOptions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, copyId, canAccess]);
+
+  // Total Payment (both sections) is always Buying Price Per Seat (Adult) x Total Seats.
+  // Keep it in sync whenever either input changes; the field itself stays editable so
+  // it can still be overridden manually afterwards.
+  useEffect(() => {
+    const total = (formData.totalSeats || 0) * (formData.price.buyingAdultPrice || 0);
+    setFormData((prev) => {
+      if (prev.advancePayment.totalPayment === total && prev.finalPayment.totalPayment === total) {
+        return prev;
+      }
+      const paidAmount = Math.round((total * prev.advancePayment.paidPercent) / 100);
+      const remainingAmount = Math.round((total * prev.finalPayment.remainingPercent) / 100);
+      return {
+        ...prev,
+        advancePayment: {
+          ...prev.advancePayment,
+          totalPayment: total,
+          paidAmount,
+          remainingPayment: total - paidAmount
+        },
+        finalPayment: {
+          ...prev.finalPayment,
+          totalPayment: total,
+          remainingAmount
+        }
+      };
+    });
+  }, [formData.totalSeats, formData.price.buyingAdultPrice]);
 
   const fetchSectors = async () => {
     try {
@@ -239,7 +299,23 @@ const GroupTicketingForm = () => {
     contactPersonPhone: booking.contactPersonPhone || "",
     contactPersonEmail: booking.contactPersonEmail || "",
     internalStatus: booking.internalStatus || "Public",
-    payments: booking.payments
+    payments: booking.payments,
+    advancePayment: {
+      supplierAccount: booking.advancePayment?.supplierAccount || { name: "", _id: "" },
+      dateOfPurchase: booking.advancePayment?.dateOfPurchase ? booking.advancePayment.dateOfPurchase.slice(0, 10) : "",
+      paidPercent: booking.advancePayment?.paidPercent || 0,
+      paidAmount: booking.advancePayment?.paidAmount || 0,
+      totalPayment: booking.advancePayment?.totalPayment || 0,
+      remainingPayment: booking.advancePayment?.remainingPayment || 0
+    },
+    finalPayment: {
+      supplierAccount: booking.finalPayment?.supplierAccount || { name: "", _id: "" },
+      dueDate: booking.finalPayment?.dueDate ? booking.finalPayment.dueDate.slice(0, 10) : "",
+      remainingPercent: booking.finalPayment?.remainingPercent || 0,
+      remainingAmount: booking.finalPayment?.remainingAmount || 0,
+      totalPayment: booking.finalPayment?.totalPayment || 0,
+      remainingPayment: booking.finalPayment?.remainingPayment || 0
+    }
   });
 
   const fetchBookingDetails = async (bookingId: string) => {
@@ -482,6 +558,125 @@ const GroupTicketingForm = () => {
     setFormData({ ...formData, flights: updatedFlights });
   };
 
+  // ── Advance Payment (Paid % / Paid Amount) and Final Payment (Remaining % / Remaining
+  // Amount) mirror each other: Paid % + Remaining % = 100 and Paid Amount + Remaining
+  // Amount = Total Payment. Total Payment is shared between both sections, so editing it
+  // in either one updates the other too.
+  const handleAdvancePaidPercentChange = (percent: number) => {
+    const total = formData.advancePayment.totalPayment;
+    const paidAmount = Math.round((total * percent) / 100);
+    const remainingPercent = 100 - percent;
+    const remainingAmount = total - paidAmount;
+    setFormData({
+      ...formData,
+      advancePayment: {
+        ...formData.advancePayment,
+        paidPercent: percent,
+        paidAmount,
+        remainingPayment: remainingAmount
+      },
+      finalPayment: {
+        ...formData.finalPayment,
+        totalPayment: total,
+        remainingPercent,
+        remainingAmount
+      }
+    });
+  };
+
+  const handleAdvancePaidAmountChange = (amount: number) => {
+    const total = formData.advancePayment.totalPayment;
+    const paidPercent = total ? Number(((amount / total) * 100).toFixed(2)) : 0;
+    const remainingAmount = total - amount;
+    const remainingPercent = total ? Number((100 - paidPercent).toFixed(2)) : 0;
+    setFormData({
+      ...formData,
+      advancePayment: {
+        ...formData.advancePayment,
+        paidAmount: amount,
+        paidPercent,
+        remainingPayment: remainingAmount
+      },
+      finalPayment: {
+        ...formData.finalPayment,
+        totalPayment: total,
+        remainingPercent,
+        remainingAmount
+      }
+    });
+  };
+
+  const handleAdvanceTotalPaymentChange = (total: number) => {
+    const paidAmount = Math.round((total * formData.advancePayment.paidPercent) / 100);
+    const remainingAmount = Math.round((total * formData.finalPayment.remainingPercent) / 100);
+    setFormData({
+      ...formData,
+      advancePayment: {
+        ...formData.advancePayment,
+        totalPayment: total,
+        paidAmount,
+        remainingPayment: total - paidAmount
+      },
+      finalPayment: {
+        ...formData.finalPayment,
+        totalPayment: total,
+        remainingAmount
+      }
+    });
+  };
+
+  // ── Final Payment (Remaining % / Remaining Amount) mirrors Advance Payment (Paid % / Paid Amount) ──
+  const handleFinalRemainingPercentChange = (percent: number) => {
+    const total = formData.finalPayment.totalPayment;
+    const remainingAmount = Math.round((total * percent) / 100);
+    const paidPercent = 100 - percent;
+    const paidAmount = total - remainingAmount;
+    setFormData({
+      ...formData,
+      finalPayment: { ...formData.finalPayment, remainingPercent: percent, remainingAmount },
+      advancePayment: {
+        ...formData.advancePayment,
+        totalPayment: total,
+        paidPercent,
+        paidAmount,
+        remainingPayment: remainingAmount
+      }
+    });
+  };
+
+  const handleFinalRemainingAmountChange = (amount: number) => {
+    const total = formData.finalPayment.totalPayment;
+    const remainingPercent = total ? Number(((amount / total) * 100).toFixed(2)) : 0;
+    const paidAmount = total - amount;
+    const paidPercent = total ? Number((100 - remainingPercent).toFixed(2)) : 0;
+    setFormData({
+      ...formData,
+      finalPayment: { ...formData.finalPayment, remainingAmount: amount, remainingPercent },
+      advancePayment: {
+        ...formData.advancePayment,
+        totalPayment: total,
+        paidPercent,
+        paidAmount,
+        remainingPayment: amount
+      }
+    });
+  };
+
+  const handleFinalTotalPaymentChange = (total: number) => {
+    const remainingAmount = Math.round((total * formData.finalPayment.remainingPercent) / 100);
+    const paidAmount = Math.round((total * formData.advancePayment.paidPercent) / 100);
+    setFormData({
+      ...formData,
+      finalPayment: { ...formData.finalPayment, totalPayment: total, remainingAmount },
+      advancePayment: {
+        ...formData.advancePayment,
+        totalPayment: total,
+        paidAmount,
+        remainingPayment: total - paidAmount
+      }
+    });
+  };
+
   if (loading) {
     return (
       <>
@@ -509,7 +704,7 @@ const GroupTicketingForm = () => {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Top Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Supplier Account
@@ -584,10 +779,6 @@ const GroupTicketingForm = () => {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Airline, Group Category, Group Name, Total Seats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Airline
@@ -628,6 +819,10 @@ const GroupTicketingForm = () => {
                 className="w-full h-11 rounded border border-gray-300 bg-gray-100 px-4 text-sm text-gray-800 outline-none dark:border-gray-700 dark:bg-gray-700 dark:text-white/90 cursor-not-allowed"
               />
             </div>
+          </div>
+
+          {/* Airline, Group Category, Group Name, Total Seats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Group Name
@@ -652,10 +847,6 @@ const GroupTicketingForm = () => {
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
             </div>
-          </div>
-
-          {/* Group No, Group Class, Date of Purchase */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Group No
@@ -678,27 +869,6 @@ const GroupTicketingForm = () => {
                 onChange={(e) => setFormData({ ...formData, groupClass: e.target.value })}
                 placeholder="Enter group class"
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
-            </div>
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Date of Purchase
-              </label>
-              <DatePicker
-                selected={parseISODate(formData.dateOfPurchase)}
-                onChange={(date: Date | null) => {
-                  setFormData({ ...formData, dateOfPurchase: date ? dateToISO(date) : "" });
-                }}
-                dateFormat="dd-MM-yyyy"
-                placeholderText="DD-MM-YYYY"
-                wrapperClassName="w-full"
-                customInput={
-                  <input
-                    type="text"
-                    placeholder="DD-MM-YYYY"
-                    className="w-full h-11 px-4 text-sm border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  />
-                }
               />
             </div>
           </div>
@@ -1140,6 +1310,239 @@ const GroupTicketingForm = () => {
                 <option value="Sold">Sold</option>
                 <option value="Closed">Closed</option>
               </select>
+            </div>
+          </div>
+
+          {/* Advance Payment */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Advance Payment</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Supplier Account
+                </label>
+                <Select
+                  value={
+                    formData.advancePayment.supplierAccount._id
+                      ? { value: formData.advancePayment.supplierAccount._id, label: formData.advancePayment.supplierAccount.name }
+                      : null
+                  }
+                  onChange={(selectedOption) => {
+                    setFormData({
+                      ...formData,
+                      advancePayment: {
+                        ...formData.advancePayment,
+                        supplierAccount: selectedOption
+                          ? { name: selectedOption.label, _id: selectedOption.value }
+                          : { name: "", _id: "" }
+                      }
+                    });
+                  }}
+                  options={data3.map((account) => ({
+                    value: account._id,
+                    label: account.account_name,
+                  }))}
+                  placeholder="Select Supplier Account"
+                  isClearable
+                  isSearchable
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({ ...base, minHeight: '44px' }),
+                    menu: (base) => ({ ...base, zIndex: 9999 }),
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Date of Purchase
+                </label>
+                <DatePicker
+                  selected={parseISODate(formData.advancePayment.dateOfPurchase)}
+                  onChange={(date: Date | null) => {
+                    setFormData({
+                      ...formData,
+                      advancePayment: { ...formData.advancePayment, dateOfPurchase: date ? dateToISO(date) : "" }
+                    });
+                  }}
+                  dateFormat="dd-MM-yyyy"
+                  placeholderText="DD-MM-YYYY"
+                  wrapperClassName="w-full"
+                  customInput={
+                    <input
+                      type="text"
+                      placeholder="DD-MM-YYYY"
+                      className="w-full h-11 px-4 text-sm border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    />
+                  }
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Paid %
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={formData.advancePayment.paidPercent || ''}
+                  onChange={(e) => handleAdvancePaidPercentChange(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Paid Amount
+                </label>
+                <input
+                  type="text"
+                  value={formData.advancePayment.paidAmount ? formData.advancePayment.paidAmount.toLocaleString() : ''}
+                  onChange={(e) => handleAdvancePaidAmountChange(Number(e.target.value.replace(/,/g, '')) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Total Payment
+                </label>
+                <input
+                  type="text"
+                  value={formData.advancePayment.totalPayment ? formData.advancePayment.totalPayment.toLocaleString() : ''}
+                  onChange={(e) => handleAdvanceTotalPaymentChange(Number(e.target.value.replace(/,/g, '')) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Remaining Payment
+                </label>
+                <input
+                  type="text"
+                  value={formData.advancePayment.remainingPayment || formData.advancePayment.remainingPayment === 0 ? formData.advancePayment.remainingPayment.toLocaleString() : ''}
+                  onChange={(e) => setFormData({ ...formData, advancePayment: { ...formData.advancePayment, remainingPayment: Number(e.target.value.replace(/,/g, '')) || 0 } })}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Final Payment */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <h4 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Final Payment</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Supplier Account
+                </label>
+                <Select
+                  value={
+                    formData.finalPayment.supplierAccount._id
+                      ? { value: formData.finalPayment.supplierAccount._id, label: formData.finalPayment.supplierAccount.name }
+                      : null
+                  }
+                  onChange={(selectedOption) => {
+                    setFormData({
+                      ...formData,
+                      finalPayment: {
+                        ...formData.finalPayment,
+                        supplierAccount: selectedOption
+                          ? { name: selectedOption.label, _id: selectedOption.value }
+                          : { name: "", _id: "" }
+                      }
+                    });
+                  }}
+                  options={data3.map((account) => ({
+                    value: account._id,
+                    label: account.account_name,
+                  }))}
+                  placeholder="Select Supplier Account"
+                  isClearable
+                  isSearchable
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({ ...base, minHeight: '44px' }),
+                    menu: (base) => ({ ...base, zIndex: 9999 }),
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Due Date
+                </label>
+                <DatePicker
+                  selected={parseISODate(formData.finalPayment.dueDate)}
+                  onChange={(date: Date | null) => {
+                    setFormData({
+                      ...formData,
+                      finalPayment: { ...formData.finalPayment, dueDate: date ? dateToISO(date) : "" }
+                    });
+                  }}
+                  dateFormat="dd-MM-yyyy"
+                  placeholderText="DD-MM-YYYY"
+                  wrapperClassName="w-full"
+                  customInput={
+                    <input
+                      type="text"
+                      placeholder="DD-MM-YYYY"
+                      className="w-full h-11 px-4 text-sm border border-gray-300 rounded bg-white text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    />
+                  }
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Remaining %
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={formData.finalPayment.remainingPercent || ''}
+                  onChange={(e) => handleFinalRemainingPercentChange(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Remaining Amount
+                </label>
+                <input
+                  type="text"
+                  value={formData.finalPayment.remainingAmount ? formData.finalPayment.remainingAmount.toLocaleString() : ''}
+                  onChange={(e) => handleFinalRemainingAmountChange(Number(e.target.value.replace(/,/g, '')) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Total Payment
+                </label>
+                <input
+                  type="text"
+                  value={formData.finalPayment.totalPayment ? formData.finalPayment.totalPayment.toLocaleString() : ''}
+                  onChange={(e) => handleFinalTotalPaymentChange(Number(e.target.value.replace(/,/g, '')) || 0)}
+                  placeholder="0"
+                  className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Remaining Payment
+                </label>
+                <input
+                  type="text"
+                  value="0"
+                  readOnly
+                  className="w-full h-11 rounded border border-gray-300 bg-gray-100 px-4 text-sm text-gray-800 outline-none dark:border-gray-700 dark:bg-gray-700 dark:text-white/90 cursor-not-allowed"
+                />
+              </div>
             </div>
           </div>
 

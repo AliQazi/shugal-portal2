@@ -65,6 +65,7 @@ import ManageUmrahQueries from "./pages/manageUmrahPackagesQueries/UmrahPackageQ
 import ManageUmrahQueriesN from "./pages/manageUmrahPackagesQueries/UmrahPackageQueryN";
 import UmrahBookingDetail from "./pages/UmrahBookingDetail/UmrahBookingDetail";
 import XOReport from "./pages/XOReport";
+import UpcomingDueDates from "./pages/UpcomingDueDates";
 
 export default function App() {
   return (
@@ -95,6 +96,7 @@ export default function App() {
                 <Route path="/all-bookings" element={<AllBookings />} />
                 <Route path="/booking-detail/:id" element={<BookingDetail />} />
                 <Route path="/xo-report" element={<XOReport />} />
+                <Route path="/upcoming-due-dates" element={<UpcomingDueDates />} />
                 <Route path="/group-ticketing" element={<GroupTicketing />} />
                 <Route path="/group-ticketing/create" element={<GroupTicketingForm />} />
                 <Route path="/group-ticketing/create/:copyId" element={<GroupTicketingForm />} />

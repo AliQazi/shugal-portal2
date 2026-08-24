@@ -83,6 +83,12 @@ const navItems: NavItem[] = [
     path: "/xo-report",
     permission: "view_bookings",
   },
+  {
+    icon: <TableIcon />,
+    name: "Upcoming Due Dates",
+    path: "/upcoming-due-dates",
+    permission: "view_groups",
+  },
   // {
   //   icon: <MoonIcon />,
   //   name: "Umrah Calculator",

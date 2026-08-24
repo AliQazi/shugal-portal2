@@ -81,6 +81,47 @@ const PaymentSchema = new mongoose.Schema(
 );
 
 /* ===========================
+   SUPPLIER ACCOUNT (reused by advance/final payment)
+=========================== */
+const SupplierAccountSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "" },
+    _id: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
+/* ===========================
+   ADVANCE PAYMENT (save-only, no auto-calculations)
+=========================== */
+const AdvancePaymentSchema = new mongoose.Schema(
+  {
+    supplierAccount: { type: SupplierAccountSchema, default: () => ({}) },
+    dateOfPurchase: { type: Date },
+    paidPercent: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 },
+    totalPayment: { type: Number, default: 0 },
+    remainingPayment: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
+/* ===========================
+   FINAL PAYMENT (save-only, no auto-calculations)
+=========================== */
+const FinalPaymentSchema = new mongoose.Schema(
+  {
+    supplierAccount: { type: SupplierAccountSchema, default: () => ({}) },
+    dueDate: { type: Date },
+    remainingPercent: { type: Number, default: 0 },
+    remainingAmount: { type: Number, default: 0 },
+    totalPayment: { type: Number, default: 0 },
+    remainingPayment: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
+/* ===========================
    MAIN GROUP TICKETING
 =========================== */
 const GroupTicketingSchema = new mongoose.Schema(
@@ -144,6 +185,10 @@ const GroupTicketingSchema = new mongoose.Schema(
     price: PriceSchema,
 
     payments: [PaymentSchema],
+
+    // Save-only fields (set from the admin form); not read by any pre-save calc below.
+    advancePayment: { type: AdvancePaymentSchema, default: () => ({}) },
+    finalPayment: { type: FinalPaymentSchema, default: () => ({}) },
 
     pnr: { type: String },
     contactPersonPhone: { type: String },

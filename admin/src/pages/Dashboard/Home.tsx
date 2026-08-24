@@ -1,6 +1,7 @@
 import PageMeta from "../../components/common/PageMeta";
-import { ArrowRightIcon, Squares2X2Icon, HomeIcon, UserGroupIcon, CurrencyRupeeIcon, DocumentDuplicateIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ArrowRightIcon, ArrowTopRightOnSquareIcon, Squares2X2Icon, HomeIcon, UserGroupIcon, CurrencyRupeeIcon, DocumentDuplicateIcon, PlusIcon, CalendarDaysIcon } from "@heroicons/react/24/outline";
 import { Link } from "react-router";
+import dayjs from "dayjs";
 import AgentStatusChart from "../../components/charts/AgentStatusChart";
 import { useEffect, useState } from "react";
 import axiosInstance from "../../Api/axios";
@@ -235,11 +236,63 @@ interface RecentBooking {
   };
 }
 
+// ===== Upcoming Due Dates widget (compact preview of the full report) =====
+interface GroupTicketingRow {
+  _id: string;
+  groupNo?: string;
+  groupName?: string;
+  sector?: string;
+  internalStatus?: string;
+  user?: { name?: string };
+  advancePayment?: { supplierAccount?: { name?: string } };
+  finalPayment?: {
+    dueDate?: string;
+    remainingAmount?: number;
+    supplierAccount?: { name?: string };
+  };
+}
+
+interface DueDateItem {
+  id: string;
+  groupNo: string;
+  groupName: string;
+  sector: string;
+  supplierName: string;
+  dueDate: string;
+  remainingAmount: number;
+  daysLeft: number;
+  urgency: "Overdue" | "Due Today" | "Due Soon" | "Upcoming";
+}
+
+const fmtDueDate = (d?: string) => (d ? dayjs(d).format("DD MMM YYYY") : "N/A");
+
+const getDueUrgency = (daysLeft: number): DueDateItem["urgency"] => {
+  if (daysLeft < 0) return "Overdue";
+  if (daysLeft === 0) return "Due Today";
+  if (daysLeft <= 7) return "Due Soon";
+  return "Upcoming";
+};
+
+const dueUrgencyLabel = (item: Pick<DueDateItem, "urgency" | "daysLeft">) =>
+  item.urgency === "Overdue"
+    ? `Overdue ${Math.abs(item.daysLeft)}d`
+    : item.urgency === "Due Today"
+      ? "Due Today"
+      : `${item.daysLeft}d left`;
+
+const dueUrgencyBadgeClass: Record<DueDateItem["urgency"], string> = {
+  Overdue: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+  "Due Today": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+  "Due Soon": "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800",
+  Upcoming: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800",
+};
+
 export default function Home() {
   // ALL YOUR EXISTING STATE AND HOOKS - UNCHANGED
   const { user } = useAuth();
   const [unifiedGroups, setUnifiedGroups] = useState<UnifiedGroup[]>([]);
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [upcomingDueDates, setUpcomingDueDates] = useState<DueDateItem[]>([]);
   const [copied, setCopied] = useState(false);
   const [isMarginModalOpen, setIsMarginModalOpen] = useState(false);
   const [marginValue, setMarginValue] = useState("");
@@ -283,6 +336,46 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error("Error fetching recent bookings:", error);
+    }
+  };
+
+  const fetchUpcomingDueDates = async () => {
+    try {
+      const response = await axiosInstance.get("/group-ticketing");
+      if (response.data.success && Array.isArray(response.data.data)) {
+        const today = dayjs().startOf("day");
+        const items: DueDateItem[] = (response.data.data as GroupTicketingRow[])
+          .filter(
+            (g) =>
+              !!g.finalPayment?.dueDate &&
+              (g.finalPayment?.remainingAmount || 0) > 0 &&
+              g.internalStatus !== "Closed"
+          )
+          .map((g) => {
+            const dueDate = g.finalPayment!.dueDate as string;
+            const daysLeft = dayjs(dueDate).startOf("day").diff(today, "day");
+            return {
+              id: g._id,
+              groupNo: g.groupNo || "N/A",
+              groupName: g.groupName || "N/A",
+              sector: g.sector || "N/A",
+              supplierName:
+                g.finalPayment?.supplierAccount?.name ||
+                g.advancePayment?.supplierAccount?.name ||
+                g.user?.name ||
+                "N/A",
+              dueDate,
+              remainingAmount: g.finalPayment?.remainingAmount || 0,
+              daysLeft,
+              urgency: getDueUrgency(daysLeft),
+            };
+          })
+          .sort((a, b) => dayjs(a.dueDate).valueOf() - dayjs(b.dueDate).valueOf())
+          .slice(0, 5);
+        setUpcomingDueDates(items);
+      }
+    } catch (error: any) {
+      console.error("Error fetching upcoming due dates:", error);
     }
   };
 
@@ -350,6 +443,10 @@ export default function Home() {
 
     if (hasPermission(user, "dashboard_recent_bookings")) {
       fetchRecentBookings();
+    }
+
+    if (hasPermission(user, "view_groups")) {
+      fetchUpcomingDueDates();
     }
   }, [user]);
 
@@ -496,107 +593,165 @@ export default function Home() {
             </div>
           )}
 
-          {/* Recent Bookings Section - MODERN DESIGN */}
-          {hasPermission(user, "dashboard_recent_bookings") && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-1 rounded-full bg-linear-to-b from-blue-500 to-indigo-600" />
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Bookings</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Latest 5 bookings</p>
+          {/* Recent Bookings + Upcoming Due Dates - side by side, compact */}
+          {(hasPermission(user, "dashboard_recent_bookings") || hasPermission(user, "view_groups")) && (
+            <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Recent Bookings - COMPACT */}
+              {hasPermission(user, "dashboard_recent_bookings") && (
+                <div className={!hasPermission(user, "view_groups") ? "lg:col-span-2" : ""}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-1 rounded-full bg-linear-to-b from-blue-500 to-indigo-600" />
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Recent Bookings</h2>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Latest 5 bookings</p>
+                      </div>
+                    </div>
+                    <Link
+                      to="/all-bookings"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    >
+                      View All
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </Link>
                   </div>
-                </div>
-                <Link
-                  to="/all-bookings"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                >
-                  View All
-                  <ArrowRightIcon className="h-4 w-4" />
-                </Link>
-              </div>
 
-              {recentBookings.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-12 text-center border border-gray-100 dark:border-gray-700">
-                  <div className="text-gray-300 dark:text-gray-600 mb-4">
-                    <DocumentDuplicateIcon className="w-16 h-16 mx-auto" />
-                  </div>
-                  <p className="text-gray-500 dark:text-gray-400 font-medium">No recent bookings</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentBookings.map((booking) => {
-                    const statusColors = {
-                      "on hold": "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
-                      "confirmed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-                      "cancelled": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-                      "processing": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
-                    };
-                    const statusClass = statusColors[booking.status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800";
+                  {recentBookings.length === 0 ? (
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-8 text-center border border-gray-100 dark:border-gray-700">
+                      <div className="text-gray-300 dark:text-gray-600 mb-3">
+                        <DocumentDuplicateIcon className="w-12 h-12 mx-auto" />
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-medium text-sm">No recent bookings</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {recentBookings.map((booking) => {
+                        const statusColors = {
+                          "on hold": "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
+                          "confirmed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+                          "cancelled": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+                          "processing": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
+                        };
+                        const statusClass = statusColors[booking.status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800";
 
-                    return (
-                      <Link
-                        key={booking._id}
-                        to={`/all-bookings`}
-                        className="block bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 p-5 border border-gray-100 dark:border-gray-700 group"
-                      >
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="flex-1 min-w-37.5">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                {booking.bookingReference}
-                              </span>
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusClass}`}>
-                                {booking.status}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                              <span className="flex items-center gap-1.5">
-                                <UserGroupIcon className="w-4 h-4" />
-                                {booking.contactPersonName}
-                              </span>
-                              <span className="flex items-center gap-1.5">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                {booking.totalPassengers} PAX
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex-1 min-w-30 text-center hidden sm:block">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Sector</div>
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                              {booking.sector}
-                            </div>
-                            {booking.airline && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {booking.airline.airline_name || booking.airline.name}
+                        return (
+                          <Link
+                            key={booking._id}
+                            to={`/all-bookings`}
+                            className="block bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-3.5 border border-gray-100 dark:border-gray-700 group"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                    {booking.bookingReference}
+                                  </span>
+                                  <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusClass}`}>
+                                    {booking.status}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+                                  <span className="flex items-center gap-1 truncate">
+                                    <UserGroupIcon className="w-3.5 h-3.5 shrink-0" />
+                                    {booking.contactPersonName}
+                                  </span>
+                                  <span>{booking.totalPassengers} PAX</span>
+                                  <span className="truncate">{booking.sector}</span>
+                                </div>
                               </div>
-                            )}
-                          </div>
 
-                          <div className="text-right min-w-25">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Total</div>
-                            <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                              PKR {booking.pricing.grandTotal.toLocaleString()}
+                              <div className="text-right shrink-0">
+                                <div className="text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                  PKR {booking.pricing.grandTotal.toLocaleString()}
+                                </div>
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 whitespace-nowrap">
+                                  {new Date(booking.departureDate).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {new Date(booking.departureDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </div>
-                          </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                          <div className="text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <ArrowRightIcon className="w-5 h-5" />
+              {/* Upcoming Due Dates - COMPACT */}
+              {hasPermission(user, "view_groups") && (
+                <div className={!hasPermission(user, "dashboard_recent_bookings") ? "lg:col-span-2" : ""}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-1 rounded-full bg-linear-to-b from-amber-500 to-red-600" />
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Upcoming Due Dates</h2>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Nearest group final payments</p>
+                      </div>
+                    </div>
+                    <Link
+                      to="/upcoming-due-dates"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    >
+                      View More
+                      <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                    </Link>
+                  </div>
+
+                  {upcomingDueDates.length === 0 ? (
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-8 text-center border border-gray-100 dark:border-gray-700">
+                      <div className="text-gray-300 dark:text-gray-600 mb-3">
+                        <CalendarDaysIcon className="w-12 h-12 mx-auto" />
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-medium text-sm">No upcoming due dates</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {upcomingDueDates.map((item) => (
+                        <Link
+                          key={item.id}
+                          to="/upcoming-due-dates"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-3.5 border border-gray-100 dark:border-gray-700 group"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                  {item.groupName}
+                                </span>
+                                <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${dueUrgencyBadgeClass[item.urgency]}`}>
+                                  {dueUrgencyLabel(item)}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+                                <span className="truncate">{item.sector}</span>
+                                <span className="flex items-center gap-1">
+                                  <CalendarDaysIcon className="w-3.5 h-3.5 shrink-0" />
+                                  {fmtDueDate(item.dueDate)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-bold text-red-600 dark:text-red-400 whitespace-nowrap">
+                                PKR {item.remainingAmount.toLocaleString()}
+                              </div>
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 whitespace-nowrap truncate max-w-30">
+                                {item.supplierName}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -172,8 +172,6 @@ const normalizeHotel = (hotel) => {
     },
     location: {
       city: hotel.city_name || "",
-      distance:
-        hotel.hotel_distance != null ? String(hotel.hotel_distance) : "",
     },
     rating: 0,
     checkIn: toDateOrUndefined(hotel.checkin),
@@ -422,8 +420,6 @@ export const buildUpSkyUmrahBookingPayload = ({
     return {
       hotel_name: hotel.hotel_name || "",
       city: hotel.city_name || "",
-      distance:
-        hotel.hotel_distance != null ? String(hotel.hotel_distance) : "",
       buying_price: matchedDetail?.buying_pkr ?? "0",
       selling_price: matchedDetail?.selling_pkr ?? "0",
       checkin: hotel.checkin || "",

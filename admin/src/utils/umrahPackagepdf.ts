@@ -17,7 +17,6 @@ export interface Flight {
 export interface Hotel {
   name?: string;
   city?: string;
-  distance?: number | string;
 }
 
 export interface PackageTotals {
@@ -270,9 +269,8 @@ const renderPDFContent = (
           ? pkg.hotels.map((h) => [
               h.name || "Standard",
               h.city || "-",
-              h.distance ? `${h.distance}` : "-",
             ])
-          : [["Standard", "-", "-"]];
+          : [["Standard", "-"]];
 
       // FLIGHT TABLE (Left)
       autoTable(doc, {
@@ -289,7 +287,7 @@ const renderPDFContent = (
       // HOTEL TABLE (Right)
       autoTable(doc, {
         startY: yPosition,
-        head: [["Hotel", "City", "Dist."]],
+        head: [["Hotel", "City"]],
         body: hotelRows,
         margin: { left: 15 + tableWidth + 4 },
         tableWidth: tableWidth,

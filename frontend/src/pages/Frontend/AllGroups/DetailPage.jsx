@@ -758,24 +758,6 @@ function HotelCard({ hotel, city }) {
         >
           <span
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              padding: "2px 7px",
-              borderRadius: "999px",
-              background: "linear-gradient(135deg, #ff6b6b, #ff8787)",
-              color: "#fff",
-              fontWeight: "600",
-              fontSize: "0.6rem",
-              width: "fit-content",
-            }}
-          >
-            <FaMapMarkerAlt size={10} />
-            {hotel?.distance} m
-          </span>
-
-          <span
-            style={{
               display: "flex",
               alignItems: "center",
               gap: "3px",

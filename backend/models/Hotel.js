@@ -53,12 +53,6 @@ const hotelSchema = new mongoose.Schema(
       trim: true,
     },
 
-    distance: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-
     rating: {
       type: Number,
       default: 0,

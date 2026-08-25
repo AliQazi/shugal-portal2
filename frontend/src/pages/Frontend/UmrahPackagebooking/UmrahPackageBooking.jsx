@@ -741,7 +741,7 @@ export default function UmrahBooking() {
 
   return (
     <div className="min-h-screen pt-1 font-sans">
-      <div className="mx-auto max-w-[1600px]">
+      <div>
         {/* Header */}
         {/* <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
@@ -2193,9 +2193,6 @@ export default function UmrahBooking() {
                           <p className="text-xs font-medium text-gray-500">
                             {[
                               hotel.location?.city,
-                              hotel.location?.distance
-                                ? `${hotel.location.distance}`
-                                : "",
                               `${hotel.nightCount || hotel.nights || 0} nights`,
                             ]
                               .filter(Boolean)

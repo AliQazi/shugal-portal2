@@ -92,7 +92,6 @@ interface HotelForm {
   supplier: SupplierAccount;
   location: {
     city: string;
-    distance?: string;
     mapUrl?: string;
   };
   rating: number;
@@ -139,7 +138,6 @@ interface HotelOption {
   data?: {
     hotelName: string;
     city?: string;
-    distance?: number;
     rating?: number;
     mapUrl?: string;
     buyingPrice?: number;
@@ -321,7 +319,6 @@ const UpdateUmrahPackage = () => {
             data: {
               hotelName: h.hotelName,
               city: h.city,
-              distance: h.distance,
               rating: h.rating,
               mapUrl: h.mapUrl,
               buyingPrice: h.buyingPrice,
@@ -669,7 +666,6 @@ const UpdateUmrahPackage = () => {
           },
           location: {
             city: h.location?.city || "",
-            distance: h.location?.distance || "",
             mapUrl: h.location?.mapUrl || "",
           },
           rating: Number(h.rating || 0),
@@ -1020,9 +1016,9 @@ const UpdateUmrahPackage = () => {
     );
   };
 
-  // Builds the hotel-row fields (name/city/distance/rating + buying/selling incl. the
+  // Builds the hotel-row fields (name/city/rating + buying/selling incl. the
   // per-room-type breakdown) implied by a Rate Volume - pulling the hotel's own details
-  // (distance, rating, map URL) from the already-loaded Hotel list via its hotelId.
+  // (rating, map URL) from the already-loaded Hotel list via its hotelId.
   const computeVolumeFields = (hotel: HotelForm, volume: RateVolumeData): Partial<HotelForm> => {
     const buying = volume.buyingPrice || 0;
     const buyingRoe = volume.buyingRoe || 1;
@@ -1049,7 +1045,6 @@ const UpdateUmrahPackage = () => {
       fields.name = matchedHotelOption.data?.hotelName || matchedHotelOption.label;
       fields.location = {
         city: matchedHotelOption.data?.city || volume.city || hotel.location.city,
-        distance: matchedHotelOption.data?.distance != null ? String(matchedHotelOption.data.distance) : hotel.location.distance,
         mapUrl: matchedHotelOption.data?.mapUrl || hotel.location.mapUrl,
       };
       fields.rating = Number(matchedHotelOption.data?.rating || 0);
@@ -1150,7 +1145,6 @@ const UpdateUmrahPackage = () => {
       name: selected.data?.hotelName || selected.label,
       location: {
         city: selected.data?.city || hotel.location.city,
-        distance: selected.data?.distance != null ? String(selected.data.distance) : "",
         mapUrl: selected.data?.mapUrl || "",
       },
       rating: Number(selected.data?.rating || 0),
@@ -1179,7 +1173,7 @@ const UpdateUmrahPackage = () => {
     });
   };
 
-  // Fill Hotel Name/City/Distance + Buying/Selling price/ROE/currency (and the
+  // Fill Hotel Name/City + Buying/Selling price/ROE/currency (and the
   // per-room-type breakdown) from a saved Rate Volume, triggered by the "Rate Volume"
   // dropdown. Check-in/check-out are left untouched.
   const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
@@ -1354,6 +1348,24 @@ const UpdateUmrahPackage = () => {
                     "";
                   formik.setFieldValue("packageName", sector);
                   formik.setFieldValue("availableRooms", group?.totalSeats || 0);
+
+                  // Auto-set the 1st hotel's Check-in Date from the first flight's
+                  // arrival date (falls back to its departure date), since that's
+                  // when the group actually lands and can check into the hotel.
+                  const firstFlight = group?.flights?.[0];
+                  const flightDate = firstFlight?.arrDate || firstFlight?.depDate;
+                  if (flightDate) {
+                    const isoCheckIn = flightDate.slice(0, 10);
+                    const updatedHotels = [...formik.values.hotels];
+                    if (updatedHotels.length > 0) {
+                      const firstHotel = { ...updatedHotels[0], checkIn: isoCheckIn };
+                      if (firstHotel.nights > 0) {
+                        firstHotel.checkOut = calculateCheckOut(isoCheckIn, firstHotel.nights);
+                      }
+                      updatedHotels[0] = firstHotel;
+                      formik.setFieldValue("hotels", updatedHotels);
+                    }
+                  }
                 }}
                 className="border p-2 w-full rounded text-sm h-9"
                 disabled={loadingGroups}
@@ -1686,7 +1698,7 @@ const UpdateUmrahPackage = () => {
                           const selected = option as HotelOption;
                           if (!selected) {
                             clearSelectedRateVolume(index);
-                            updateHotel(index, { name: "", hotelId: "", location: { city: hotel.location.city, distance: "", mapUrl: "" }, rating: 0 });
+                            updateHotel(index, { name: "", hotelId: "", location: { city: hotel.location.city, mapUrl: "" }, rating: 0 });
                             return;
                           }
                           if (selected.data) {
@@ -1726,8 +1738,8 @@ const UpdateUmrahPackage = () => {
                     </div>
                   </div>
 
-                  {/* Row 2: Check-in, Check-out, Nights, Distance, Buying Price/Room, ROE, Currency, Selling Price/Room, Selling ROE */}
-                  <div className="grid grid-cols-2 md:grid-cols-10 gap-3 items-end">
+                  {/* Row 2: Check-in, Check-out, Nights, Buying Price/Room, ROE, Currency, Selling Price/Room, Selling ROE */}
+                  <div className="grid grid-cols-2 md:grid-cols-9 gap-3 items-end">
                     <div>
                       <label className="block text-xs font-semibold mb-1">Check-in Date</label>
                       <DatePicker
@@ -1755,16 +1767,6 @@ const UpdateUmrahPackage = () => {
                         readOnly
                         className="border p-2 w-full rounded text-xs h-9 bg-gray-100"
                         placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1">Distance from Haram (M)</label>
-                      <input
-                        type="text"
-                        value={hotel.location.distance || ""}
-                        onChange={(e) => updateHotel(index, { location: { ...hotel.location, distance: e.target.value } })}
-                        className="border p-2 w-full rounded text-xs h-9"
-                        placeholder=""
                       />
                     </div>
                     <div>
@@ -2022,15 +2024,20 @@ const UpdateUmrahPackage = () => {
             <div className="flex justify-center mt-2">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  // The new hotel's Check-in Date starts where the previous
+                  // hotel's Check-out Date left off, so consecutive hotel stays
+                  // chain together instead of both defaulting to blank.
+                  const hotels = formik.values.hotels;
+                  const previousHotel = hotels[hotels.length - 1];
                   formik.setFieldValue("hotels", [
-                    ...formik.values.hotels,
+                    ...hotels,
                     {
                       name: "",
                       supplier: { name: "", _id: "" },
-                      location: { city: "", distance: "", mapUrl: "" },
+                      location: { city: "", mapUrl: "" },
                       rating: 0,
-                      checkIn: "",
+                      checkIn: previousHotel?.checkOut || "",
                       checkOut: "",
                       nights: 0,
                       nightCount: 0,
@@ -2046,8 +2053,8 @@ const UpdateUmrahPackage = () => {
                       quadRoom: { buyingPrice: 0, buyingRoe: 1, buyingCurrency: "PKR", sellingPrice: 0, sellingRoe: 1, sellingCurrency: "PKR" },
                       sharedRoom: { buyingPrice: 0, buyingRoe: 1, buyingCurrency: "PKR", sellingPrice: 0, sellingRoe: 1, sellingCurrency: "PKR" },
                     },
-                  ])
-                }
+                  ]);
+                }}
                 className="bg-green-600 text-white px-6 py-2 rounded text-sm hover:bg-green-700"
               >
                 + Add More Hotels

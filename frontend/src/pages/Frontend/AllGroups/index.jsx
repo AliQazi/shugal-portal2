@@ -171,9 +171,6 @@ const HotelCellLines = ({ pkg }) => {
         <div key={hotel._id || i} className="text-xs leading-relaxed">
           <span className="font-bold text-gray-800">{tag}:</span>{" "}
           <span className="text-gray-700">{hotel.name || "-"}</span>
-          {hotel.distance && hotel.distance !== "-" && (
-            <span className="text-gray-500"> ({hotel.distance})</span>
-          )}
         </div>
       ))}
     </div>
@@ -719,7 +716,6 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             _id: h._id || `${h.name}-${index}`,
             name: h.name || "",
             city: h.location?.city || "",
-            distance: h.location?.distance || "-",
             nightCount: Number(h?.nightCount ?? h?.nights ?? 0) || 0,
             rating: h.rating || 0,
             mapUrl: h.location?.mapUrl || "",

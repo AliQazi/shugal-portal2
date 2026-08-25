@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router";
 import {
   Table,
   TableCell,
@@ -41,10 +42,8 @@ interface HotelData {
   name: string;
   location?: {
     city?: string;
-    distance?: string | number;
     mapUrl?: string;
   };
-  distance?: number | string;
 }
 
 interface TransportData {
@@ -88,6 +87,7 @@ interface PackageData {
     childWithBed?: number;
     infant?: number;
     incentive?: number;
+    margin?: number;
   };
 
   flights: FlightData[];
@@ -335,8 +335,143 @@ const getStatusClass = (status?: string) => {
   return "border-gray-200 bg-gray-50 text-gray-700";
 };
 
+const packagePricingRows: Array<{
+  label: string;
+  key: "double" | "triple" | "quad" | "shared";
+}> = [
+  { label: "Double", key: "double" },
+  { label: "Triple", key: "triple" },
+  { label: "Quad", key: "quad" },
+  { label: "Shared", key: "shared" },
+];
+
+const PackagePricingMiniTable = ({
+  pkg,
+  canEdit,
+  onEditFull,
+  onApplyMargin,
+}: {
+  pkg: PackageData;
+  canEdit: boolean;
+  onEditFull: () => void;
+  onApplyMargin: (packageId: string, margin: number) => Promise<boolean>;
+}) => {
+  const totals = pkg.packageTotals || {};
+  const savedMargin = totals.margin || 0;
+
+  const [marginInput, setMarginInput] = useState(savedMargin);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    setMarginInput(savedMargin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pkg._id, savedMargin]);
+
+  // The base price (before the currently saved margin) is what the "Apply
+  // Margin" button adds the new margin on top of, so re-applying replaces
+  // the previous margin instead of stacking on top of it.
+  const baseTotals = {
+    double: (totals.double || 0) - savedMargin,
+    triple: (totals.triple || 0) - savedMargin,
+    quad: (totals.quad || 0) - savedMargin,
+    shared: (totals.shared || 0) - savedMargin,
+  };
+
+  const previewTotals: Record<string, number> = {
+    double: baseTotals.double + marginInput,
+    triple: baseTotals.triple + marginInput,
+    quad: baseTotals.quad + marginInput,
+    shared: baseTotals.shared + marginInput,
+  };
+
+  const handleApply = async () => {
+    setApplying(true);
+    await onApplyMargin(pkg._id, marginInput);
+    setApplying(false);
+  };
+
+  const inputClass =
+    "w-24 rounded border border-gray-300 bg-white px-1.5 py-1 text-xs text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white";
+
+  return (
+    <div className="w-fit">
+      <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900/40">
+        <button
+          type="button"
+          onClick={() => canEdit && onEditFull()}
+          disabled={!canEdit}
+          className="absolute right-1.5 top-1.5 z-10 flex items-center justify-center rounded-md bg-white p-1 text-blue-600 shadow-sm ring-1 ring-gray-200 transition hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:ring-white/10"
+          title={
+            canEdit
+              ? "Edit Full Pricing"
+              : "You don't have permission to manage Umrah packages"
+          }
+        >
+          <PencilIcon className="h-3 w-3" />
+        </button>
+
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <th className="px-2 py-1.5 text-left font-bold">Type</th>
+              <th className="px-2 py-1.5 pr-8 text-left font-bold">Selling</th>
+            </tr>
+          </thead>
+          <tbody>
+            {packagePricingRows.map((row) => (
+              <tr
+                key={row.key}
+                className="border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300"
+              >
+                <td className="px-2 py-1.5 font-bold">{row.label}</td>
+                <td className="px-2 py-1.5 font-semibold">
+                  {formatMoney(previewTotals[row.key])}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {canEdit && (
+        <div className="mt-2 space-y-1">
+          <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Margin (PKR)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={marginInput ? marginInput.toLocaleString("en-PK") : ""}
+              onChange={(event) =>
+                setMarginInput(parseFormattedNumber(event.target.value))
+              }
+              placeholder="0"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={handleApply}
+              disabled={applying}
+              className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-50"
+            >
+              {applying ? "Applying..." : "Apply"}
+            </button>
+          </div>
+          {savedMargin !== 0 && (
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+              Last applied margin: PKR {savedMargin.toLocaleString("en-PK")}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ManageUmrahPackage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const canView = hasPermission(user, "view_umrah_packages");
   const canUseActions = hasPermission(user, "umrah_packages_action_buttons");
@@ -638,11 +773,7 @@ const ManageUmrahPackage = () => {
       toast.error("You don't have permission to manage Umrah packages");
       return;
     }
-    window.open(
-      `/admin-portal/create-package/${pkg._id}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    navigate(`/create-package/${pkg._id}`);
   };
 
   const handleOpenPricingModal = (pkg: PackageData) => {
@@ -715,10 +846,14 @@ const ManageUmrahPackage = () => {
 
     setPricingSaving(true);
 
+    // This form doesn't touch margin, so carry the previously saved margin
+    // through unchanged instead of letting it be wiped back to 0.
+    const margin = pricingPackage.packageTotals?.margin || 0;
+
     try {
       const { data } = await axiosInstance.patch(
         `/umrahpackages/${pricingPackage._id}/package-totals`,
-        { packageTotals: pricingTotals }
+        { packageTotals: { ...pricingTotals, margin } }
       );
 
       if (!data?.success) {
@@ -728,7 +863,7 @@ const ManageUmrahPackage = () => {
       setPackages((prev) =>
         prev.map((pkg) =>
           pkg._id === pricingPackage._id
-            ? { ...pkg, packageTotals: { ...pricingTotals } }
+            ? { ...pkg, packageTotals: { ...pricingTotals, margin } }
             : pkg
         )
       );
@@ -740,6 +875,58 @@ const ManageUmrahPackage = () => {
       toast.error("Failed to update package pricing");
     } finally {
       setPricingSaving(false);
+    }
+  };
+
+  const handleApplyMargin = async (
+    packageId: string,
+    margin: number
+  ): Promise<boolean> => {
+    if (!canUseActions) {
+      toast.error("You don't have permission to manage Umrah packages");
+      return false;
+    }
+
+    const target = packages.find((pkg) => pkg._id === packageId);
+    if (!target) return false;
+
+    const totals = target.packageTotals || {};
+    const savedMargin = totals.margin || 0;
+
+    // Recompute from the base price (current totals minus the previously
+    // saved margin) so re-applying replaces the old margin instead of
+    // stacking on top of it. Only double/triple/quad/shared are touched.
+    const updatedTotals = {
+      ...totals,
+      double: (totals.double || 0) - savedMargin + margin,
+      triple: (totals.triple || 0) - savedMargin + margin,
+      quad: (totals.quad || 0) - savedMargin + margin,
+      shared: (totals.shared || 0) - savedMargin + margin,
+      margin,
+    };
+
+    try {
+      const { data } = await axiosInstance.patch(
+        `/umrahpackages/${packageId}/package-totals`,
+        { packageTotals: updatedTotals }
+      );
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to apply margin");
+      }
+
+      setPackages((prev) =>
+        prev.map((pkg) =>
+          pkg._id === packageId ? { ...pkg, packageTotals: updatedTotals } : pkg
+        )
+      );
+
+      toast.success("Margin applied and pricing updated");
+      return true;
+    } catch (error) {
+      console.error("Error applying margin:", error);
+      toast.error("Failed to apply margin");
+      return false;
     }
   };
 
@@ -812,7 +999,6 @@ const ManageUmrahPackage = () => {
             hotels: pkg.hotels.map((hotel) => ({
               name: hotel.name,
               city: hotel.location?.city || "-",
-              distance: hotel.location?.distance || hotel.distance || "-",
             })),
             packageTotals: {
               double: pkg.packageTotals?.double || 0,
@@ -967,6 +1153,7 @@ const ManageUmrahPackage = () => {
                 {[
                   // "Package Name",
                   "Package Details",
+                  "Flight Details",
                   "Price",
                   "Hotels",
                   // "Visa Type",
@@ -1057,7 +1244,7 @@ const ManageUmrahPackage = () => {
                         </div>
                       </TableCell> */}
 
-                      <TableCell className="min-w-40 px-3 py-4">
+                      <TableCell className="px-3 py-4">
                         <div className="space-y-1 text-sm font-semibold">
                           <p className="text-gray-700 dark:text-gray-300">
                             Sector: {groupTicketInfo.sector}
@@ -1090,125 +1277,69 @@ const ManageUmrahPackage = () => {
                             </div>
                           </div>
 
-                          <p className="text-green-600">
-                            Departure: {departureRange.from}
-                          </p>
-                          <p className="text-red-500">
-                            Return: {departureRange.to}
-                          </p>
-
                           <p className="text-xs text-gray-700 dark:text-gray-300">
                             Created At: {formatDate(pkg.createdAt)}
                           </p>
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-90 px-3 py-4">
-                        <div className="relative overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
-                          <button
-                            onClick={() =>
-                              canUseActions && handleOpenPricingModal(pkg)
-                            }
-                            disabled={!canUseActions}
-                            className="absolute right-1.5 top-1.5 z-10 flex items-center justify-center rounded-md bg-white p-1 text-blue-600 shadow-sm ring-1 ring-gray-200 transition hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:ring-white/10"
-                            title={
-                              canUseActions
-                                ? "Edit Pricing"
-                                : "You don't have permission to manage Umrah packages"
-                            }
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
-
-                          <table className="w-full border-collapse text-sm">
-                            <thead>
-                              <tr className="bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100">
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
-                                  Type
-                                </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
-                                  Double
-                                </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
-                                  Triple
-                                </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
-                                  Quad
-                                </th>
-                                <th className="border-b border-gray-200 pl-3 pr-8 py-2 text-left font-extrabold dark:border-white/10">
-                                  Shared
-                                </th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              <tr className="bg-gray-50 dark:bg-white/4">
-                                <td className="px-3 py-2 font-extrabold text-green-600">
-                                  Selling
-                                </td>
-                                <td className="px-3 py-2 font-bold text-green-600">
-                                  {formatMoney(pkg.packageTotals?.double)}
-                                </td>
-                                <td className="px-3 py-2 font-bold text-green-600">
-                                  {formatMoney(pkg.packageTotals?.triple)}
-                                </td>
-                                <td className="px-3 py-2 font-bold text-green-600">
-                                  {formatMoney(pkg.packageTotals?.quad)}
-                                </td>
-                                <td className="pl-3 pr-8 py-2 font-bold text-green-600">
-                                  {formatMoney(pkg.packageTotals?.shared)}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                      <TableCell className="min-w-32 px-3 py-4">
+                        <div className="space-y-1 text-xs font-semibold">
+                          <p className="text-green-600 dark:text-green-400">
+                            Departure: {departureRange.from}
+                          </p>
+                          <p className="text-red-500 dark:text-red-400">
+                            Return: {departureRange.to}
+                          </p>
                         </div>
 
-                        <div className="mt-3 overflow-hidden rounded-md border border-gray-200 dark:border-white/10">
-                          <table className="w-full border-collapse text-sm">
+                        <div className="mt-3 w-fit overflow-hidden rounded-lg border border-gray-200 text-xs dark:border-gray-700">
+                          <table className="w-full border-collapse">
                             <thead>
-                              <tr className="bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100">
-                                <th className="px-3 py-2 text-left font-extrabold">
-                                  Tot.
+                              <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                <th className="px-2 py-1.5 text-left font-bold">
+                                  Seats
                                 </th>
-                                {/* <th className="px-3 py-2 text-left font-extrabold">
-                                  Req
-                                </th> */}
-                                <th className="px-3 py-2 text-left font-extrabold text-green-600">
-                                  Con
-                                </th>
-                                <th className="px-3 py-2 text-left font-extrabold text-red-500">
-                                  Can
-                                </th>
-                                <th className="px-3 py-2 text-left font-extrabold">
-                                  Rem
+                                <th className="px-2 py-1.5 pr-8 text-left font-bold">
+                                  Count
                                 </th>
                               </tr>
                             </thead>
 
                             <tbody>
-                              <tr className="bg-gray-50 text-gray-700 dark:bg-white/4 dark:text-gray-300">
-                                <td className="px-3 py-2">
-                                  {seatStats.totalSeats}
-                                </td>
-                                {/* <td className="px-3 py-2">
-                                  {seatStats.pendingBookings}
-                                </td> */}
-                                <td className="px-3 py-2">
-                                  {seatStats.bookedSeats}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {seatStats.cancelledBookings}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {seatStats.remainingSeats}
-                                </td>
-                              </tr>
+                              {[
+                                { label: "Tot.", value: seatStats.totalSeats, className: "text-gray-700 dark:text-gray-300" },
+                                { label: "Con", value: seatStats.bookedSeats, className: "text-green-600 dark:text-green-400" },
+                                { label: "Can", value: seatStats.cancelledBookings, className: "text-red-500 dark:text-red-400" },
+                                { label: "Rem", value: seatStats.remainingSeats, className: "text-gray-700 dark:text-gray-300" },
+                              ].map((row) => (
+                                <tr
+                                  key={row.label}
+                                  className="border-t border-gray-100 dark:border-gray-800"
+                                >
+                                  <td className={`px-2 py-1.5 font-bold ${row.className}`}>
+                                    {row.label}
+                                  </td>
+                                  <td className={`px-2 py-1.5 font-semibold ${row.className}`}>
+                                    {row.value}
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
                       </TableCell>
 
-                      <TableCell className="min-w-105 px-3 py-4">
+                      <TableCell className="px-3 py-4">
+                        <PackagePricingMiniTable
+                          pkg={pkg}
+                          canEdit={canUseActions}
+                          onEditFull={() => handleOpenPricingModal(pkg)}
+                          onApplyMargin={handleApplyMargin}
+                        />
+                      </TableCell>
+
+                      <TableCell className="px-3 py-4">
                         {/* <p className="mb-4 text-sm font-extrabold uppercase text-gray-900 dark:text-gray-100">
                           {sectorText}
                         </p> */}
@@ -1217,14 +1348,11 @@ const ManageUmrahPackage = () => {
                           <table className="w-full border-collapse text-xs">
                             <thead>
                               <tr className="bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100">
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
+                                <th className="border-b border-gray-200 px-2 py-1.5 text-left font-extrabold dark:border-white/10">
                                   Hotel
                                 </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
+                                <th className="border-b border-gray-200 px-2 py-1.5 text-left font-extrabold dark:border-white/10">
                                   City
-                                </th>
-                                <th className="border-b border-gray-200 px-3 py-2 text-left font-extrabold dark:border-white/10">
-                                  Distance
                                 </th>
                               </tr>
                             </thead>
@@ -1240,24 +1368,19 @@ const ManageUmrahPackage = () => {
                                         : "bg-gray-50 dark:bg-white/4"
                                     }
                                   >
-                                    <td className="border-b border-gray-200 px-3 py-2 font-bold uppercase text-gray-700 last:border-b-0 dark:border-white/10 dark:text-gray-300">
+                                    <td className="border-b border-gray-200 px-2 py-1.5 font-bold uppercase text-gray-700 last:border-b-0 dark:border-white/10 dark:text-gray-300">
                                       {hotel.name || "N/A"}
                                     </td>
-                                    <td className="border-b border-gray-200 px-3 py-2 font-bold uppercase text-gray-700 last:border-b-0 dark:border-white/10 dark:text-gray-300">
+                                    <td className="border-b border-gray-200 px-2 py-1.5 font-bold uppercase text-gray-700 last:border-b-0 dark:border-white/10 dark:text-gray-300">
                                       {hotel.location?.city || "N/A"}
-                                    </td>
-                                    <td className="border-b border-gray-200 px-3 py-2 font-bold text-gray-700 last:border-b-0 dark:border-white/10 dark:text-gray-300">
-                                      {hotel.location?.distance ||
-                                        hotel.distance ||
-                                        "N/A"}
                                     </td>
                                   </tr>
                                 ))
                               ) : (
                                 <tr>
                                   <td
-                                    colSpan={3}
-                                    className="px-3 py-4 text-center text-gray-500"
+                                    colSpan={2}
+                                    className="px-2 py-3 text-center text-gray-500"
                                   >
                                     No hotel data
                                   </td>
@@ -1301,7 +1424,7 @@ const ManageUmrahPackage = () => {
                         </label>
                       </TableCell> */}
 
-                      <TableCell className="px-3 py-4">
+                      <TableCell className="w-24 px-3 md:px-6 py-4">
                         <div className="flex flex-col-reverse gap-2">
                           <div className="flex items-center justify-center gap-2">
                             <label className="relative inline-flex cursor-pointer items-center">
@@ -1345,10 +1468,7 @@ const ManageUmrahPackage = () => {
                             <button
                               onClick={() =>
                                 canUseActions &&
-                                window.open(
-                                  `/admin-portal/update-umrah-package/${pkg._id}`,
-                                  "_blank"
-                                )
+                                navigate(`/update-umrah-package/${pkg._id}`)
                               }
                               disabled={!canUseActions}
                               className="flex justify-center flex-1 rounded-lg bg-blue-50 p-2 text-blue-600 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500/10"

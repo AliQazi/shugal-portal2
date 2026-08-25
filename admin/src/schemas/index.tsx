@@ -167,9 +167,6 @@ export const hotelSchema = Yup.object().shape({
     .min(1, "Rating must be at least 1")
     .max(7, "Rating cannot be more than 7"),
   address: Yup.string().required("Address is required"),
-  distanceFromHaram: Yup.number()
-    .required("Distance from Haram is required")
-    .min(0, "Distance cannot be negative"),
   staffName: Yup.string().required("Staff Name is required"),
   staffNumber: Yup.string()
     .required("Staff Number is required")

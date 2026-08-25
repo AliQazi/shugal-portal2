@@ -9,7 +9,6 @@ export const createHotel = async (req, res) => {
       hotelName,
       name,
       city,
-      distance,
       rating,
       mapUrl,
       roomOptions,
@@ -50,7 +49,6 @@ export const createHotel = async (req, res) => {
       hotelName,
       name: name || hotelName, // Sync name with hotelName if not provided
       city,
-      distance: distance || 0,
       rating: rating || 0,
       mapUrl: mapUrl || "",
       roomOptions: roomOptions || [],
@@ -153,7 +151,6 @@ export const updateHotel = async (req, res) => {
       hotelName,
       name,
       city,
-      distance,
       rating,
       mapUrl,
       roomOptions,
@@ -169,7 +166,6 @@ export const updateHotel = async (req, res) => {
       ...(hotelName && { hotelName }),
       ...(name && { name }),
       ...(city && { city }),
-      ...(distance !== undefined && { distance }),
       ...(rating !== undefined && { rating }),
       ...(mapUrl !== undefined && { mapUrl }),
       ...(roomOptions && { roomOptions }),
@@ -270,8 +266,8 @@ export const getHotelsByCity = async (req, res) => {
       city: { $regex: city, $options: "i" },
       isActive: true,
     })
-      .select("hotelName name city distance rating mapUrl roomOptions location")
-      .sort({ distance: 1 }); // Sort by nearest first
+      .select("hotelName name city rating mapUrl roomOptions location")
+      .sort({ hotelName: 1 }); // Sort alphabetically
 
     const transformedHotels = hotels.map((hotel) => ({
       ...hotel.toObject(),

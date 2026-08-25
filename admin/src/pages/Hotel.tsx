@@ -14,7 +14,6 @@ interface HotelType {
     hotelName: string;
     name?: string;
     city: string;
-    distance: number;
     rating: number;
     mapUrl: string;
     roomOptions: RoomOption[];
@@ -33,7 +32,6 @@ interface HotelType {
 const initialState: HotelType = {
     hotelName: "",
     city: "",
-    distance: 0,
     rating: 0,
     mapUrl: "",
     roomOptions: [
@@ -76,10 +74,7 @@ export default function Hotel() {
 
         setFormData((prev) => ({
             ...prev,
-            [name]:
-                name === "distance" || name === "rating"
-                    ? Number(value)
-                    : value,
+            [name]: name === "rating" ? Number(value) : value,
         }));
     };
 
@@ -172,7 +167,6 @@ export default function Hotel() {
         setFormData({
             hotelName: hotel.hotelName,
             city: hotel.city,
-            distance: hotel.distance,
             rating: hotel.rating,
             mapUrl: hotel.mapUrl,
             roomOptions: hotel.roomOptions || initialState.roomOptions,
@@ -243,20 +237,6 @@ export default function Hotel() {
                                     value={formData.city}
                                     onChange={handleChange}
                                     placeholder="Makkah / Madinah"
-                                    required
-                                    className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            {/* DISTANCE */}
-                            <div>
-                                <label className="block mb-2 font-medium">Distance (meters) *</label>
-                                <input
-                                    type="number"
-                                    name="distance"
-                                    value={formData.distance}
-                                    onChange={handleChange}
-                                    placeholder="500"
                                     required
                                     className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -474,7 +454,6 @@ export default function Hotel() {
                                 <tr>
                                     <th className="text-left p-4">Hotel</th>
                                     <th className="text-left p-4">City</th>
-                                    <th className="text-left p-4">Distance</th>
                                     <th className="text-left p-4">Rating</th>
                                     <th className="text-left p-4">Room Types</th>
                                     <th className="text-left p-4">Map</th>
@@ -488,7 +467,6 @@ export default function Hotel() {
                                         <tr key={hotel._id} className="border-b hover:bg-gray-50">
                                             <td className="p-4 font-medium">{hotel.hotelName}</td>
                                             <td className="p-4">{hotel.city}</td>
-                                            <td className="p-4">{hotel.distance} m</td>
                                             <td className="p-4">⭐ {hotel.rating}</td>
                                             <td className="p-4">
                                                 {hotel.roomOptions && hotel.roomOptions.length > 0 ? (
@@ -533,7 +511,7 @@ export default function Hotel() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={7} className="text-center p-10 text-gray-500">
+                                        <td colSpan={6} className="text-center p-10 text-gray-500">
                                             No hotels found
                                         </td>
                                     </tr>

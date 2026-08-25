@@ -111,7 +111,7 @@ const drawBatchTable = (doc, batch, startY) => {
     const makkah = (pkg.hotels || []).filter(h => ["makkah", "mecca"].includes(h.city?.toLowerCase()));
     const madina = (pkg.hotels || []).filter(h => ["madinah", "madina", "medina"].includes(h.city?.toLowerCase()));
 
-    const hotelLine = [...makkah.map(h => `Makkah: ${h.name} (${h.distance || '-'})`), ...madina.map(h => `Madina: ${h.name} (${h.distance || '-'})`)].join("\n");
+    const hotelLine = [...makkah.map(h => `Makkah: ${h.name}`), ...madina.map(h => `Madina: ${h.name}`)].join("\n");
 
     const scheduleLine = (pkg.flights || []).map(f => {
       const code = pkg.airline?.airlineCode ? `${pkg.airline.airlineCode} ` : "";
@@ -320,8 +320,8 @@ export const generateUmrahPackagesPDF = async (packages) => {
 //     const madina = (pkg.hotels || []).filter(h => ["madinah", "madina", "medina"].includes(h.city?.toLowerCase()));
 
 //     const hotelLine = [
-//       ...makkah.map(h => `Makkah: ${h.name} (${h.distance || '-'})`),
-//       ...madina.map(h => `Madina: ${h.name} (${h.distance || '-'})`)
+//       ...makkah.map(h => `Makkah: ${h.name}`),
+//       ...madina.map(h => `Madina: ${h.name}`)
 //     ].join("\n");
 
 //     // Schedule Text
@@ -568,13 +568,12 @@ export const generateUmrahPackagesPDF = async (packages) => {
 //       // HOTEL TABLE (Right)
 //       autoTable(doc, {
 //         startY: yPosition,
-//         head: [["Hotel", "City", "Dist."]],
+//         head: [["Hotel", "City"]],
 //         body: (pkg.hotels || [])
 //           .slice(0, 2)
 //           .map((h) => [
 //             h.name || "Standard",
 //             h.city || "-",
-//             h.distance ? `${h.distance}m` : "-",
 //           ]),
 //         margin: { left: 15 + tableWidth + 4 },
 //         tableWidth: tableWidth,

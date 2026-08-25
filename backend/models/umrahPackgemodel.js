@@ -10,6 +10,7 @@ const PackageTotalsSchema = new mongoose.Schema(
     childWithBed: { type: Number, default: 0 },
     infant: { type: Number, default: 0 },
     incentive: { type: Number, default: 0 },
+    margin: { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -113,7 +114,6 @@ const GroupTicketingSchema = new mongoose.Schema(
         supplier: { type: SupplierSchema, default: () => ({}) },
         location: {
           city: { type: String },
-          distance: { type: String },
           mapUrl: { type: String },
         },
         rating: { type: Number, default: 0 },

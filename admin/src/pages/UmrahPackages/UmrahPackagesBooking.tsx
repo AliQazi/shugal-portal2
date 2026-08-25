@@ -49,7 +49,7 @@ interface UmrahPackageDetails {
         baggage?: string; meal?: string;
     }[];
     hotels?: {
-        name?: string; location?: { city?: string; distance?: string };
+        name?: string; location?: { city?: string };
         nights?: number; nightCount?: number; rating?: number;
     }[];
     transports?: { route?: string; transportType?: string }[];
@@ -1016,7 +1016,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                         <div key={index} style={{ padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px" }}>
                                             <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", marginBottom: "3px" }}>{hotel.name || "Hotel N/A"}</div>
                                             <div style={{ fontSize: "0.73rem", color: "#64748B" }}>
-                                                {[hotel.location?.city, hotel.location?.distance ? `${hotel.location.distance} from Haram` : "", `${hotel.nightCount || hotel.nights || 0} nights`].filter(Boolean).join(" - ")}
+                                                {[hotel.location?.city, `${hotel.nightCount || hotel.nights || 0} nights`].filter(Boolean).join(" - ")}
                                             </div>
                                         </div>
                                     ))}

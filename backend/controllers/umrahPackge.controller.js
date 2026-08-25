@@ -228,7 +228,6 @@ export const getAllPackages = async (req, res) => {
             name: extPkg.makkah?.name || "Makkah Hotel",
             location: {
               city: "Makkah",
-              distance: extPkg.makkah?.distance || "",
             },
             nights: parseInt(extPkg.makkah_nights) || 0,
             checkIn: new Date(extPkg.makkah_stays?.[0]?.from),
@@ -238,7 +237,6 @@ export const getAllPackages = async (req, res) => {
             name: extPkg.madina?.name || "Madina Hotel",
             location: {
               city: "Madina",
-              distance: extPkg.madina?.distance || "",
             },
             nights: parseInt(extPkg.madina_nights) || 0,
             checkIn: new Date(extPkg.madina_stays?.[0]?.from),
@@ -476,6 +474,7 @@ export const updatePackageTotals = async (req, res) => {
       "childWithBed",
       "infant",
       "incentive",
+      "margin",
     ];
 
     const sanitizedTotals = {};

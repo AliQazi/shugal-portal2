@@ -9,7 +9,8 @@ import { getAllBookingsAdmin } from "../Api/umrahBookingApi";
 import { useAuth } from "../context/AuthContext";
 import { hasPermission } from "../utils/permissions";
 import dayjs from 'dayjs'
-import { Pencil, Copy, Trash2, Check, X, Loader2 } from "lucide-react";
+import { Pencil, Copy, Trash2, Save, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
 
 const GROUP_TYPE_OPTIONS = [
   "UAE Groups",
@@ -201,9 +202,6 @@ const formatCurrency = (amount?: number, currency = "PKR") => {
 };
 
 interface PriceEditValues {
-  buyingAdultPrice: number;
-  buyingChildPrice: number;
-  buyingInfantPrice: number;
   sellingAdultPriceB2B: number;
   sellingChildPriceB2B: number;
   sellingInfantPriceB2B: number;
@@ -218,28 +216,24 @@ const GroupPricingMiniTable = ({
   canEdit: boolean;
   onSave: (bookingId: string, price: PriceEditValues) => Promise<boolean>;
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<PriceEditValues>({
-    buyingAdultPrice: booking.price.buyingAdultPrice || 0,
-    buyingChildPrice: booking.price.buyingChildPrice || 0,
-    buyingInfantPrice: booking.price.buyingInfantPrice || 0,
     sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B || 0,
     sellingChildPriceB2B: booking.price.sellingChildPriceB2B || 0,
     sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B || 0,
   });
 
-  const startEdit = () => {
+  useEffect(() => {
     setDraft({
-      buyingAdultPrice: booking.price.buyingAdultPrice || 0,
-      buyingChildPrice: booking.price.buyingChildPrice || 0,
-      buyingInfantPrice: booking.price.buyingInfantPrice || 0,
       sellingAdultPriceB2B: booking.price.sellingAdultPriceB2B || 0,
       sellingChildPriceB2B: booking.price.sellingChildPriceB2B || 0,
       sellingInfantPriceB2B: booking.price.sellingInfantPriceB2B || 0,
     });
-    setIsEditing(true);
-  };
+  }, [
+    booking.price.sellingAdultPriceB2B,
+    booking.price.sellingChildPriceB2B,
+    booking.price.sellingInfantPriceB2B,
+  ]);
 
   const updateDraft = (field: keyof PriceEditValues, value: string) => {
     const numeric = Number(value.replace(/[^0-9]/g, "")) || 0;
@@ -248,144 +242,69 @@ const GroupPricingMiniTable = ({
 
   const handleSave = async () => {
     setSaving(true);
-    const ok = await onSave(booking._id, draft);
+    await onSave(booking._id, draft);
     setSaving(false);
-    if (ok) setIsEditing(false);
   };
 
   const inputClass =
-    "w-16 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white";
+    "w-20 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-800 outline-none focus:border-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white";
+
+  const rows: { label: string; field: keyof PriceEditValues; value: number }[] = [
+    { label: "Adult", field: "sellingAdultPriceB2B", value: draft.sellingAdultPriceB2B },
+    { label: "Child", field: "sellingChildPriceB2B", value: draft.sellingChildPriceB2B },
+    { label: "Infant", field: "sellingInfantPriceB2B", value: draft.sellingInfantPriceB2B },
+  ];
 
   return (
-    <div className="relative mt-3 max-w-86">
-      {canEdit && (
-        <div className="absolute -top-6 right-1 z-10 flex items-center gap-1">
-          {isEditing ? (
-            <>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                title="Save pricing"
-                className="rounded bg-green-600 p-1 text-white shadow hover:bg-green-700 disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                disabled={saving}
-                title="Cancel"
-                className="rounded bg-gray-400 p-1 text-white shadow hover:bg-gray-500 disabled:opacity-50"
-              >
-                <X size={11} />
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={startEdit}
-              title="Edit pricing"
-              className="rounded bg-yellow-500 p-1 text-white shadow hover:bg-yellow-600"
-            >
-              <Pencil size={11} />
-            </button>
-          )}
+    <div className="flex items-center justify-center">
+      <div className="mt-3 w-fit">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900/40">
+          <table className="border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                <th className="px-2 py-1.5 text-left font-bold">Type</th>
+                <th className="px-2 py-1.5 text-left font-bold">Selling</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.field}
+                  className="border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300"
+                >
+                  <td className="px-2 py-1.5 font-bold">{row.label}</td>
+                  <td className="px-2 py-1.5">
+                    {canEdit ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={row.value ? row.value.toLocaleString() : ""}
+                        onChange={(e) => updateDraft(row.field, e.target.value)}
+                        className={inputClass}
+                        placeholder="0"
+                      />
+                    ) : (
+                      <span className="font-semibold">
+                        {formatCurrency(row.value, booking.price.sellingCurrencyB2B)}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900/40">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-              <th className="px-2 py-1.5 text-left font-bold">Type</th>
-              <th className="px-2 py-1.5 text-left font-bold">Adult</th>
-              <th className="px-2 py-1.5 text-left font-bold">Child</th>
-              <th className="px-2 py-1.5 text-left font-bold">Infant</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t border-gray-100 text-blue-600 dark:border-gray-800 dark:text-blue-300">
-              <td className="px-2 py-1.5 font-bold">Buying</td>
-              {isEditing ? (
-                <>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.buyingAdultPrice}
-                      onChange={(e) => updateDraft("buyingAdultPrice", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.buyingChildPrice}
-                      onChange={(e) => updateDraft("buyingChildPrice", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.buyingInfantPrice}
-                      onChange={(e) => updateDraft("buyingInfantPrice", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingAdultPrice, booking.price.buyingCurrency)}</td>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingChildPrice, booking.price.buyingCurrency)}</td>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.buyingInfantPrice, booking.price.buyingCurrency)}</td>
-                </>
-              )}
-            </tr>
-            <tr className="border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300">
-              <td className="px-2 py-1.5 font-bold">Selling</td>
-              {isEditing ? (
-                <>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.sellingAdultPriceB2B}
-                      onChange={(e) => updateDraft("sellingAdultPriceB2B", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.sellingChildPriceB2B}
-                      onChange={(e) => updateDraft("sellingChildPriceB2B", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.sellingInfantPriceB2B}
-                      onChange={(e) => updateDraft("sellingInfantPriceB2B", e.target.value)}
-                      className={inputClass}
-                    />
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingAdultPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingChildPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-                  <td className="px-2 py-1.5 font-semibold">{formatCurrency(booking.price.sellingInfantPriceB2B, booking.price.sellingCurrencyB2B)}</td>
-                </>
-              )}
-            </tr>
-          </tbody>
-        </table>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="mt-2 flex justify-center items-center w-full gap-1.5 rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            {saving ? "Saving..." : "Save"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -499,7 +418,7 @@ const GroupTicketing = () => {
       window.alert("You don't have permission to manage groups");
       return;
     }
-    window.open(`/admin-portal/group-ticketing/edit/${bookingId}`, "_blank", "noopener,noreferrer");
+    navigate(`/group-ticketing/edit/${bookingId}`);
   };
 
   const handleCopy = (bookingId: string) => {
@@ -769,12 +688,13 @@ const GroupTicketing = () => {
         setBookings((prev) =>
           prev.map((group) => (group._id === bookingId ? response.data.data : group))
         );
+        toast.success("Pricing updated successfully!");
         return true;
       }
       return false;
     } catch (error: any) {
       console.error("Error updating pricing:", error);
-      window.alert("❌ " + (error.response?.data?.message || "Failed to update pricing"));
+      toast.error(error.response?.data?.message || "Failed to update pricing");
       return false;
     }
   };
@@ -973,7 +893,7 @@ const GroupTicketing = () => {
                     {/* <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Sector (Route)</th> */}
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Airline & PNR</th>
                     <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Passengers (A/C/I)</th>
-                    <th className="px-4 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Pricing</th>
+                    <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Pricing</th>
                     <th className="px-4 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>

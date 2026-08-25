@@ -247,7 +247,7 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
             <td>${String(i + 1).padStart(2, "0")}</td>
             <td>${name}</td>
             <td>${type}</td>
-            <td>${p.ticketNumber || p.eTicketNumber || "–"}</td>
+            <td>${p.passport || p.passportNumber || "–"}</td>
             <td>${status}</td>
         </tr>`;
     })
@@ -388,7 +388,7 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
                     <th>#</th>
                     <th>Name</th>
                     <th>Type</th>
-                    <th>Ticket Number</th>
+                    <th>Passport Number</th>
                     <th>Status</th>
                 </tr>
             </thead>

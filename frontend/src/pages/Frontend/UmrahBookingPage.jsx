@@ -1418,19 +1418,6 @@ export default function UmrahBookingPage({ user }) {
                             borderRadius: "6px",
                           }}
                         >
-                          <FaMapMarkerAlt size={10} /> {hotel?.distance}m
-                        </span>
-
-                        <span
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "3px",
-                            background: "#fff",
-                            padding: "3px 6px",
-                            borderRadius: "6px",
-                          }}
-                        >
                           <FaStarIcon color="#ecc94b" size={10} /> {hotel.rating}.0
                         </span>
                       </div>

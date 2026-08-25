@@ -1025,8 +1025,8 @@ const GroupTicketingForm = () => {
                           const search = inputValue.toLowerCase().trim();
 
                           return (
-                            option.data.value.toLowerCase() === search ||
-                            option.data.label.toLowerCase() === search
+                            option.data.value.toLowerCase().includes(search) ||
+                            option.data.label.toLowerCase().includes(search)
                           );
                         }}
                         placeholder="Select city"
@@ -1064,8 +1064,8 @@ const GroupTicketingForm = () => {
                           const search = inputValue.toLowerCase().trim();
 
                           return (
-                            option.data.value.toLowerCase() === search ||
-                            option.data.label.toLowerCase() === search
+                            option.data.value.toLowerCase().includes(search) ||
+                            option.data.label.toLowerCase().includes(search)
                           );
                         }}
                         placeholder="Select city"

@@ -1,7 +1,7 @@
 import { useFormik, FormikHelpers } from "formik";
 import * as Yup from "yup";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import axiosInstance from "../Api/axios";
 import ComponentCard from "../components/common/ComponentCard";
 import { ToastContainer, toast } from "react-toastify";
@@ -253,8 +253,15 @@ const optionalNonNegativeNumber = Yup.number()
 
 const UmrahPackage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { copyId } = useParams();
   const canCreate = hasPermission(user, "create_umrah_package");
+  // Copy mode (arrived via the "Copy" button on Manage Umrah Packages) shows a
+  // minimal form - only the Umrah Group Ticket selector and Package Totals are
+  // editable. Hotel/Transport/Visa/Days are still carried over in formik state
+  // from the source package (see fetchPackageDetails) and submitted as-is,
+  // they're just not rendered so the admin isn't tempted to re-edit them here.
+  const isCopyMode = Boolean(copyId);
   // Logo/Flight Logo fields are hidden from this form (not currently needed).
   const [umrahGroups, setUmrahGroups] = useState<GroupTicketing[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -786,6 +793,14 @@ const UmrahPackage = () => {
         const flightLogoInput = document.getElementById("flightLogoInput") as HTMLInputElement;
         if (logoInput) logoInput.value = "";
         if (flightLogoInput) flightLogoInput.value = "";
+
+        // Copy mode ("Copy" button on Manage Umrah Packages) is a one-shot flow -
+        // once the new package is saved, head back to the manage list instead of
+        // leaving the admin on this now-blank form. "Save and Copy" has its own
+        // success handling below and deliberately stays on this page.
+        if (isCopyMode) {
+          navigate("/manage-package");
+        }
       } catch (error: any) {
         console.error(error);
         const errorMessage = error.response?.data?.error ||
@@ -1306,7 +1321,7 @@ const UmrahPackage = () => {
             Loading package data to copy...
           </div>
         )}
-        <form onSubmit={formik.handleSubmit} className="space-y-3 p-4">
+        <form onSubmit={formik.handleSubmit} className="space-y-3 p-2">
           {(() => {
             const selectedGroup = getSelectedGroupTicket(formik.values.selectedGroupTicketId);
 
@@ -1460,7 +1475,7 @@ const UmrahPackage = () => {
 
                   {selectedGroup && (
                     <div className="rounded-lg border border-gray-200 bg-linear-to-br from-gray-50 to-white p-4 shadow-md transition-all duration-300">
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
+                      {/* <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
                         <div className="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Group</p>
                           <p className="text-sm font-semibold text-gray-900">
@@ -1483,7 +1498,7 @@ const UmrahPackage = () => {
                         <div className="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">PNR</p>
                           {selectedGroup.pnr ? (
-                            <p className="inline-flex items-center gap-1 px-3 py-1.5 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-mono font-bold shadow-md">
+                            <p className="inline-flex items-center gap-1 px-2 py-1 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-md text-xs font-mono font-bold shadow-md">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
                               </svg>
@@ -1493,9 +1508,9 @@ const UmrahPackage = () => {
                             <p className="text-sm text-gray-400 italic">No PNR</p>
                           )}
                         </div>
-                      </div>
+                      </div> */}
 
-                      <div className="mt-4">
+                      <div>
                         <p className="text-xs font-bold mb-3 text-gray-700 uppercase tracking-wide flex items-center gap-2">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
@@ -1503,31 +1518,44 @@ const UmrahPackage = () => {
                           Selected Flights
                         </p>
 
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2.5">
                           {selectedGroup.flights?.length ? (
                             selectedGroup.flights.map((flight, index) => (
                               <div
                                 key={`${flight.flightNo}-${index}`}
                                 className="rounded-lg border border-gray-200 bg-white hover:shadow-lg transition-shadow duration-300 overflow-hidden"
                               >
-                                <div className="bg-linear-to-r from-blue-50 to-white px-4 py-2 border-b border-gray-100">
-                                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                                    <div className="flex items-center gap-2">
+                                <div className="bg-linear-to-r from-blue-50 to-white px-3 py-2 border-b border-gray-100">
+                                  <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between">
+                                    <div className="flex flex-wrap items-center gap-2">
                                       <span className="font-bold text-sm text-gray-900">
                                         {flight.airline || "Airline"} {flight.flightNo}
                                       </span>
-                                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">
-                                        {flight.flightClass?.trim() || "Economy"}
+                                      <span className="text-sm font-medium text-gray-600">
+                                        {flight.sectorFrom} ✈ {flight.sectorTo}
                                       </span>
                                     </div>
-                                    <span className="text-sm font-medium text-gray-600">
-                                      {flight.sectorFrom} ✈ {flight.sectorTo}
-                                    </span>
+                                    <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                                      <span className={`px-2 py-0.5 rounded-full font-semibold ${flight.flightClass?.toLowerCase().includes('business')
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                        : flight.flightClass?.toLowerCase().includes('first')
+                                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                          : 'bg-blue-100 text-blue-700 border border-blue-200'
+                                        }`}>
+                                        ✈️ {flight.flightClass?.trim() || "Economy"}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                                        🧳 {flight.baggage?.trim() || "N/A"}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-semibold">
+                                        🍽️ {flight.meal?.trim() || "N/A"}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
 
                                 <div className="p-3">
-                                  <div className="flex flex-col gap-2 text-xs text-gray-600 md:flex-row md:gap-6 mb-3">
+                                  <div className="flex flex-col gap-2 text-xs text-gray-600 md:flex-row md:gap-6">
                                     <span className="flex items-center gap-1">
                                       <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1539,23 +1567,6 @@ const UmrahPackage = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                       </svg>
                                       Arrival: {formatFlightDate(flight.arrDate)} {flight.arrTime || ""}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2 text-[11px]">
-                                    <span className={`px-2 py-1 rounded-full font-semibold ${flight.flightClass?.toLowerCase().includes('business')
-                                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                      : flight.flightClass?.toLowerCase().includes('first')
-                                        ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                                        : 'bg-gray-100 text-gray-700 border border-gray-200'
-                                      }`}>
-                                      ✈️ {flight.flightClass?.trim() || "Economy"}
-                                    </span>
-                                    <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                                      🧳 {flight.baggage?.trim() || "N/A"}
-                                    </span>
-                                    <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 font-semibold">
-                                      🍽️ {flight.meal?.trim() || "N/A"}
                                     </span>
                                   </div>
                                 </div>
@@ -1571,6 +1582,79 @@ const UmrahPackage = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Read-only summary of the Hotel/Transport/Visa carried over from the
+                    source package - shown in place of the full editable sections
+                    (which are hidden below) so the admin can still see what's implied
+                    in this copy without being able to accidentally alter it here. */}
+                {isCopyMode && (
+                  <div className="border rounded-lg overflow-hidden shadow-sm">
+                    <div className="bg-gray-800 text-white px-4 py-2">
+                      <h4 className="text-sm font-semibold">Copied From Source Package</h4>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 gap-4 divide-y divide-gray-200 md:grid-cols-3 md:divide-y-0 md:divide-x [&>*:not(:first-child)]:pt-3 [&>*:not(:first-child)]:md:pt-0 [&>*:not(:first-child)]:md:pl-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                          Hotels
+                        </p>
+                        {formik.values.hotels.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {formik.values.hotels.map((hotel, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
+                              >
+                                {hotel.name || "Unnamed Hotel"}
+                                {hotel.location?.city ? ` - ${hotel.location.city}` : ""}
+                                {hotel.nights ? ` (${hotel.nights}N)` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs italic text-gray-400">No hotels</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                          Transport
+                        </p>
+                        {formik.values.transports.some((t) => t.route) ? (
+                          <div className="flex flex-wrap gap-2">
+                            {formik.values.transports
+                              .filter((t) => t.route)
+                              .map((transport, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
+                                >
+                                  {transport.route}
+                                  {transport.transportType ? ` (${transport.transportType})` : ""}
+                                </span>
+                              ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs italic text-gray-400">No transport</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                          Visa
+                        </p>
+                        {formik.values.visa ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                            {formik.values.visa.visaType || "Visa"}
+                            {" "}
+                            ({formik.values.visa.withTransport ? "With Transport" : "Without Transport"})
+                          </span>
+                        ) : (
+                          <p className="text-xs italic text-gray-400">No visa</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Available Rooms and Days - Row 2 */}
                 {/* Total Seats is hidden - it is auto-filled from the selected group
@@ -1589,6 +1673,7 @@ const UmrahPackage = () => {
                   />
                 </div>
                 */}
+                {!isCopyMode && (
                 <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-xs font-semibold mb-1">Package Duration (Days)</label>
@@ -1603,8 +1688,12 @@ const UmrahPackage = () => {
                     />
                   </div>
                 </div>
+                )}
 
-                {/* Hotels - New Design matching screenshot */}
+                {/* Hotels - New Design matching screenshot: hidden in copy mode -
+                    the copied hotel rows (with their pricing) stay in formik state
+                    and are submitted unchanged, they're just not re-editable here. */}
+                {!isCopyMode && (
                 <div>
                   {formik.values.hotels.map((hotel, index) => (
 
@@ -2067,8 +2156,12 @@ const UmrahPackage = () => {
                     </button>
                   </div>
                 </div>
+                )}
 
-                {/* ✅ NEW: Transport Section - same pattern as Hotels */}
+                {/* ✅ NEW: Transport Section - same pattern as Hotels: hidden in copy
+                    mode, the copied transports stay in formik state and are submitted
+                    unchanged. */}
+                {!isCopyMode && (
                 <div className="border rounded p-3">
                   <h4 className="text-sm font-semibold mb-2">Transport</h4>
                   {formik.values.transports.map((transport, index) => (
@@ -2168,8 +2261,11 @@ const UmrahPackage = () => {
                     + Add Transport
                   </button>
                 </div>
+                )}
 
-                {/* Visa Selection */}
+                {/* Visa Selection: hidden in copy mode, the copied visa stays in
+                    formik state and is submitted unchanged. */}
+                {!isCopyMode && (
                 <div className="border rounded-lg overflow-hidden shadow-sm">
                   <div className="px-4 py-2 border-b bg-white">
                     <h4 className="text-sm font-semibold">Visa</h4>
@@ -2298,6 +2394,7 @@ const UmrahPackage = () => {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Profit Breakdown Card - Shown above Submit */}
                 {/* {profitBreakdown && (
@@ -2355,7 +2452,7 @@ const UmrahPackage = () => {
                 {/* Package Totals Section */}
                 <div className="border rounded-lg overflow-hidden shadow-sm">
                   <div className="bg-green-600 text-white px-4 py-2">
-                    <h4 className="text-sm font-semibold">Package Totals (Selling)</h4>
+                    <h4 className="text-sm font-semibold">Package Totals (Selling) - Per Pex (PKR)</h4>
                   </div>
                   <div className="p-4 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -2365,7 +2462,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Double Package Total (2 Pax)</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2390,7 +2486,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Triple Package Total (3 Pax)</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2415,7 +2510,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Quad Package Total (4 Pax)</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2440,7 +2534,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Shared Package Total (5 Pax)</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2465,7 +2558,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Child W/O Bed Package Total</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2490,7 +2582,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Child W/ Bed Package Total</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2515,7 +2606,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Infant Package Total</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Total Price (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input
@@ -2540,7 +2630,6 @@ const UmrahPackage = () => {
                           <span className="text-xs font-bold">Incentive</span>
                         </div>
                         <div className="p-3">
-                          <label className="block text-xs mb-1">Incentive Amount (PKR)</label>
                           <div className="flex items-center border rounded overflow-hidden h-9">
                             <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                             <input

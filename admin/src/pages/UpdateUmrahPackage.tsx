@@ -538,9 +538,9 @@ const UpdateUmrahPackage = () => {
           prevTotals.infant === 0
             ? prevTotals
             : {
-                ...prevTotals,
-                infant: Math.round(value + (formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : 0) + prevTotals.incentive),
-              },
+              ...prevTotals,
+              infant: Math.round(value + (formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : 0) + prevTotals.incentive),
+            },
         );
       }
       return nextPrice;
@@ -2318,7 +2318,7 @@ const UpdateUmrahPackage = () => {
           )} */}
           <div className="border rounded-lg overflow-hidden shadow-sm">
             <div className="bg-green-600 text-white px-4 py-2">
-              <h4 className="text-sm font-semibold">Package Totals (Selling)</h4>
+              <h4 className="text-sm font-semibold">Package Totals (Selling) - Per Pax (PKR)</h4>
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -2328,7 +2328,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Double Package Total (2 Pax)</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2358,7 +2357,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Triple Package Total (3 Pax)</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2387,7 +2385,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Quad Package Total (4 Pax)</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price/Pax (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2416,7 +2413,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Shared Package Total (5 Pax)</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2445,7 +2441,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Child W/O Bed Package Total</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2474,7 +2469,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Child W/ Bed Package Total</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2503,7 +2497,6 @@ const UpdateUmrahPackage = () => {
                     <span className="text-xs font-bold">Infant Package Total</span>
                   </div>
                   <div className="p-3">
-                    <label className="block text-xs mb-1">Total Price (PKR)</label>
                     <div className="flex items-center border rounded overflow-hidden h-9">
                       <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
                       <input
@@ -2525,45 +2518,43 @@ const UpdateUmrahPackage = () => {
                     </div>
                   </div>
                 </div>
+
+                <div className="border rounded overflow-hidden">
+                  <div className="bg-orange-500 text-white px-3 py-2">
+                    <span className="text-xs font-bold">Incentive</span>
+                  </div>
+                  <div className="p-3">
+                    <div className="flex items-center border rounded overflow-hidden h-9">
+                      <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={packageTotals.incentive.toLocaleString()}
+                        onChange={(e) => {
+                          lockPackageTotalsAutoSync();
+                          const inc = parseFormattedNumber(e.target.value);
+                          const base = baseTotalsRef.current;
+                          // ✅ Use the stored base values (which now include manual changes)
+                          setPackageTotals({
+                            double: base.double + inc,
+                            triple: base.triple + inc,
+                            quad: base.quad + inc,
+                            shared: base.shared + inc,
+                            childWithoutBed: base.childWithoutBed + inc,
+                            childWithBed: base.childWithBed + inc,
+                            infant: base.infant + inc,
+                            incentive: inc,
+                          });
+                        }}
+                        className="flex-1 p-2 text-xs outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Incentive - Separate Section */}
               <div className="border-t-2 border-dashed border-orange-300 pt-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div className="border rounded overflow-hidden">
-                    <div className="bg-orange-500 text-white px-3 py-2">
-                      <span className="text-xs font-bold">Incentive</span>
-                    </div>
-                    <div className="p-3">
-                      <label className="block text-xs mb-1">Incentive Amount (PKR)</label>
-                      <div className="flex items-center border rounded overflow-hidden h-9">
-                        <span className="bg-gray-100 border-r px-2 text-xs h-full flex items-center text-gray-600">PKR</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={packageTotals.incentive.toLocaleString()}
-                          onChange={(e) => {
-                            lockPackageTotalsAutoSync();
-                            const inc = parseFormattedNumber(e.target.value);
-                            const base = baseTotalsRef.current;
-                            // ✅ Use the stored base values (which now include manual changes)
-                            setPackageTotals({
-                              double: base.double + inc,
-                              triple: base.triple + inc,
-                              quad: base.quad + inc,
-                              shared: base.shared + inc,
-                              childWithoutBed: base.childWithoutBed + inc,
-                              childWithBed: base.childWithBed + inc,
-                              infant: base.infant + inc,
-                              incentive: inc,
-                            });
-                          }}
-                          className="flex-1 p-2 text-xs outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
                 <p className="text-xs text-orange-600 font-semibold mt-2">
                   * Incentive (PKR {packageTotals.incentive.toLocaleString()}) is included in all room totals above
                 </p>

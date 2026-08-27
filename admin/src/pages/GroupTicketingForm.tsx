@@ -544,6 +544,39 @@ const GroupTicketingForm = () => {
     return `${y}-${m}-${d}`;
   };
 
+  // Turn a sector code like "LHE-JED-LHE" into one flight leg per consecutive
+  // pair of cities: LHE→JED, JED→LHE. "LHE-DXB-JED-DXB-LHE" yields 4 legs.
+  // Existing flight rows are reused by index (so flight#, dates, class, etc.
+  // already entered are kept) - only sectorFrom/sectorTo/terminals are (re)set
+  // to match the new sector. Extra rows are trimmed, missing rows are added.
+  const buildFlightsFromSector = (sectorCode: string, existingFlights: typeof formData.flights): typeof formData.flights => {
+    const codes = sectorCode.split("-").map((c) => c.trim()).filter(Boolean);
+    if (codes.length < 2) return existingFlights;
+
+    const findCityLabel = (code: string) =>
+      cityOptions.find((opt) => opt.value === code)?.label || "";
+
+    return codes.slice(0, -1).map((fromCode, i) => {
+      const toCode = codes[i + 1];
+      const existing = existingFlights[i];
+      return {
+        airline: existing?.airline || formData.airline,
+        flightNo: existing?.flightNo || "",
+        depDate: existing?.depDate || "",
+        depTime: existing?.depTime || "",
+        arrDate: existing?.arrDate || "",
+        arrTime: existing?.arrTime || "",
+        sectorFrom: fromCode,
+        sectorTo: toCode,
+        fromTerminal: findCityLabel(fromCode),
+        toTerminal: findCityLabel(toCode),
+        flightClass: existing?.flightClass || "",
+        baggage: existing?.baggage || "",
+        meal: existing?.meal || ""
+      };
+    });
+  };
+
   const removeFlight = (index: number) => {
     setFormData({
       ...formData,
@@ -766,7 +799,8 @@ const GroupTicketingForm = () => {
                     sector: e.target.value,
                     groupCategory: selectedSector?.groupType || "",
                     groupType: selectedSector?.groupType || "",
-                    groupName: selectedAirline ? `${selectedAirline.shortCode}-${e.target.value || 'NULL'}` : formData.groupName
+                    groupName: selectedAirline ? `${selectedAirline.shortCode}-${e.target.value || 'NULL'}` : formData.groupName,
+                    flights: buildFlightsFromSector(e.target.value, formData.flights)
                   });
                 }}
                 className="w-full h-11 rounded border border-gray-300 bg-white px-4 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"

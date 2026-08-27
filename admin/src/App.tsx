@@ -66,6 +66,7 @@ import ManageUmrahQueriesN from "./pages/manageUmrahPackagesQueries/UmrahPackage
 import UmrahBookingDetail from "./pages/UmrahBookingDetail/UmrahBookingDetail";
 import XOReport from "./pages/XOReport";
 import UpcomingDueDates from "./pages/UpcomingDueDates";
+import GroupPassengerList from "./pages/GroupPassengerList";
 
 export default function App() {
   return (
@@ -101,6 +102,7 @@ export default function App() {
                 <Route path="/group-ticketing/create" element={<GroupTicketingForm />} />
                 <Route path="/group-ticketing/create/:copyId" element={<GroupTicketingForm />} />
                 <Route path="/group-ticketing/edit/:id" element={<GroupTicketingForm />} />
+                <Route path="/group-passenger-list/:groupId" element={<GroupPassengerList />} />
                 <Route path="/local-groups" element={<LocalGroupsByCategory />} />
                 <Route path="/view-payment-voucher" element={<ViewPaymentVoucher />} />
                 <Route path="/view-payment-voucher/edit/:id" element={<EditPaymentVoucher />} />

@@ -9,7 +9,7 @@ import { getAllBookingsAdmin } from "../Api/umrahBookingApi";
 import { useAuth } from "../context/AuthContext";
 import { hasPermission } from "../utils/permissions";
 import dayjs from 'dayjs'
-import { Pencil, Copy, Trash2, Save, Loader2 } from "lucide-react";
+import { Pencil, Copy, Trash2, Save, Loader2, ListChecks } from "lucide-react";
 import { toast } from "react-toastify";
 
 const GROUP_TYPE_OPTIONS = [
@@ -324,6 +324,7 @@ const GroupTicketing = () => {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
+  const [sectorFilter, setSectorFilter] = useState<string>("All");
   const [groupTypeFilter, setGroupTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [entriesPerPage, setEntriesPerPage] = useState(50);
@@ -620,6 +621,14 @@ const GroupTicketing = () => {
     }
   };
 
+  const sectorOptions = useMemo(() => {
+    const sectors = new Set<string>();
+    bookings.forEach((booking) => {
+      if (booking.sector) sectors.add(booking.sector);
+    });
+    return Array.from(sectors).sort((a, b) => a.localeCompare(b));
+  }, [bookings]);
+
   const filteredBookings = bookings
     .filter(booking => {
       const matchesSearch =
@@ -631,11 +640,13 @@ const GroupTicketing = () => {
         (booking.groupName && booking.groupName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (booking.airline && booking.airline.toLowerCase().includes(searchTerm.toLowerCase()));
 
+      const matchesSector = sectorFilter === "All" || booking.sector === sectorFilter;
+
       const matchesGroupType = groupTypeFilter === "All" || booking.groupType === groupTypeFilter;
 
       const matchesStatus = statusFilter === "All" || booking.internalStatus === statusFilter;
 
-      return matchesSearch && matchesGroupType && matchesStatus;
+      return matchesSearch && matchesSector && matchesGroupType && matchesStatus;
     })
     .sort((a, b) => {
       const dateA = a.flights?.[0]?.depDate ? new Date(a.flights[0].depDate).getTime() : Number.MAX_SAFE_INTEGER;
@@ -826,7 +837,24 @@ const GroupTicketing = () => {
           </div>
 
           {/* Filters */}
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Filter by Sector
+              </label>
+              <select
+                value={sectorFilter}
+                onChange={(e) => setSectorFilter(e.target.value)}
+                className="w-full h-11 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="All">All Sectors</option>
+                {sectorOptions.map((sector) => (
+                  <option key={sector} value={sector}>
+                    {sector}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 Filter by Group Type
@@ -850,7 +878,7 @@ const GroupTicketing = () => {
               </label>
               <input
                 type="text"
-                placeholder="Search by voucher ID..."
+                placeholder="Search ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full h-11 rounded-lg border border-gray-300 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
@@ -1113,9 +1141,23 @@ const GroupTicketing = () => {
         className="max-w-7xl"
       >
         <div className="max-h-[85vh] overflow-y-auto p-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-            Bookings for {selectedGroup?.groupName || "Group"}
-          </h2>
+          <div className="mb-4 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+              Bookings for {selectedGroup?.groupName || "Group"}
+            </h2>
+
+            {selectedGroup && (
+              <button
+                onClick={() =>
+                  window.open(`/admin-portal/group-passenger-list/${selectedGroup._id}`, "_blank", "noopener,noreferrer")
+                }
+                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-white shadow-sm transition-all bg-[linear-gradient(to_top,#06911b,#11bd2b)] hover:bg-[linear-gradient(to_top,#057a16,#0ea324)] active:scale-95"
+              >
+                <ListChecks size={16} />
+                Passenger List Report
+              </button>
+            )}
+          </div>
 
           {selectedGroup && (
             <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

@@ -200,3 +200,21 @@ export const updatePassengersLock = async (id: string, locked: boolean) => {
     throw error;
   }
 };
+
+// Update this booking's own copy of Flights / Hotels / Transport details
+// (admin edit, scoped to this booking only - does not touch the shared package)
+export const updateBookingPackageDetails = async (
+  id: string,
+  data: { flights?: any[]; hotels?: any[]; transports?: any[] },
+) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/umrah-bookings/${id}/package-details`,
+      data,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating booking package details:", error);
+    throw error;
+  }
+};

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "react-toastify";
+import CreatableSelect from "react-select/creatable";
 import {
     getAllBookingsAdmin,
     reviewPayment,
@@ -10,6 +11,7 @@ import {
     extendUmrahBookingHold,
     savePassengerDiscounts,
     updatePassengersLock,
+    updateBookingPackageDetails,
 } from "../../Api/umrahBookingApi";
 import axiosInstance from "../../Api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -22,7 +24,7 @@ import {
     BanknotesIcon, ClockIcon, EyeIcon, UserIcon, HomeIcon,
     MagnifyingGlassIcon, ChartBarIcon, CurrencyDollarIcon,
     IdentificationIcon, BuildingLibraryIcon, PrinterIcon,
-    LockClosedIcon, LockOpenIcon,
+    LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon, TrashIcon,
 } from "@heroicons/react/24/outline";
 
 interface Passenger {
@@ -131,9 +133,18 @@ interface UmrahBooking {
     supplierDiscount?: number;
     // Admin-controlled lock for agent-side passenger detail edits (false = editable).
     passengersLocked?: boolean;
+    // Admin edit of this booking's own Flights/Hotels/Transport display - scoped to
+    // this booking only, never written back to the shared package.
+    packageDetailsOverride?: {
+        flights?: UmrahPackageDetails["flights"];
+        hotels?: UmrahPackageDetails["hotels"];
+        transports?: UmrahPackageDetails["transports"];
+    } | null;
 }
 
 interface Timer { hours: number; minutes: number; seconds: number; expired: boolean; }
+
+const TRANSPORT_TYPES = ["Bus", "Van", "Car", "Coaster", "Hiace", "Mini Bus", "Other"];
 
 const SUPPLIER_SOURCE_LABELS: Record<string, string> = {
     "travel-network": "Travel Network",
@@ -163,6 +174,24 @@ const StatusBadge = ({ status }: { status: string }) => (
 const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+// Layers a booking's admin-edited Flights/Hotels/Transport (packageDetailsOverride)
+// on top of the base package details. Per-field: an overridden array wholly
+// replaces the base one; anything not overridden falls through unchanged.
+const applyPackageDetailsOverride = (
+    base: UmrahPackageDetails | null,
+    override?: UmrahBooking["packageDetailsOverride"],
+): UmrahPackageDetails | null => {
+    if (!override) return base;
+    const merged: UmrahPackageDetails = { ...(base || {}) };
+    if (override.flights?.length) merged.flights = override.flights;
+    if (override.hotels?.length) merged.hotels = override.hotels;
+    if (override.transports?.length) {
+        merged.transports = override.transports;
+        merged.transport = override.transports;
+    }
+    return merged;
 };
 
 const calculateTimer = (expiresAt?: string | null): Timer => {
@@ -277,6 +306,25 @@ export default function UmrahPackagesBooking() {
         if (!canManage) { toast.error("No permission"); return; }
         try { const res = await savePassengerDiscounts(bookingId, passengers); setBookings(prev => prev.map(b => { if (b._id !== bookingId) return b; return { ...b, passengers: b.passengers.map(p => { const match = res.data.find((up: any) => up.passport === p.passport); return match ? { ...p, discount: match.discount } : p; }) }; })); toast.success("Discounts saved"); }
         catch (error: any) { toast.error(error.response?.data?.message); throw error; }
+    };
+
+    const handleSavePackageDetails = async (
+        bookingId: string,
+        payload: {
+            flights: NonNullable<UmrahPackageDetails["flights"]>;
+            hotels: NonNullable<UmrahPackageDetails["hotels"]>;
+            transports: NonNullable<UmrahPackageDetails["transports"]>;
+        },
+    ) => {
+        if (!canManage) { toast.error("No permission"); return; }
+        try {
+            const res = await updateBookingPackageDetails(bookingId, payload);
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, packageDetailsOverride: res.data.packageDetailsOverride } : b));
+            toast.success("Booking details updated");
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to update booking details");
+            throw error;
+        }
     };
 
     const getId = (value: unknown): string => {
@@ -401,6 +449,10 @@ export default function UmrahPackagesBooking() {
                     ? booking.packageId
                     : booking.packageData || null;
 
+            // Admin's booking-specific Flights/Hotels/Transport edit (if any) takes
+            // precedence over whatever the base package/source data says.
+            packageData = applyPackageDetailsOverride(packageData, booking.packageDetailsOverride);
+
             const packageId = getId(booking.packageId || packageData?._id);
 
             // Travel Network booking: TNT stored/live data se flights lo
@@ -413,6 +465,11 @@ export default function UmrahPackagesBooking() {
 
                 if (!tntFlights.length && packageData?.flights?.length) {
                     tntFlights = packageData.flights as PrintFlight[];
+                }
+
+                // Admin's manual flight edit always wins over live TNT data
+                if (booking.packageDetailsOverride?.flights?.length) {
+                    tntFlights = booking.packageDetailsOverride.flights as PrintFlight[];
                 }
 
                 const tntSource = {
@@ -443,6 +500,8 @@ export default function UmrahPackagesBooking() {
                 try {
                     const packageRes = await axiosInstance.get(`/umrahpackages/${packageId}`);
                     packageData = packageRes.data?.package || packageRes.data?.data || packageData;
+                    // Re-apply the booking's edit on top of the freshly-fetched master package
+                    packageData = applyPackageDetailsOverride(packageData, booking.packageDetailsOverride);
                 } catch (error) {
                     console.warn("Umrah package fetch failed, using populated package data", error);
                 }
@@ -766,7 +825,7 @@ export default function UmrahPackagesBooking() {
                 </>
             )}
 
-            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
+            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} onSavePackageDetails={handleSavePackageDetails} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
             {paymentHistoryBooking && <PaymentHistoryModal booking={paymentHistoryBooking} onClose={() => setPaymentHistoryBooking(null)} />}
             {modalData && <StatusModal modalData={modalData} onClose={() => setModalData(null)} onSuccess={() => { fetchBookings(); setModalData(null); }} />}
         </div>
@@ -774,16 +833,85 @@ export default function UmrahPackagesBooking() {
 }
 
 // Details Modal with ALL functionality
-function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, extendingHoldId, timers, onUpdate }: any) {
+function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, onSavePackageDetails, extendingHoldId, timers, onUpdate }: any) {
     const [discounts, setDiscounts] = useState<number[]>(booking.passengers.map((p: any) => p.discount ?? 0));
     const [savingDiscounts, setSavingDiscounts] = useState(false);
     const timer = timers[booking._id] || calculateTimer(booking.expiresAt);
     const packageDetails: UmrahPackageDetails | null =
         booking.packageId && typeof booking.packageId === "object" ? booking.packageId : booking.packageData || null;
     const packageTotals = packageDetails?.packageTotals || booking.packageData?.packageTotals;
-    const packageFlights = packageDetails?.flights || booking.packageData?.flights || [];
-    const packageHotels = packageDetails?.hotels || booking.packageData?.hotels || [];
-    const packageTransports =
+
+    // Admin's booking-specific edit of Flights/Hotels/Transport (view-mode source of truth).
+    // Saving replaces this in full - it does not touch the shared package.
+    const [packageOverride, setPackageOverride] = useState<UmrahBooking["packageDetailsOverride"]>(booking.packageDetailsOverride || null);
+    const [isEditingPackage, setIsEditingPackage] = useState(false);
+    const [flightsEdit, setFlightsEdit] = useState<any[]>([]);
+    const [hotelsEdit, setHotelsEdit] = useState<any[]>([]);
+    const [transportsEdit, setTransportsEdit] = useState<any[]>([]);
+    const [selectedGroupTicketIdEdit, setSelectedGroupTicketIdEdit] = useState("");
+    const [savingPackage, setSavingPackage] = useState(false);
+
+    // Same pick-from-existing-records selectors used on the Umrah Package create/edit
+    // screens - Umrah Group Ticket (drives Flights), Hotel, Transport.
+    const [groupTicketOptions, setGroupTicketOptions] = useState<{ _id: string; label: string; pnr?: string; supplierName?: string; flights: any[] }[]>([]);
+    const [hotelOptions, setHotelOptions] = useState<{ value: string; label: string; data: { hotelName: string; city?: string; rating?: number } }[]>([]);
+    const [transportOptions, setTransportOptions] = useState<{ value: string; label: string; data: { route: string; transportType?: string } }[]>([]);
+    const [loadingSelectors, setLoadingSelectors] = useState(false);
+
+    useEffect(() => {
+        if (!canManage) return;
+        setLoadingSelectors(true);
+        Promise.all([
+            axiosInstance.get("/group-ticketing"),
+            axiosInstance.get("/hotels/all"),
+            axiosInstance.get("/transports/all"),
+        ]).then(([groupsRes, hotelsRes, transportsRes]) => {
+            if (groupsRes.data?.success) {
+                setGroupTicketOptions(
+                    (groupsRes.data.data || [])
+                        .filter((g: any) => g.groupType === "Umrah Groups")
+                        .map((g: any) => {
+                            const parts = [
+                                (g.groupName || g.groupBookingId || g.sector || "Untitled Group"),
+                                `Seats: ${g.totalSeats || 0}`,
+                                `PNR: ${g.pnr || "N/A"}`,
+                                `Supplier: ${g.user?.name || "N/A"}`,
+                            ];
+                            return {
+                                _id: g._id,
+                                label: parts.join(" | "),
+                                pnr: g.pnr || "",
+                                supplierName: g.user?.name || "",
+                                flights: g.flights || [],
+                            };
+                        })
+                );
+            }
+            if (hotelsRes.data?.success) {
+                setHotelOptions(
+                    (hotelsRes.data.data || []).map((h: any) => ({
+                        value: h._id,
+                        label: h.hotelName,
+                        data: { hotelName: h.hotelName, city: h.city, rating: h.rating },
+                    }))
+                );
+            }
+            if (transportsRes.data?.success) {
+                setTransportOptions(
+                    (transportsRes.data.data || []).map((t: any) => ({
+                        value: t._id,
+                        label: t.route,
+                        data: { route: t.route, transportType: t.transportType },
+                    }))
+                );
+            }
+        }).catch((err) => console.error("Failed to load package selectors:", err))
+            .finally(() => setLoadingSelectors(false));
+    }, [canManage]);
+
+    const baseFlights = packageDetails?.flights || booking.packageData?.flights || [];
+    const baseHotels = packageDetails?.hotels || booking.packageData?.hotels || [];
+    const baseTransports =
         (packageDetails as any)?.transport?.length
             ? (packageDetails as any).transport
             : packageDetails?.transports?.length
@@ -791,6 +919,111 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                 : (booking.packageData as any)?.transport?.length
                     ? (booking.packageData as any).transport
                     : booking.packageData?.transports || [];
+
+    // What's actually shown in view mode: the admin's edit (if saved) wins over the base data.
+    const packageFlights = packageOverride?.flights?.length ? packageOverride.flights : baseFlights;
+    const packageHotels = packageOverride?.hotels?.length ? packageOverride.hotels : baseHotels;
+    const packageTransports = packageOverride?.transports?.length ? packageOverride.transports : baseTransports;
+
+    const startEditingPackage = () => {
+        setFlightsEdit(packageFlights.map((f: any) => ({ ...f })));
+        setHotelsEdit(packageHotels.map((h: any) => ({ ...h })));
+        setTransportsEdit(packageTransports.map((t: any) => ({ ...t })));
+        setSelectedGroupTicketIdEdit("");
+        setIsEditingPackage(true);
+    };
+
+    const cancelEditingPackage = () => setIsEditingPackage(false);
+
+    // Picking an Umrah Group Ticket replaces Flights wholesale with that ticket's
+    // flights - same as on the package create/edit screens, flights aren't hand-typed.
+    const handleGroupTicketSelect = (groupId: string) => {
+        setSelectedGroupTicketIdEdit(groupId);
+        const group = groupTicketOptions.find((g) => g._id === groupId);
+        setFlightsEdit(group ? group.flights.map((f: any) => ({ ...f })) : []);
+    };
+
+    const applyHotelSelection = (index: number, option: any) =>
+        setHotelsEdit(prev => prev.map((h, i) => {
+            if (i !== index) return h;
+            if (!option) return { ...h, name: "", hotelId: "", city: "", location: { ...h.location, city: "" }, rating: 0 };
+            const city = option.data?.city || "";
+            return {
+                ...h,
+                name: option.data?.hotelName || option.label || "",
+                hotelId: option.value || "",
+                city,
+                location: { ...h.location, city },
+                rating: Number(option.data?.rating || 0),
+            };
+        }));
+    const setHotelName = (index: number, name: string) =>
+        setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, name, hotelId: "" } : h));
+    const updateHotelNights = (index: number, nights: number) =>
+        setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, nightCount: nights } : h));
+    const addHotelRow = () =>
+        setHotelsEdit(prev => [...prev, { name: "", hotelId: "", city: "", location: { city: "" }, nightCount: 0, rating: 0 }]);
+    const removeHotelRow = (index: number) =>
+        setHotelsEdit(prev => prev.filter((_, i) => i !== index));
+
+    const applyTransportSelection = (index: number, option: any) =>
+        setTransportsEdit(prev => prev.map((t, i) => {
+            if (i !== index) return t;
+            if (!option) return { ...t, route: "" };
+            return {
+                ...t,
+                route: option.data?.route || option.label || "",
+                transportType: option.data?.transportType || t.transportType || "",
+            };
+        }));
+    const setTransportRoute = (index: number, route: string) =>
+        setTransportsEdit(prev => prev.map((t, i) => i === index ? { ...t, route } : t));
+    const updateTransportType = (index: number, transportType: string) =>
+        setTransportsEdit(prev => prev.map((t, i) => i === index ? { ...t, transportType } : t));
+    const addTransportRow = () =>
+        setTransportsEdit(prev => [...prev, { route: "", transportType: "" }]);
+    const removeTransportRow = (index: number) =>
+        setTransportsEdit(prev => prev.filter((_, i) => i !== index));
+
+    const savePackageDetailsEdit = async () => {
+        setSavingPackage(true);
+        try {
+            await onSavePackageDetails(booking._id, { flights: flightsEdit, hotels: hotelsEdit, transports: transportsEdit });
+            setPackageOverride({ flights: flightsEdit, hotels: hotelsEdit, transports: transportsEdit });
+            setIsEditingPackage(false);
+        } catch (e) { }
+        finally { setSavingPackage(false); }
+    };
+
+    const compactSelectStyles = {
+        control: (base: any) => ({ ...base, minHeight: "32px", fontSize: "0.72rem" }),
+        valueContainer: (base: any) => ({ ...base, padding: "0 8px" }),
+        input: (base: any) => ({ ...base, margin: 0, padding: 0 }),
+        menu: (base: any) => ({ ...base, fontSize: "0.72rem" }),
+        // Rendered in a portal on document.body (see menuPortalTarget below), so this
+        // needs its own sky-high z-index - the modal wrapper's overflow:hidden and the
+        // scrollable body would otherwise clip the dropdown menu.
+        menuPortal: (base: any) => ({ ...base, zIndex: 100000000 }),
+    };
+
+    const rowFieldLabelStyle: React.CSSProperties = {
+        fontSize: "0.6rem", color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px",
+    };
+
+    const compactSelectFieldStyle: React.CSSProperties = {
+        width: "100%", padding: "6px 8px", border: "1px solid #E2E8F0", borderRadius: "6px",
+        fontSize: "0.72rem", outline: "none", boxSizing: "border-box", background: "white",
+    };
+
+    const editRowCardStyle: React.CSSProperties = {
+        padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", position: "relative",
+    };
+
+    const removeRowButtonStyle: React.CSSProperties = {
+        position: "absolute", top: "8px", right: "8px", border: "none", background: "#FEF2F2",
+        borderRadius: "6px", padding: "4px", cursor: "pointer", display: "flex",
+    };
+
     const isExternalSource = booking.packageSource && booking.packageSource !== "local-db";
     const sourceLabel = supplierSourceLabel(booking.packageSource);
     const sourceBadgeStyle: React.CSSProperties = {
@@ -1067,7 +1300,23 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                         </div>
                     </div>
                     <div style={{ ...sectionCard, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-                        {sectionTitle(<BuildingOffice2Icon style={{ width: 15, height: 15, color: "#2563EB" }} />, "Package Details", "#1D4ED8")}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                            <div style={{ fontWeight: 700, fontSize: "0.83rem", display: "flex", alignItems: "center", gap: "8px", color: "#1D4ED8" }}>
+                                <BuildingOffice2Icon style={{ width: 15, height: 15, color: "#2563EB" }} /> Package Details
+                            </div>
+                            {canManage && (
+                                isEditingPackage ? (
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                        <button type="button" onClick={cancelEditingPackage} disabled={savingPackage} style={{ padding: "6px 12px", background: "white", border: "1px solid #BFDBFE", borderRadius: "7px", cursor: savingPackage ? "not-allowed" : "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#475569" }}>Cancel</button>
+                                        <button type="button" onClick={savePackageDetailsEdit} disabled={savingPackage} style={{ padding: "6px 12px", background: "#1D4ED8", border: "none", borderRadius: "7px", cursor: savingPackage ? "not-allowed" : "pointer", fontSize: "0.72rem", fontWeight: 700, color: "white", opacity: savingPackage ? 0.7 : 1 }}>{savingPackage ? "Saving..." : "Save"}</button>
+                                    </div>
+                                ) : (
+                                    <button type="button" onClick={startEditingPackage} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "6px 12px", background: "white", border: "1px solid #BFDBFE", borderRadius: "7px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#1D4ED8" }}>
+                                        <PencilSquareIcon style={{ width: 13, height: 13 }} /> Edit
+                                    </button>
+                                )
+                            )}
+                        </div>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "14px" }}>
                             {/* {detailItem("Package", packageDetails?.packageName || booking.packageName)} */}
@@ -1081,83 +1330,238 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                             {/* {detailItem("Group Ticket", packageDetails?.selectedGroupTicketId || "N/A")} */}
                         </div>
 
-                        {isExternalSource && (!packageDetails || (!packageFlights.length && !packageHotels.length)) && (
+                        {isExternalSource && !isEditingPackage && (!packageDetails || (!packageFlights.length && !packageHotels.length)) && (
                             <div style={{ padding: "10px", background: "#E0F2FE", border: "1px solid #BAE6FD", borderRadius: "9px", color: "#0369A1", fontSize: "0.78rem", fontWeight: 700, marginBottom: "12px" }}>
                                 {sourceLabel} package. Some local package details are not available.
                             </div>
                         )}
 
-                        {packageFlights.length > 0 && (
+                        {(isEditingPackage || packageFlights.length > 0) && (
                             <div style={{ marginBottom: "14px" }}>
                                 <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Flights</div>
-                                <div style={{ display: "grid", gap: "8px" }}>
-                                    {packageFlights.map((flight: any, index: any) => (
-                                        <div key={index} style={{ padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", display: "grid", gap: "4px" }}>
-                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A" }}>
-                                                {flight.flightNo || "Flight N/A"} {flight.airline ? `- ${flight.airline}` : ""}
-                                            </div>
-                                            <div style={{ fontSize: "0.74rem", color: "#475569", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                                <span>{flight.sectorFrom || "N/A"} to {flight.sectorTo || "N/A"}</span>
-                                                <span>{formatDate(flight.depDate)} {flight.depTime || ""}</span>
-                                                {flight.arrDate && <span>Arr: {formatDate(flight.arrDate)} {flight.arrTime || ""}</span>}
-                                                {flight.baggage && <span>Bag: {flight.baggage}</span>}
-                                                {flight.meal && <span>Meal: {flight.meal}</span>}
-                                            </div>
+                                {isEditingPackage ? (
+                                    <>
+                                        <div style={{ marginBottom: "10px" }}>
+                                            <div style={rowFieldLabelStyle}>Umrah Group Ticket</div>
+                                            <select
+                                                value={selectedGroupTicketIdEdit}
+                                                onChange={(e) => handleGroupTicketSelect(e.target.value)}
+                                                disabled={loadingSelectors}
+                                                className="w-full p-2 bg-white text-xs rounded-md"
+                                            >
+                                                <option value="">{loadingSelectors ? "Loading groups..." : "Select a group ticket to replace flights"}</option>
+                                                {groupTicketOptions.map((g) => (
+                                                    <option key={g._id} value={g._id}>{g.label}</option>
+                                                ))}
+                                            </select>
+                                            {/* {selectedGroupTicketIdEdit && (() => {
+                                                const selectedTicket = groupTicketOptions.find((g) => g._id === selectedGroupTicketIdEdit);
+                                                if (!selectedTicket) return null;
+                                                return (
+                                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                                                        <span style={{ padding: "3px 9px", borderRadius: "999px", background: "#DBEAFE", color: "#1D4ED8", fontSize: "0.68rem", fontWeight: 700 }}>
+                                                            PNR: {selectedTicket.pnr || "N/A"}
+                                                        </span>
+                                                        <span style={{ padding: "3px 9px", borderRadius: "999px", background: "#DBEAFE", color: "#1D4ED8", fontSize: "0.68rem", fontWeight: 700 }}>
+                                                            Supplier: {selectedTicket.supplierName || "N/A"}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()} */}
                                         </div>
-                                    ))}
-                                </div>
+                                        {flightsEdit.length > 0 ? (
+                                            <div style={{ display: "grid", gap: "8px" }}>
+                                                {flightsEdit.map((flight, index) => (
+                                                    <div key={index} style={{ padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", display: "grid", gap: "4px" }}>
+                                                        <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A" }}>
+                                                            {flight.flightNo || "Flight N/A"} {flight.airline ? `- ${flight.airline}` : ""}
+                                                        </div>
+                                                        <div style={{ fontSize: "0.74rem", color: "#475569", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                                            <span>{flight.sectorFrom || "N/A"} to {flight.sectorTo || "N/A"}</span>
+                                                            <span>{formatDate(flight.depDate)} {flight.depTime || ""}</span>
+                                                            {flight.arrDate && <span>Arr: {formatDate(flight.arrDate)} {flight.arrTime || ""}</span>}
+                                                            {flight.baggage && <span>Bag: {flight.baggage}</span>}
+                                                            {flight.meal && <span>Meal: {flight.meal}</span>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: "0.76rem", color: "#94A3B8" }}>No flights selected yet - pick an Umrah Group Ticket above.</div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div style={{ display: "grid", gap: "8px" }}>
+                                        {packageFlights.map((flight: any, index: any) => (
+                                            <div key={index} style={{ padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", display: "grid", gap: "4px" }}>
+                                                <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A" }}>
+                                                    {flight.flightNo || "Flight N/A"} {flight.airline ? `- ${flight.airline}` : ""}
+                                                </div>
+                                                <div style={{ fontSize: "0.74rem", color: "#475569", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                                    <span>{flight.sectorFrom || "N/A"} to {flight.sectorTo || "N/A"}</span>
+                                                    <span>{formatDate(flight.depDate)} {flight.depTime || ""}</span>
+                                                    {flight.arrDate && <span>Arr: {formatDate(flight.arrDate)} {flight.arrTime || ""}</span>}
+                                                    {flight.baggage && <span>Bag: {flight.baggage}</span>}
+                                                    {flight.meal && <span>Meal: {flight.meal}</span>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {packageHotels.length > 0 && (
+                        {(isEditingPackage || packageHotels.length > 0) && (
                             <div style={{ marginBottom: "14px" }}>
-                                <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Hotels</div>
-                                <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                        <thead>
-                                            <tr style={{ background: "#DBEAFE" }}>
-                                                {["Hotel", "City", "Nights", "Rating"].map((h) => (
-                                                    <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {packageHotels.map((hotel: any, index: number) => (
-                                                <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{hotel.name || "Hotel N/A"}</td>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.location?.city || hotel.city || "N/A"}</td>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.nightCount || hotel.nights || 0}</td>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "N/A"}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                    <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.4px" }}>Hotels</div>
+                                    {isEditingPackage && (
+                                        <button type="button" onClick={addHotelRow} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", background: "white", border: "1px solid #BFDBFE", borderRadius: "6px", cursor: "pointer", fontSize: "0.68rem", fontWeight: 700, color: "#1D4ED8" }}>
+                                            <PlusIcon style={{ width: 11, height: 11 }} /> Add Hotel
+                                        </button>
+                                    )}
                                 </div>
+                                {isEditingPackage ? (
+                                    <div style={{ display: "grid", gap: "8px" }}>
+                                        {hotelsEdit.map((hotel, index) => (
+                                            <div key={index} style={editRowCardStyle}>
+                                                <button type="button" onClick={() => removeHotelRow(index)} style={removeRowButtonStyle}>
+                                                    <TrashIcon style={{ width: 12, height: 12, color: "#DC2626" }} />
+                                                </button>
+                                                <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 2.5fr) minmax(110px, 1fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr)", gap: "8px", paddingRight: "28px" }}>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>Hotel</div>
+                                                        <CreatableSelect
+                                                            options={hotelOptions}
+                                                            value={hotel.name ? { value: hotel.hotelId || hotel.name, label: hotel.name } : null}
+                                                            onChange={(option: any) => applyHotelSelection(index, option)}
+                                                            onCreateOption={(inputValue) => setHotelName(index, inputValue)}
+                                                            placeholder={loadingSelectors ? "Loading hotels..." : "Select hotel"}
+                                                            isClearable
+                                                            isSearchable
+                                                            isLoading={loadingSelectors}
+                                                            styles={compactSelectStyles}
+                                                            menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>City</div>
+                                                        <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.city || hotel.location?.city || "—"}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>Nights</div>
+                                                        <input type="number" min="0" value={hotel.nightCount ?? hotel.nights ?? 0} onChange={(e) => updateHotelNights(index, Number(e.target.value) || 0)} style={compactSelectFieldStyle} />
+                                                    </div>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>Rating</div>
+                                                        <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "—"}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {hotelsEdit.length === 0 && <div style={{ fontSize: "0.76rem", color: "#94A3B8", padding: "4px 0" }}>No hotels added yet - click "Add Hotel" to add one.</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
+                                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                            <thead>
+                                                <tr style={{ background: "#DBEAFE" }}>
+                                                    {["Hotel", "City", "Nights", "Rating"].map((h) => (
+                                                        <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {packageHotels.map((hotel: any, index: number) => (
+                                                    <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{hotel.name || "Hotel N/A"}</td>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.location?.city || hotel.city || "N/A"}</td>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.nightCount || hotel.nights || 0}</td>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "N/A"}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {packageTransports.length > 0 && (
+                        {(isEditingPackage || packageTransports.length > 0) && (
                             <div>
-                                <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Transport</div>
-                                <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
-                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                        <thead>
-                                            <tr style={{ background: "#DBEAFE" }}>
-                                                {["Route", "Type"].map((h) => (
-                                                    <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {packageTransports.map((t: any, index: number) => (
-                                                <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{t.route || "Route N/A"}</td>
-                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{t.transportType || "N/A"}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                    <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.4px" }}>Transport</div>
+                                    {isEditingPackage && (
+                                        <button type="button" onClick={addTransportRow} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", background: "white", border: "1px solid #BFDBFE", borderRadius: "6px", cursor: "pointer", fontSize: "0.68rem", fontWeight: 700, color: "#1D4ED8" }}>
+                                            <PlusIcon style={{ width: 11, height: 11 }} /> Add Transport
+                                        </button>
+                                    )}
                                 </div>
+                                {isEditingPackage ? (
+                                    <div style={{ display: "grid", gap: "8px" }}>
+                                        {transportsEdit.map((t, index) => (
+                                            <div key={index} style={editRowCardStyle}>
+                                                <button type="button" onClick={() => removeTransportRow(index)} style={removeRowButtonStyle}>
+                                                    <TrashIcon style={{ width: 12, height: 12, color: "#DC2626" }} />
+                                                </button>
+                                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "8px", paddingRight: "28px" }}>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>Route</div>
+                                                        <CreatableSelect
+                                                            options={transportOptions}
+                                                            value={t.route ? { value: t.route, label: t.route } : null}
+                                                            onChange={(option: any) => applyTransportSelection(index, option)}
+                                                            onCreateOption={(inputValue) => setTransportRoute(index, inputValue)}
+                                                            placeholder={loadingSelectors ? "Loading transports..." : "Select route"}
+                                                            isClearable
+                                                            isSearchable
+                                                            isLoading={loadingSelectors}
+                                                            styles={compactSelectStyles}
+                                                            menuPortalTarget={document.body}
+                                                            menuPosition="fixed"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <div style={rowFieldLabelStyle}>Type</div>
+                                                        <select
+                                                            value={t.transportType || ""}
+                                                            onChange={(e) => updateTransportType(index, e.target.value)}
+                                                            // style={compactSelectFieldStyle}
+                                                            className="w-full p-2.5 bg-white text-xs border border-neutral-200 rounded-sm"
+                                                        >
+                                                            <option value="">Select type</option>
+                                                            {TRANSPORT_TYPES.map((tt) => (
+                                                                <option key={tt} value={tt}>{tt}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {transportsEdit.length === 0 && <div style={{ fontSize: "0.76rem", color: "#94A3B8", padding: "4px 0" }}>No transport added yet - click "Add Transport" to add one.</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
+                                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                            <thead>
+                                                <tr style={{ background: "#DBEAFE" }}>
+                                                    {["Route", "Type"].map((h) => (
+                                                        <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {packageTransports.map((t: any, index: number) => (
+                                                    <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{t.route || "Route N/A"}</td>
+                                                        <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{t.transportType || "N/A"}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
 

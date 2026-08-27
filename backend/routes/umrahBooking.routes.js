@@ -17,6 +17,7 @@ import {
   savePassengerDiscounts,
   updatePassengersLock,
   updatePassengerDetails,
+  updateBookingPackageDetails,
 } from "../controllers/umrahBooking.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { uploadUmrahDoc } from "../config/cloudinary.js";
@@ -80,6 +81,7 @@ router.patch(
   uploadUmrahDoc.any(),
   updatePassengerDetails,
 );
+router.patch("/:id/package-details", protect, updateBookingPackageDetails);
 
 router.patch("/savePassengerDiscounts", protect, savePassengerDiscounts);
 

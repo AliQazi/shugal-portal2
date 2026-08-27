@@ -125,11 +125,30 @@ export default function UmrahBooking() {
   const formatMoney = (amount, currency = "PKR") =>
     `${currency} ${(Number(amount) || 0).toLocaleString()}`;
 
-  const getPackageDetails = (booking) =>
-    detailsPackageData ||
-    (booking?.packageId && typeof booking.packageId === "object"
-      ? booking.packageId
-      : booking?.packageData || {});
+  // Layers an admin's booking-specific Flights/Hotels/Transport edit
+  // (booking.packageDetailsOverride, set from the admin Booking Details modal)
+  // on top of the base package details. Per-field: an overridden array wholly
+  // replaces the base one; anything not overridden falls through unchanged.
+  const applyPackageDetailsOverride = (base, override) => {
+    if (!override) return base;
+    const merged = { ...(base || {}) };
+    if (override.flights?.length) merged.flights = override.flights;
+    if (override.hotels?.length) merged.hotels = override.hotels;
+    if (override.transports?.length) {
+      merged.transports = override.transports;
+      merged.transport = override.transports;
+    }
+    return merged;
+  };
+
+  const getPackageDetails = (booking) => {
+    const base =
+      detailsPackageData ||
+      (booking?.packageId && typeof booking.packageId === "object"
+        ? booking.packageId
+        : booking?.packageData || {});
+    return applyPackageDetailsOverride(base, booking?.packageDetailsOverride);
+  };
 
   const getPackageSourceInfo = (source) => {
     if (source === "travel-network") {
@@ -321,6 +340,15 @@ export default function UmrahBooking() {
           ? booking.packageId
           : booking.packageData || null;
 
+      // Admin's booking-specific Flights/Hotels/Transport edit (if any) takes
+      // precedence over whatever the base package/source data says.
+      packageData = applyPackageDetailsOverride(
+        packageData,
+        booking.packageDetailsOverride,
+      );
+
+      const packageId = getId(booking.packageId || packageData?._id);
+
       // Travel Network booking: TNT API se live data fetch karo
       if (booking.packageSource === "travel-network") {
         const tntBookingId = booking.travelNetworkBookingId || booking.travelNetworkBookingData?.data?.id;
@@ -330,6 +358,11 @@ export default function UmrahBooking() {
 
         if (!tntFlights.length && packageData?.flights?.length) {
           tntFlights = packageData.flights;
+        }
+
+        // Admin's manual flight edit always wins over live TNT data
+        if (booking.packageDetailsOverride?.flights?.length) {
+          tntFlights = booking.packageDetailsOverride.flights;
         }
 
         const tntSource = {
@@ -361,6 +394,11 @@ export default function UmrahBooking() {
           `/umrahpackages/${packageId}`,
         );
         packageData = packageRes.data?.package || packageRes.data?.data;
+        // Re-apply the booking's edit on top of the freshly-fetched master package
+        packageData = applyPackageDetailsOverride(
+          packageData,
+          booking.packageDetailsOverride,
+        );
       }
 
       const groupTicketId = getId(
@@ -827,8 +865,12 @@ export default function UmrahBooking() {
   const selectedBookingDiscountTotal = getDiscountTotal(selectedBooking);
   const selectedBookingAfterDiscountTotal = getPayableTotal(selectedBooking);
   const selectedPackageDetails = getPackageDetails(selectedBooking);
-  const selectedPackageFlights =
-    detailsGroupTicket?.flights || selectedPackageDetails?.flights || [];
+  // The admin's booking-specific flight edit always wins, even over a freshly
+  // fetched group ticket's own flights.
+  const selectedPackageFlights = selectedBooking?.packageDetailsOverride
+    ?.flights?.length
+    ? selectedBooking.packageDetailsOverride.flights
+    : detailsGroupTicket?.flights || selectedPackageDetails?.flights || [];
   const selectedPackageHotels = selectedPackageDetails?.hotels || [];
   const selectedPackageTransports = selectedPackageDetails?.transports || [];
   const selectedPackageVisa = selectedPackageDetails?.visa || null;
@@ -2369,14 +2411,6 @@ export default function UmrahBooking() {
                         </p>
                         <p className="font-bold text-gray-900">
                           {selectedPackageVisa.visaType || "N/A"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase text-gray-400">
-                          Price
-                        </p>
-                        <p className="font-bold text-gray-900">
-                          {formatMoney(selectedPackageVisa.sellingPrice)}
                         </p>
                       </div>
                     </div>

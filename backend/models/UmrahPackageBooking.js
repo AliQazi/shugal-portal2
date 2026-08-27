@@ -344,6 +344,15 @@ const UmrahPackageBookingSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Admin edits to this booking's displayed Flights / Hotels / Transport.
+    // Scoped to THIS booking only - never writes back to the shared UmrahPackage
+    // document, and is intentionally NOT read by the Confirmed-status ledger
+    // voucher logic (which always prices off the original linked package).
+    packageDetailsOverride: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
     // Additional Notes
     specialRequests: String,
     internalNotes: String,

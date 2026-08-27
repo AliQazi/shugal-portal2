@@ -2115,6 +2115,73 @@ export const updatePassengerDetails = async (req, res) => {
   }
 };
 
+/* ===========================
+   UPDATE BOOKING PACKAGE DETAILS (ADMIN ONLY)
+   Lets admin edit how Flights / Hotels / Transport are displayed & printed
+   for THIS booking only. This is a booking-scoped override - it never
+   touches the shared UmrahPackage document, and is intentionally never
+   consulted by the Confirmed-status ledger voucher logic in
+   updateOverallStatus, which always prices off the original linked package.
+=========================== */
+export const updateBookingPackageDetails = async (req, res) => {
+  try {
+    const { flights, hotels, transports } = req.body;
+
+    if (
+      !Array.isArray(flights) &&
+      !Array.isArray(hotels) &&
+      !Array.isArray(transports)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "At least one of flights, hotels, or transports must be provided as an array",
+      });
+    }
+
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Umrah booking not found",
+      });
+    }
+
+    booking.packageDetailsOverride = {
+      ...(booking.packageDetailsOverride || {}),
+      ...(Array.isArray(flights) ? { flights } : {}),
+      ...(Array.isArray(hotels) ? { hotels } : {}),
+      ...(Array.isArray(transports) ? { transports } : {}),
+      updatedAt: new Date(),
+      updatedBy: req.user._id.toString(),
+    };
+    booking.markModified("packageDetailsOverride");
+
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Flights/Hotels/Transport details edited (booking-specific) for Umrah booking "${booking.bookingNumber}"`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Booking package details updated successfully",
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Update Booking Package Details Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export const getBookedSeats = async (req, res) => {
   try {
     const { groupId } = req.query;

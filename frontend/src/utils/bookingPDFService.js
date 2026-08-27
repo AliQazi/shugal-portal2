@@ -234,6 +234,17 @@ export const printGDSBooking = async (booking) => {
     return unique.length ? unique.join(", ") : fallback;
   };
 
+  // Same de-dupe as joinUnique, but renders each entry on its own line
+  // (via <br/>) instead of a single comma-separated paragraph. Escapes each
+  // entry itself, so the caller must NOT run the result through escapeHTML again.
+  const joinUniqueLines = (values, fallback = "N/A") => {
+    const cleaned = values
+      .map((value) => value?.toString().trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(cleaned));
+    return unique.length ? unique.map((v) => escapeHTML(v)).join("<br/>") : fallback;
+  };
+
   const getRoomTypeFromRooms = (rooms) => {
     if (!rooms || typeof rooms !== "object") return "";
     return Object.entries(rooms)
@@ -254,7 +265,7 @@ export const printGDSBooking = async (booking) => {
 
   const makkahHotelText = joinUnique(makkahHotels.map(getHotelName));
   const madinahHotelText = joinUnique(madinahHotels.map(getHotelName));
-  const transportText = joinUnique(
+  const transportText = joinUniqueLines(
     packageTransports.map((transport) => {
       const route = (
         transport?.route ||
@@ -307,7 +318,7 @@ export const printGDSBooking = async (booking) => {
                 <div class="package-icon">${ICON_BUS(NAVY)}</div>
                 <div>
                     <div class="package-label">Transport</div>
-                    <div class="package-value">${escapeHTML(transportText)}</div>
+                    <div class="package-value">${transportText}</div>
                 </div>
             </div>
             <div class="package-item">

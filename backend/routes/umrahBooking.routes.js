@@ -15,6 +15,8 @@ import {
   updateOverallStatus,
   extendUmrahBookingHold,
   savePassengerDiscounts,
+  updatePassengersLock,
+  updatePassengerDetails,
 } from "../controllers/umrahBooking.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { uploadUmrahDoc } from "../config/cloudinary.js";
@@ -71,6 +73,13 @@ router.patch(
 router.patch("/:id/voucher-status", protect, updateVoucherStatus);
 router.patch("/:id/overall-status", protect, updateOverallStatus);
 router.patch("/:id/extend-hold", protect, extendUmrahBookingHold);
+router.patch("/:id/passengers-lock", protect, updatePassengersLock);
+router.patch(
+  "/:id/passengers",
+  protect,
+  uploadUmrahDoc.any(),
+  updatePassengerDetails,
+);
 
 router.patch("/savePassengerDiscounts", protect, savePassengerDiscounts);
 

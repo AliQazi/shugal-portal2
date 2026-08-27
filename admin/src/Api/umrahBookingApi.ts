@@ -186,3 +186,17 @@ export const extendUmrahBookingHold = async (
     throw error;
   }
 };
+
+// Lock/unlock agent-side passenger detail editing
+export const updatePassengersLock = async (id: string, locked: boolean) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/umrah-bookings/${id}/passengers-lock`,
+      { locked },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating passengers lock:", error);
+    throw error;
+  }
+};

@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { getMyBookings, submitPayment } from "../../../api/umrahBookingApi";
+import {
+  getMyBookings,
+  submitPayment,
+  updatePassengerDetails,
+} from "../../../api/umrahBookingApi";
 import axiosInstance from "../../../api/axios";
 import { printGDSBooking } from "../../../utils/bookingPDFService";
 import {
@@ -20,6 +24,8 @@ import {
   CalendarDays,
   Users,
   Plane,
+  Pencil,
+  Lock,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import useAccountsList from "../../../context/useAccountsList";
@@ -56,6 +62,11 @@ export default function UmrahBooking() {
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  // Edit passengers modal state
+  const [editPassengersBooking, setEditPassengersBooking] = useState(null);
+  const [editPassengersForm, setEditPassengersForm] = useState([]);
+  const [savingPassengers, setSavingPassengers] = useState(false);
 
   // Bank accounts filter - data3 se sirf bank wale accounts
   const bankAccounts = useMemo(() => {
@@ -555,6 +566,95 @@ export default function UmrahBooking() {
     }
   };
 
+  const handleOpenEditPassengersModal = (booking) => {
+    if (booking.passengersLocked) {
+      toast.error(
+        "Passenger editing is locked for this booking. Please contact admin.",
+      );
+      return;
+    }
+    setEditPassengersBooking(booking);
+    setEditPassengersForm(
+      (booking.passengers || []).map((p) => ({
+        type: p.type,
+        childType: p.childType,
+        title: p.title || "",
+        givenName: p.givenName || "",
+        surName: p.surName || "",
+        passport: p.passport || "",
+        dateOfBirth: p.dateOfBirth ? p.dateOfBirth.split("T")[0] : "",
+        passportExpiry: p.passportExpiry ? p.passportExpiry.split("T")[0] : "",
+        nationality: p.nationality || "",
+        documentUrl: p.documentUrl || "",
+        documentFile: null,
+        documentFileName: "",
+      })),
+    );
+  };
+
+  const handleClosePassengersModal = () => {
+    setEditPassengersBooking(null);
+    setEditPassengersForm([]);
+    setSavingPassengers(false);
+  };
+
+  const handlePassengerFieldChange = (index, field, value) => {
+    setEditPassengersForm((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handlePassengerFileChange = (index, file) => {
+    if (!file) return;
+    handlePassengerFieldChange(index, "documentFile", file);
+    handlePassengerFieldChange(index, "documentFileName", file.name);
+  };
+
+  const handleSavePassengers = async (e) => {
+    e.preventDefault();
+    if (!editPassengersBooking) return;
+
+    try {
+      setSavingPassengers(true);
+
+      const fd = new FormData();
+      const passengersPayload = editPassengersForm.map((p) => ({
+        title: p.title,
+        givenName: p.givenName,
+        surName: p.surName,
+        passport: p.passport,
+        dateOfBirth: p.dateOfBirth,
+        passportExpiry: p.passportExpiry,
+        nationality: p.nationality,
+      }));
+      fd.append("passengers", JSON.stringify(passengersPayload));
+      editPassengersForm.forEach((p, i) => {
+        if (p.documentFile) {
+          fd.append(`documentFile_${i}`, p.documentFile, p.documentFileName);
+        }
+      });
+
+      const res = await updatePassengerDetails(
+        editPassengersBooking._id,
+        fd,
+      );
+      setBookings((prev) =>
+        prev.map((b) => (b._id === editPassengersBooking._id ? res.data : b)),
+      );
+      toast.success("Passenger details updated successfully");
+      handleClosePassengersModal();
+    } catch (error) {
+      console.error("Error updating passenger details:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update passenger details",
+      );
+    } finally {
+      setSavingPassengers(false);
+    }
+  };
+
   useEffect(() => {
     fetchBookings();
   }, []);
@@ -895,15 +995,6 @@ export default function UmrahBooking() {
                       (sortConfig.direction === "asc" ? "↑" : "↓")}
                   </th>
 
-                  <th
-                    onClick={() => handleSort("createdAt")}
-                    className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 cursor-pointer hover:text-emerald-600"
-                  >
-                    Booked On{" "}
-                    {sortConfig.key === "createdAt" &&
-                      (sortConfig.direction === "asc" ? "Asc" : "Desc")}
-                  </th>
-
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                     Passenger
                   </th>
@@ -948,6 +1039,10 @@ export default function UmrahBooking() {
                         <div className="font-mono font-semibold text-gray-900">
                           {booking.bookingNumber}
                         </div>
+                        <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-1">
+                          <CalendarDays className="h-3 w-3 text-emerald-600" />
+                          {formatDate(booking.createdAt)}
+                        </div>
                         <div className="text-[11px] text-gray-500 capitalize">
                           {booking.roomType || "Room N/A"}
                         </div>
@@ -961,14 +1056,7 @@ export default function UmrahBooking() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2 text-xs! font-medium text-gray-900">
-                          <CalendarDays className="h-4 w-4 text-emerald-600" />
-                          {formatDate(booking.createdAt)}
-                        </div>
-                      </td>
-
-                      <td className="flex items-center gap-2 px-4 py-3 whitespace-nowrap">
+                      <td className="flex flex-col gap-1 px-4 py-3 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
                           {booking.passengers?.[0]?.givenName}{" "}
                           {booking.passengers?.[0]?.surName}
@@ -1125,6 +1213,28 @@ export default function UmrahBooking() {
                             Details
                           </button>
 
+                          {booking.passengersLocked ? (
+                            <button
+                              disabled
+                              className="inline-flex items-center gap-1 px-2! py-1! bg-gray-100 text-gray-400 border border-gray-200 rounded-md text-xs! font-medium whitespace-nowrap cursor-not-allowed"
+                              title="Passenger editing is locked by admin"
+                            >
+                              <Lock className="w-3 h-3" />
+                              Edit
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                handleOpenEditPassengersModal(booking)
+                              }
+                              className="inline-flex items-center gap-1 px-2! py-1! bg-amber-50 text-amber-700 border border-amber-100 rounded-md hover:bg-amber-100 text-xs! font-medium whitespace-nowrap"
+                              title="Edit Passenger Details"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              Edit
+                            </button>
+                          )}
+
                           {booking.overallStatus !== "Cancelled" && (
                             <button
                               onClick={(e) => {
@@ -1197,7 +1307,7 @@ export default function UmrahBooking() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="px-6 py-16 text-center">
+                    <td colSpan="9" className="px-6 py-16 text-center">
                       <Filter className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                       <p className="text-sm font-semibold text-gray-900">
                         No bookings
@@ -1562,7 +1672,7 @@ export default function UmrahBooking() {
                       required
                       readOnly
                       value={paymentForm.amount}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 cursor-not-allowed"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 cursor-not-allowed"
                       placeholder="0.00"
                     />
                   </div>
@@ -1579,7 +1689,7 @@ export default function UmrahBooking() {
                           method: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-sm"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-xs"
                     >
                       <option value="">Select</option>
                       {/* <option value="Cash">Cash</option> */}
@@ -1603,7 +1713,7 @@ export default function UmrahBooking() {
                         receiptNumber: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-sm"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-xs"
                     placeholder="TRX-123456"
                   />
                 </div>
@@ -1622,7 +1732,7 @@ export default function UmrahBooking() {
                         selectedBankId: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-sm"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none text-xs"
                   >
                     <option value="">Select Bank</option>
                     {bankAccounts.map((bank) => (
@@ -1642,7 +1752,7 @@ export default function UmrahBooking() {
                     className="group flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/30 transition-all cursor-pointer"
                   >
                     <Upload className="w-8 h-8 text-gray-300 group-hover:text-emerald-500 mb-2" />
-                    <span className="text-sm font-medium text-gray-600 group-hover:text-emerald-700">
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-emerald-700">
                       {receiptFile ? receiptFile.name : "Choose receipt file"}
                     </span>
                     <input
@@ -2449,6 +2559,269 @@ export default function UmrahBooking() {
                   </button>
                 )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PASSENGERS MODAL */}
+      {editPassengersBooking && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+            onClick={handleClosePassengersModal}
+          ></div>
+
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="px-6 pt-6 pb-3 flex items-start justify-between border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">
+                  Edit Passenger Details
+                </h2>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  Ref:{" "}
+                  <span className="font-mono font-medium text-emerald-600">
+                    {editPassengersBooking.bookingNumber}
+                  </span>{" "}
+                  · {editPassengersForm.length} passenger
+                  {editPassengersForm.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <button
+                onClick={handleClosePassengersModal}
+                className="p-2 bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSavePassengers}
+              className="flex-1 overflow-y-auto flex flex-col"
+            >
+              <div className="flex-1 overflow-auto px-4 py-3">
+                <table className="w-full min-w-245 border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                      <th className="px-2 py-2 text-left border-b border-gray-200 w-10">
+                        #
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200">
+                        Type
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200 w-20">
+                        Title
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200">
+                        Given Name
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200">
+                        Surname
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200">
+                        Passport
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200 w-32">
+                        Date of Birth
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200 w-32">
+                        Passport Expiry
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200">
+                        Nationality
+                      </th>
+                      <th className="px-2 py-2 text-left border-b border-gray-200 w-32">
+                        Document
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {editPassengersForm.map((pax, i) => (
+                      <tr key={i} className="hover:bg-gray-50/60">
+                        <td className="px-2 py-1.5 align-middle font-semibold text-gray-400">
+                          {i + 1}
+                        </td>
+                        <td className="px-2 py-1.5 align-middle whitespace-nowrap">
+                          <span className="inline-block rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            {pax.type === "Child"
+                              ? `Child (${pax.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                              : pax.type}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <select
+                            value={pax.title}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "title",
+                                e.target.value,
+                              )
+                            }
+                            className="w-16 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          >
+                            {(pax.type === "Adult"
+                              ? ["Mr", "Mrs", "Ms", "Miss", "Dr"]
+                              : pax.type === "Child"
+                                ? ["Child", "Master"]
+                                : ["INF", "Baby"]
+                            ).map((o) => (
+                              <option key={o} value={o}>
+                                {o}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="text"
+                            required
+                            value={pax.givenName}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "givenName",
+                                e.target.value,
+                              )
+                            }
+                            className="w-32 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="text"
+                            required
+                            value={pax.surName}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "surName",
+                                e.target.value,
+                              )
+                            }
+                            className="w-32 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="text"
+                            required
+                            value={pax.passport}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "passport",
+                                e.target.value.toUpperCase(),
+                              )
+                            }
+                            className="w-30 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! uppercase focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="date"
+                            required
+                            value={pax.dateOfBirth}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "dateOfBirth",
+                                e.target.value,
+                              )
+                            }
+                            className="w-36 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="date"
+                            required
+                            value={pax.passportExpiry}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "passportExpiry",
+                                e.target.value,
+                              )
+                            }
+                            className="w-36 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="text"
+                            required
+                            value={pax.nationality}
+                            onChange={(e) =>
+                              handlePassengerFieldChange(
+                                i,
+                                "nationality",
+                                e.target.value,
+                              )
+                            }
+                            className="w-30 px-1.5 py-1 bg-white border border-gray-200 rounded text-sm! focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 align-middle">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) =>
+                              handlePassengerFileChange(
+                                i,
+                                e.target.files?.[0],
+                              )
+                            }
+                            style={{ display: "none" }}
+                            id={`edit-pax-doc-${i}`}
+                          />
+                          <label
+                            htmlFor={`edit-pax-doc-${i}`}
+                            className={`flex items-center justify-center gap-1 px-2 py-1 rounded border text-[10px] font-semibold cursor-pointer whitespace-nowrap ${
+                              pax.documentFileName
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                            }`}
+                            title={pax.documentFileName || "Upload new document"}
+                          >
+                            <Upload className="w-3 h-3" />
+                            {pax.documentFileName
+                              ? "New file selected"
+                              : "Replace"}
+                          </label>
+                          {!pax.documentFileName && pax.documentUrl && (
+                            <a
+                              href={pax.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 block text-center text-[10px] font-semibold text-blue-600 hover:text-blue-800"
+                            >
+                              View current
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/60">
+                <button
+                  type="button"
+                  onClick={handleClosePassengersModal}
+                  className="flex-1 px-6 py-2.5! text-gray-600 font-bold text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPassengers}
+                  className="flex-1 px-6 py-2.5! bg-emerald-600 text-white font-bold text-sm rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
+                >
+                  {savingPassengers ? "Saving..." : "Save Passenger Details"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1949,6 +1949,172 @@ export const savePassengerDiscounts = async (req, res) => {
   }
 };
 
+/* ===========================
+   TOGGLE PASSENGERS EDIT LOCK (ADMIN ONLY)
+   Admin locks/unlocks whether the agent can edit passenger details
+=========================== */
+export const updatePassengersLock = async (req, res) => {
+  try {
+    const { locked } = req.body;
+
+    if (typeof locked !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "'locked' boolean is required",
+      });
+    }
+
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Umrah booking not found",
+      });
+    }
+
+    booking.passengersLocked = locked;
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Passenger edits ${locked ? "locked" : "unlocked"} for Umrah booking "${booking.bookingNumber}"`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Passenger edits ${locked ? "locked" : "unlocked"} successfully`,
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Update Passengers Lock Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/* ===========================
+   UPDATE PASSENGER DETAILS (AGENT/USER)
+   Agent edits passenger details only, while unlocked by admin.
+   Only editable identity fields are updated - type/childType/discount/documentUrl
+   are left untouched.
+=========================== */
+export const updatePassengerDetails = async (req, res) => {
+  try {
+    // Sent as FormData - passengers travels as a JSON string alongside any
+    // updated document files (documentFile_0, documentFile_1, ...).
+    let passengers = req.body.passengers;
+    if (typeof passengers === "string") {
+      try {
+        passengers = JSON.parse(passengers);
+      } catch (_) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid passengers payload",
+        });
+      }
+    }
+
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Passengers array is required",
+      });
+    }
+
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Umrah booking not found",
+      });
+    }
+
+    // Only the booking owner may edit their own passengers
+    if (booking.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only edit passengers for your own bookings",
+      });
+    }
+
+    if (booking.passengersLocked) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Passenger editing is locked for this booking. Please contact admin.",
+      });
+    }
+
+    if (passengers.length !== booking.passengers.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Passenger count mismatch",
+      });
+    }
+
+    const editableFields = [
+      "title",
+      "givenName",
+      "surName",
+      "passport",
+      "dateOfBirth",
+      "passportExpiry",
+      "nationality",
+    ];
+
+    // Updated document files, matched by index via field name documentFile_0, documentFile_1, etc.
+    const uploadedFiles = req.files || [];
+    const fileByIndex = {};
+    uploadedFiles.forEach((f) => {
+      const match = f.fieldname.match(/^documentFile_(\d+)$/);
+      if (match) fileByIndex[parseInt(match[1], 10)] = f.path;
+    });
+
+    booking.passengers.forEach((existingPassenger, index) => {
+      const updated = passengers[index];
+      if (updated) {
+        editableFields.forEach((field) => {
+          if (updated[field] !== undefined && updated[field] !== "") {
+            existingPassenger[field] = updated[field];
+          }
+        });
+      }
+      if (fileByIndex[index]) {
+        existingPassenger.documentUrl = fileByIndex[index];
+      }
+    });
+
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Passenger details updated by agent for Umrah booking "${booking.bookingNumber}"`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Passenger details updated successfully",
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Update Passenger Details Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export const getBookedSeats = async (req, res) => {
   try {
     const { groupId } = req.query;

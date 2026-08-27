@@ -185,3 +185,25 @@ export const extendUmrahBookingHold = async (id, holdData) => {
     throw error;
   }
 };
+
+// Update passenger details (agent/user - only allowed while unlocked by admin)
+// Pass a FormData containing a "passengers" JSON string field and, optionally,
+// updated document files keyed as documentFile_0, documentFile_1, ...
+export const updatePassengerDetails = async (id, formData) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/umrah-bookings/${id}/passengers`,
+      formData,
+      {
+        headers:
+          formData instanceof FormData
+            ? { "Content-Type": "multipart/form-data" }
+            : {},
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating passenger details:", error);
+    throw error;
+  }
+};

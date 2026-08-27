@@ -9,6 +9,7 @@ import {
     updateOverallStatus,
     extendUmrahBookingHold,
     savePassengerDiscounts,
+    updatePassengersLock,
 } from "../../Api/umrahBookingApi";
 import axiosInstance from "../../Api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -21,6 +22,7 @@ import {
     BanknotesIcon, ClockIcon, EyeIcon, UserIcon, HomeIcon,
     MagnifyingGlassIcon, ChartBarIcon, CurrencyDollarIcon,
     IdentificationIcon, BuildingLibraryIcon, PrinterIcon,
+    LockClosedIcon, LockOpenIcon,
 } from "@heroicons/react/24/outline";
 
 interface Passenger {
@@ -121,6 +123,8 @@ interface UmrahBooking {
     hotelStatus: { status: string; confirmationNumber?: string; bookingDate?: string; confirmationDocument?: string; notes?: string; };
     overallStatus: string; expiresAt?: string | null; createdAt: string; updatedAt?: string;
     supplierDiscount?: number;
+    // Admin-controlled lock for agent-side passenger detail edits (false = editable).
+    passengersLocked?: boolean;
 }
 
 interface Timer { hours: number; minutes: number; seconds: number; expired: boolean; }
@@ -194,6 +198,7 @@ export default function UmrahPackagesBooking() {
     const [timers, setTimers] = useState<Record<string, Timer>>({});
     const [extendingHoldId, setExtendingHoldId] = useState<string | null>(null);
     const [printingTicketId, setPrintingTicketId] = useState<string | null>(null);
+    const [togglingLockId, setTogglingLockId] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [openedBookingId, setOpenedBookingId] = useState<string | null>(null);
     const itemsPerPage = 10;
@@ -246,6 +251,20 @@ export default function UmrahPackagesBooking() {
         try { setExtendingHoldId(bookingId); const res = await extendUmrahBookingHold(bookingId, { holdMinutes }); setBookings(prev => prev.map(b => b._id === bookingId ? res.data : b)); toast.success("Hold extended"); }
         catch (error: any) { toast.error(error.response?.data?.message); }
         finally { setExtendingHoldId(null); }
+    };
+
+    const handleTogglePassengersLock = async (bookingId: string, nextLocked: boolean) => {
+        if (!canManage) { toast.error("No permission"); return; }
+        try {
+            setTogglingLockId(bookingId);
+            const res = await updatePassengersLock(bookingId, nextLocked);
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, passengersLocked: res.data.passengersLocked } : b));
+            toast.success(nextLocked ? "Passenger edits locked" : "Passenger edits unlocked");
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to update lock");
+        } finally {
+            setTogglingLockId(null);
+        }
     };
 
     const handleSaveDiscounts = async (bookingId: string, passengers: { passport: string; discount: number }[]) => {
@@ -607,6 +626,42 @@ export default function UmrahPackagesBooking() {
                                             <td style={{ padding: "13px 14px" }}>
                                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                                     <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                                                        {canManage && (
+                                                            <button
+                                                                onClick={() => handleTogglePassengersLock(b._id, !b.passengersLocked)}
+                                                                disabled={togglingLockId === b._id}
+                                                                title={b.passengersLocked ? "Passenger edits locked — click to unlock" : "Passenger edits unlocked — click to lock"}
+                                                                style={{
+                                                                    display: "flex", alignItems: "center", gap: "6px",
+                                                                    padding: "4px 8px 4px 4px", borderRadius: "7px", border: "1px solid",
+                                                                    borderColor: b.passengersLocked ? "#FCA5A5" : "#A7F3D0",
+                                                                    background: b.passengersLocked ? "#FEF2F2" : "#ECFDF5",
+                                                                    cursor: togglingLockId === b._id ? "not-allowed" : "pointer",
+                                                                    opacity: togglingLockId === b._id ? 0.6 : 1,
+                                                                    transition: "all 0.15s",
+                                                                }}
+                                                            >
+                                                                <span style={{
+                                                                    position: "relative", width: "26px", height: "15px", borderRadius: "999px",
+                                                                    background: b.passengersLocked ? "#EF4444" : "#10B981",
+                                                                    transition: "background 0.15s", flexShrink: 0,
+                                                                }}>
+                                                                    <span style={{
+                                                                        position: "absolute", top: "2px",
+                                                                        left: b.passengersLocked ? "2px" : "13px",
+                                                                        width: "11px", height: "11px", borderRadius: "50%",
+                                                                        background: "white", transition: "left 0.15s",
+                                                                        boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+                                                                    }} />
+                                                                </span>
+                                                                {b.passengersLocked
+                                                                    ? <LockClosedIcon style={{ width: 12, height: 12, color: "#B91C1C" }} />
+                                                                    : <LockOpenIcon style={{ width: 12, height: 12, color: "#047857" }} />}
+                                                                <span style={{ fontSize: "0.68rem", fontWeight: 700, color: b.passengersLocked ? "#B91C1C" : "#047857" }}>
+                                                                    {b.passengersLocked ? "Can't Edit" : "Can Edit"}
+                                                                </span>
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => handlePrintTicket(b)}
                                                             disabled={printingTicketId === b._id}
@@ -761,7 +816,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
 
     return (
         <>
-            <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 99999, backdropFilter: "blur(2px)" }} />
+            <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999999, backdropFilter: "blur(2px)" }} />
             <div style={{
                 position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
                 width: "90%", maxWidth: "800px", maxHeight: "80vh", background: "white",
@@ -1122,10 +1177,10 @@ function StatusModal({ modalData, onClose, onSuccess }: any) {
 
     return (
         <>
-            <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 99999, backdropFilter: "blur(2px)" }} />
+            <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 999999, backdropFilter: "blur(2px)" }} />
             <div style={{
                 position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                width: "420px", background: "white", borderRadius: "16px", zIndex: 999999,
+                width: "420px", background: "white", borderRadius: "16px", zIndex: 9999999,
                 padding: "24px", boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
             }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>

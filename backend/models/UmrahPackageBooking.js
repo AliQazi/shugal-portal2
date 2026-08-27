@@ -337,6 +337,13 @@ const UmrahPackageBookingSchema = new mongoose.Schema(
       default: "On Hold",
     },
 
+    // Admin-controlled lock for agent-side passenger detail edits.
+    // false (default) = agent can edit passenger details; true = locked, agent cannot edit.
+    passengersLocked: {
+      type: Boolean,
+      default: false,
+    },
+
     // Additional Notes
     specialRequests: String,
     internalNotes: String,

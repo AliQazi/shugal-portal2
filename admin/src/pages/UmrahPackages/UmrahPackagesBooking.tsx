@@ -783,6 +783,14 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
     const packageTotals = packageDetails?.packageTotals || booking.packageData?.packageTotals;
     const packageFlights = packageDetails?.flights || booking.packageData?.flights || [];
     const packageHotels = packageDetails?.hotels || booking.packageData?.hotels || [];
+    const packageTransports =
+        (packageDetails as any)?.transport?.length
+            ? (packageDetails as any).transport
+            : packageDetails?.transports?.length
+                ? packageDetails.transports
+                : (booking.packageData as any)?.transport?.length
+                    ? (booking.packageData as any).transport
+                    : booking.packageData?.transports || [];
     const isExternalSource = booking.packageSource && booking.packageSource !== "local-db";
     const sourceLabel = supplierSourceLabel(booking.packageSource);
     const sourceBadgeStyle: React.CSSProperties = {
@@ -801,7 +809,6 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
         booking.travelNetworkBookingId || booking.travelNetworkBookingData?.data?.id || booking.zipBookingId || booking.zipBookingData?.data?.id;
     const upskyBookingId =
         booking.upskyBookingId || booking.upskyBookingData?.data?.booking_id || booking.upskyBookingData?.data?.id;
-    // const packageTransports = packageDetails?.transports || [];
     // const packageVisa = packageDetails?.visa;
     const adultPrice = booking.pricing?.pricePerPerson || 0;
     const childPrice = packageTotals?.childWithoutBed || 0;
@@ -1105,19 +1112,54 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                         {packageHotels.length > 0 && (
                             <div style={{ marginBottom: "14px" }}>
                                 <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Hotels</div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px" }}>
-                                    {packageHotels.map((hotel: any, index: any) => (
-                                        <div key={index} style={{ padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px" }}>
-                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", marginBottom: "3px" }}>{hotel.name || "Hotel N/A"}</div>
-                                            <div style={{ fontSize: "0.73rem", color: "#64748B" }}>
-                                                {[hotel.location?.city, `${hotel.nightCount || hotel.nights || 0} nights`].filter(Boolean).join(" - ")}
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr style={{ background: "#DBEAFE" }}>
+                                                {["Hotel", "City", "Nights", "Rating"].map((h) => (
+                                                    <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {packageHotels.map((hotel: any, index: number) => (
+                                                <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{hotel.name || "Hotel N/A"}</td>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.location?.city || hotel.city || "N/A"}</td>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.nightCount || hotel.nights || 0}</td>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "N/A"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         )}
 
+                        {packageTransports.length > 0 && (
+                            <div>
+                                <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Transport</div>
+                                <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "hidden" }}>
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr style={{ background: "#DBEAFE" }}>
+                                                {["Route", "Type"].map((h) => (
+                                                    <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {packageTransports.map((t: any, index: number) => (
+                                                <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{t.route || "Route N/A"}</td>
+                                                    <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{t.transportType || "N/A"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
                     </div>
 

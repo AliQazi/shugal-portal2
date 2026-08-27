@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
+  ArrowUpRight,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -16,12 +17,13 @@ import {
   PackageCheck,
   Plane,
   Sparkles,
-  TicketCheck,
+  TrendingUp,
   XCircle,
+  Zap,
+  Target,
 } from "lucide-react";
 import axiosInstance from "../../../api/axios";
 import { groupTypes } from "../../../data/groupTypes";
-import TopBar from "../../../components/TopBar/TopBar";
 
 import madinaImg from "../../../assets/images/allgroupsbgg.jpg";
 import uaeImg from "../../../assets/images/uaebg.jpg";
@@ -40,32 +42,32 @@ const groupImages = {
 
 const groupStyles = {
   "All Groups": {
-    accent: "linear-gradient(135deg,#2563eb,#0891b2)",
+    accent: "linear-gradient(135deg,#6366f1,#8b5cf6)",
     icon: Globe2,
     tag: "All routes",
   },
   "UAE (United Arab Emirates)": {
-    accent: "linear-gradient(135deg,#f59e0b,#e11d48)",
+    accent: "linear-gradient(135deg,#f59e0b,#ef4444)",
     icon: MapPinned,
     tag: "UAE seats",
   },
   "KSA (Saudia Arabia) one way": {
-    accent: "linear-gradient(135deg,#059669,#0f766e)",
+    accent: "linear-gradient(135deg,#10b981,#0ea5e9)",
     icon: Compass,
     tag: "KSA one way",
   },
   "Kuwait (KWI)": {
-    accent: "linear-gradient(135deg,#7c3aed,#2563eb)",
+    accent: "linear-gradient(135deg,#8b5cf6,#6366f1)",
     icon: Plane,
     tag: "KWI groups",
   },
   "Umrah Groups (Only Seats)": {
-    accent: "linear-gradient(135deg,#be123c,#f97316)",
+    accent: "linear-gradient(135deg,#ef4444,#f97316)",
     icon: Landmark,
     tag: "Only seats",
   },
   "Umrah Packages": {
-    accent: "linear-gradient(135deg,#0e7490,#2563eb)",
+    accent: "linear-gradient(135deg,#0ea5e9,#6366f1)",
     icon: PackageCheck,
     tag: "Packages",
   },
@@ -89,25 +91,31 @@ const Dashboard = () => {
   const statCards = useMemo(
     () => [
       {
-        label: "Confirmed Bookings",
+        label: "Confirmed",
         value: summary.confirmed,
         Icon: CircleCheck,
-        gradient: "linear-gradient(135deg,#047857,#10b981)",
-        shadow: "rgba(4,120,87,0.24)",
+        color: "#10b981",
+        bg: "bg-white",
+        border: "border-emerald-200",
+        progressBg: "bg-emerald-500",
       },
       {
-        label: "Hold Tickets",
+        label: "On Hold",
         value: summary.hold,
         Icon: Clock3,
-        gradient: "linear-gradient(135deg,#b45309,#f59e0b)",
-        shadow: "rgba(180,83,9,0.24)",
+        color: "#f59e0b",
+        bg: "bg-white",
+        border: "border-amber-200",
+        progressBg: "bg-amber-500",
       },
       {
         label: "Cancelled",
         value: summary.cancelled,
         Icon: XCircle,
-        gradient: "linear-gradient(135deg,#b91c1c,#ef4444)",
-        shadow: "rgba(185,28,28,0.22)",
+        color: "#ef4444",
+        bg: "bg-white",
+        border: "border-red-200",
+        progressBg: "bg-red-500",
       },
     ],
     [summary],
@@ -172,8 +180,6 @@ const Dashboard = () => {
     const basePath = group.path.split("?")[0];
 
     if (basePath === "groups") {
-      // Trigger the matching group-type filter on the All Groups page
-      // directly instead of encoding it into the URL query string.
       navigate("/dashboard/groups", {
         state: { presetGroupType: group.value },
       });
@@ -198,344 +204,349 @@ const Dashboard = () => {
   return (
     <>
       <style>{`
-        @keyframes dashboard-marquee {
-          0% { transform: translateX(100vw); }
-          100% { transform: translateX(-100%); }
-        }
-        @keyframes dashboard-rise {
-          from { opacity: 0; transform: translateY(16px); }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes dashboard-glow {
-          0%, 100% { opacity: 0.65; }
-          50% { opacity: 1; }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
         }
-        @keyframes dashboard-sheen {
-          0% { transform: translateX(-120%); }
-          100% { transform: translateX(120%); }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
-        .dashboard-marquee {
-          display: inline-block;
-          animation: dashboard-marquee 30s linear infinite;
-          white-space: nowrap;
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
-        .dashboard-rise {
-          animation: dashboard-rise 0.55s ease both;
+        .animate-slide-in {
+          animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
-        .dashboard-card-sheen::after {
-          content: "";
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        .animate-pulse-slow {
+          animation: pulse 2s ease-in-out infinite;
+        }
+        .shimmer {
+          position: relative;
+          overflow: hidden;
+        }
+        .shimmer::after {
+          content: '';
           position: absolute;
-          inset: 0;
-          background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.25) 45%, transparent 70%);
-          transform: translateX(-120%);
-          transition: transform 0.7s ease;
-          pointer-events: none;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          animation: shimmer 2s infinite;
         }
-        .dashboard-card-sheen:hover::after {
-          transform: translateX(120%);
+        .glass-effect {
+          backdrop-filter: blur(20px);
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-border {
+          position: relative;
+          background: linear-gradient(white, white) padding-box,
+                      linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899) border-box;
+          border: 2px solid transparent;
         }
       `}</style>
 
-      <div
-        className="w-full overflow-hidden relative flex items-center py-2.5 rounded-lg"
-        style={{
-          background: "linear-gradient(90deg,#0064BC 0%,#0064BC 48%,#0891b2 100%)",
-        }}
-      >
-        <span className="shrink-0 ml-4 mr-3 flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-rose-300 opacity-75 animate-ping" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-400" />
-          </span>
-          <span className="text-white/85 text-xs font-bold uppercase tracking-widest">
-            Live
-          </span>
-        </span>
-        <div className="flex-1 overflow-hidden">
-          <span className="dashboard-marquee text-white text-sm font-medium tracking-wide">
-            Welcome to Abid Air Travel & Tours - We book comfort for you - Latest
-            Umrah, UAE, KSA and Kuwait seats are waiting - Book smarter and
-            travel with confidence
-          </span>
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-indigo-50/50">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden bg-linear-to-r from-[#09B0FF] via-[#018fd1] to-[#1560ec] rounded-lg">
+          <div className="absolute inset-0 opacity-10">
+            <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+          </div>
+          <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-14">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 glass-effect px-3 py-1.5 rounded-full">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                    </span>
+                    <span className="text-white/90 text-xs font-semibold">Live Updates</span>
+                  </div>
+                </div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3">
+                  Welcome Back, Agent
+                </h1>
+                <p className="text-white/80 text-sm sm:text-base max-w-xl">
+                  Your travel booking dashboard is ready. Explore destinations, manage bookings, and discover exclusive deals.
+                </p>
+              </div>
+              <div className="hidden lg:block animate-float">
+                <div className="w-26 h-26 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Plane className="w-12 h-12 text-white/80" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div
-        className="w-full min-h-screen pb-12 pt-2"
-      >
-        <TopBar liveTickets={true} title="Agent Dashboard" />
-
-        {/* <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mb-8">
-          {statCards.map(({ label, value, Icon, gradient, shadow }, index) => {
-            const progress =
-              totalBookings === 0
-                ? 0
-                : Math.min((value / totalBookings) * 100, 100);
-
-            return (
-              <div
-                key={label}
-                className="dashboard-rise dashboard-card-sheen relative overflow-hidden rounded-lg p-5 text-white"
-                style={{
-                  animationDelay: `${index * 0.08}s`,
-                  background: gradient,
-                  boxShadow: `0 16px 42px ${shadow}`,
-                }}
-              >
-                <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/12" />
-                <div className="absolute -left-6 bottom-0 h-20 w-20 rounded-full bg-white/10" />
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-4xl font-black leading-none">
-                      {value}
+        {/* Stats Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {statCards.map(({ label, value, Icon, color, bg, border, progressBg }, index) => {
+              const progress = totalBookings === 0 ? 0 : Math.min((value / totalBookings) * 100, 100);
+              
+              return (
+                <div
+                  key={label}
+                  className={`animate-slide-in ${bg} ${border} rounded-lg p-6 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden group border`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-white/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <p className="text-3xl font-bold text-slate-900 mb-1">
+                          {value}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                          {label} Bookings
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white shadow-md">
+                        <Icon size={20} style={{ color }} />
+                      </div>
                     </div>
-                    <div className="mt-2 text-xs font-bold uppercase tracking-widest text-white/78">
-                      {label}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-slate-600">
+                        <span>Progress</span>
+                        <span className="font-semibold">{Math.round(progress)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${progressBg} rounded-full transition-all duration-1000`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/20 bg-white/15 backdrop-blur-md">
-                    <Icon size={24} strokeWidth={2.2} />
                   </div>
                 </div>
-                <div className="relative z-10 mt-5 h-1.5 overflow-hidden rounded-full bg-white/22">
-                  <div
-                    className="h-full rounded-full bg-white/80"
-                    style={{ width: `${progress}%` }}
-                  />
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8">
+            {/* Destination Groups */}
+            <section>
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                    <Target size={18} />
+                    <span className="text-xs font-bold uppercase tracking-wider">Explore</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    Popular Destinations
+                  </h2>
+                </div>
+                <div>
                 </div>
               </div>
-            );
-          })}
-        </section> */}
 
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mb-8">
-          {statCards.map(({ label, value, Icon, gradient, shadow }, index) => {
-            const progress =
-              totalBookings === 0
-                ? 0
-                : Math.min((value / totalBookings) * 100, 100);
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
+                {groupTypes.map((group, index) => {
+                  const style = groupStyles[group.label] ?? groupStyles["All Groups"];
+                  const GroupIcon = style.icon;
 
-            // Define specific icon colors for each card
-            const iconColors = {
-              "Confirmed Bookings": "#059669",
-              "Hold Tickets": "#d97706",
-              "Cancelled": "#dc2626"
-            };
-
-            return (
-              <div
-                key={label}
-                className="dashboard-rise relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
-                style={{ animationDelay: `${index * 0.06}s` }}
-              >
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div className="mb-4">
-                    <div className="text-4xl font-black leading-none text-slate-900">
-                      {value}
-                    </div>
-                    <div className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {label}
-                    </div>
-                  </div>
-                  <div className="grid h-12 w-12 shrink-0 place-items-center">
-                    <Icon size={24} strokeWidth={2.2} color={iconColors[label]} />
-                  </div>
-                </div>
-                <div className="relative z-10 mt-5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${progress}%`,
-                      background: gradient
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </section>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_390px] gap-8 items-start">
-          <section>
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-              <div>
-                <div className="flex items-center gap-2 text-[#0064BC]">
-                  <Compass size={18} />
-                  <span className="text-xs font-black uppercase tracking-widest">
-                    Explore
-                  </span>
-                </div>
-                <h2 className="mt-1 text-2xl font-black text-slate-900">
-                  Destination Groups
-                </h2>
-              </div>
-              <span className="text-sm font-semibold text-slate-500">
-                {groupTypes.length} active categories
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
-              {groupTypes.map((group, index) => {
-                const style =
-                  groupStyles[group.label] ?? groupStyles["All Groups"];
-                const GroupIcon = style.icon;
-
-                return (
-                  <button
-                    type="button"
-                    key={group.value || group.path}
-                    onClick={() => handleCategoryClick(group)}
-                    className="dashboard-rise group relative h-56 overflow-hidden rounded-lg text-left shadow-sm outline-none ring-1 ring-slate-200/80 transition duration-300 hover:-translate-y-1 hover:shadow-2xl focus-visible:ring-4 focus-visible:ring-blue-300"
-                    style={{ animationDelay: `${index * 0.06}s` }}
-                    aria-label={`Open ${group.label}`}
-                  >
-                    <img
-                      style={{ height: "100%" }}
-                      src={groupImages[group.label]}
-                      alt={group.label}
-                      className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-linear-to-t from-slate-950/88 via-slate-950/38 to-slate-950/8" />
-                    <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-white/20 bg-white/14 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-md">
-                      <GroupIcon size={15} />
-                      {style.tag}
-                    </div>
-                    <div
-                      className="absolute right-6 top-6 grid place-items-center text-white transition duration-300 group-hover:-rotate-12"
-                    // style={{ background: style.accent }}
+                  return (
+                    <button
+                      type="button"
+                      key={group.value || group.path}
+                      onClick={() => handleCategoryClick(group)}
+                      className="animate-slide-in p-0! group relative rounded-lg overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                      style={{ animationDelay: `${index * 0.08}s` }}
+                      aria-label={`Open ${group.label}`}
                     >
-                      <ArrowRight size={19} />
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 p-4">
-                      <h3 className="max-w-[82%] text-lg font-black leading-snug text-white drop-shadow">
-                        {group.label}
+                      <div className="relative h-64 overflow-hidden">
+                        <img
+                          src={groupImages[group.label]}
+                          alt={group.label}
+                          className="w-full h-full! object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent" />
+                        
+                        {/* Top badges */}
+                        <div className="absolute top-4 left-4 flex items-center gap-2">
+                          <div className="glass-effect rounded-full px-3 py-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <GroupIcon size={14} className="text-white" />
+                              <span className="text-white text-xs font-semibold">{style.tag}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Arrow icon */}
+                        <div className="absolute top-4 right-4 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 transition-all duration-300 group-hover:bg-white group-hover:text-indigo-600">
+                          <ArrowUpRight size={18} className="text-white group-hover:text-indigo-600 transition-colors" />
+                        </div>
+
+                        {/* Bottom content */}
+                        <div className="absolute bottom-0 left-0 right-0 p-5">
+                          <h3 className="text-start text-lg font-bold text-white mb-2">
+                            {group.label}
+                          </h3>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-white/70 font-medium">
+                              View
+                            </span>
+                            <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                              <ArrowRight size={14} className="text-white" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Special Offers */}
+            <aside className="xl:sticky xl:top-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-2 text-pink-600 mb-2">
+                    <Gift size={18} />
+                    <span className="text-xs font-bold uppercase tracking-wider">Special</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    Exclusive Deals
+                  </h2>
+                </div>
+                {!loadingCards && indexCards.length > 0 && (
+                  <div className="flex items-center gap-1.5 bg-pink-50 text-pink-600 px-3 py-1.5 rounded-full">
+                    <Sparkles size={14} className="animate-pulse-slow" />
+                    <span className="text-xs font-semibold">{indexCards.length} Live</span>
+                  </div>
+                )}
+              </div>
+
+              {loadingCards ? (
+                <div className="rounded-lg border border-slate-200 bg-white shadow-xl overflow-hidden">
+                  <div className="h-80 bg-linear-to-br from-slate-200 to-slate-300 animate-pulse shimmer" />
+                  <div className="p-6 space-y-4">
+                    <div className="h-4 bg-slate-200 rounded animate-pulse w-4/5" />
+                    <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
+                  </div>
+                </div>
+              ) : cardsError ? (
+                <div className="rounded-lg border-2 border-red-200 bg-red-50 p-8 text-center">
+                  <AlertCircle className="mx-auto mb-4 text-red-500" size={32} />
+                  <p className="text-sm font-semibold text-red-600">{cardsError}</p>
+                </div>
+              ) : indexCards.length === 0 ? (
+                <div className="rounded-lg border-2 border-dashed border-slate-300 bg-white p-10 text-center">
+                  <Gift className="mx-auto mb-4 text-slate-400" size={32} />
+                  <p className="text-sm font-semibold text-slate-500">No special offers available</p>
+                  <p className="text-xs text-slate-400 mt-1">Check back later for exclusive deals</p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                  <div className="relative h-96 overflow-hidden">
+                    <img
+                      key={activeOffer?._id || currentIndex}
+                      src={activeOffer?.image}
+                      alt={activeOffer?.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent" />
+                    
+                    {/* Navigation buttons */}
+                    <button
+                      type="button"
+                      onClick={prevSlide}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors focus:outline-none focus:ring-4 focus:ring-white/50"
+                      aria-label="Previous offer"
+                    >
+                      <ChevronLeft size={20} className="text-slate-800" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextSlide}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors focus:outline-none focus:ring-4 focus:ring-white/50"
+                      aria-label="Next offer"
+                    >
+                      <ChevronRight size={20} className="text-slate-800" />
+                    </button>
+
+                    {/* Content */}
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full mb-3">
+                        <Sparkles size={12} className="text-yellow-300" />
+                        <span className="text-white text-xs font-semibold uppercase tracking-wider">Featured</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white leading-snug">
+                        {activeOffer?.title}
                       </h3>
-                      {/* <div className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/75">
-                        View available seats
-                        <span className="h-px flex-1 bg-white/25" />
-                      </div> */}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+                  </div>
 
-          <aside className="w-full xl:sticky xl:top-6">
-            <div className="flex items-end justify-between gap-4 mb-5">
-              <div>
-                <div className="flex items-center gap-2 text-[#0064BC]">
-                  <Gift size={18} />
-                  <span className="text-xs font-black uppercase tracking-widest">
-                    Offers
-                  </span>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <CalendarDays size={16} />
+                        <span>
+                          {activeOffer?.createdAt
+                            ? new Date(activeOffer.createdAt).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "Recently added"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <TrendingUp size={14} />
+                        <span>{currentIndex + 1} of {indexCards.length}</span>
+                      </div>
+                    </div>
+
+                    {/* Dots */}
+                    <div className="flex items-center justify-center gap-2">
+                      {indexCards.map((offer, index) => (
+                        <button
+                          type="button"
+                          key={offer?._id || index}
+                          onClick={() => setCurrentIndex(index)}
+                          className="h-2 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          style={{
+                            width: index === currentIndex ? 32 : 8,
+                            background:
+                              index === currentIndex
+                                ? "linear-gradient(90deg,#6366f1,#8b5cf6)"
+                                : "#e2e8f0",
+                          }}
+                          aria-label={`Show offer ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <h2 className="mt-1 text-2xl font-black text-slate-900">
-                  Special Deals
-                </h2>
-              </div>
-              {!loadingCards && indexCards.length > 0 && (
-                <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white">
-                  {indexCards.length} Live
-                </span>
               )}
-            </div>
-
-            {loadingCards ? (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
-                <div className="h-72 bg-slate-200 animate-pulse" />
-                <div className="p-5 space-y-3">
-                  <div className="h-4 bg-slate-200 rounded animate-pulse w-4/5" />
-                  <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
-                </div>
-              </div>
-            ) : cardsError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm font-semibold text-red-600 shadow-sm">
-                <AlertCircle className="mx-auto mb-3" size={26} />
-                {cardsError}
-              </div>
-            ) : indexCards.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-500 shadow-sm">
-                <Gift className="mx-auto mb-3 text-slate-400" size={28} />
-                No special offers right now.
-                <span className="block text-slate-400">Check back soon.</span>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
-                <div className="relative h-80 overflow-hidden">
-                  <img
-                    key={activeOffer?._id || currentIndex}
-                    src={activeOffer?.image}
-                    alt={activeOffer?.title}
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
-
-                  <button
-                    type="button"
-                    onClick={prevSlide}
-                    className="p-0 absolute left-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/25 bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
-                    aria-label="Previous offer"
-                  >
-                    <ChevronLeft size={21} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={nextSlide}
-                    className="p-0 absolute right-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/25 bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
-                    aria-label="Next offer"
-                  >
-                    <ChevronRight size={21} />
-                  </button>
-
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white backdrop-blur-md">
-                      <Sparkles size={13} />
-                      Featured Offer
-                    </div>
-                    <h3 className="text-xl font-black leading-snug text-white drop-shadow">
-                      {activeOffer?.title}
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                    <CalendarDays size={16} />
-                    {activeOffer?.createdAt
-                      ? new Date(activeOffer.createdAt).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )
-                      : "Recently added"}
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-center gap-2">
-                    {indexCards.map((offer, index) => (
-                      <button
-                        type="button"
-                        key={offer?._id || index}
-                        onClick={() => setCurrentIndex(index)}
-                        className="p-0 h-2 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                        style={{
-                          width: index === currentIndex ? 28 : 8,
-                          background:
-                            index === currentIndex
-                              ? "linear-gradient(90deg,#2563eb,#0891b2)"
-                              : "#cbd5e1",
-                        }}
-                        aria-label={`Show offer ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </aside>
+            </aside>
+          </div>
         </div>
       </div>
     </>

@@ -97,6 +97,7 @@ export default function MaskedDatePicker({
   minDate,
   maxDate,
   placeholderText = "DD/MM/YYYY",
+  className = "",
 }) {
   return (
     <DatePicker
@@ -132,9 +133,9 @@ export default function MaskedDatePicker({
       }}
 
       className={`w-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 ${size === "big"
-        ? "px-4 py-2 pr-10 rounded-md text-sm"
-        : "px-2 py-1.5 rounded-md text-xs"
-        }`}
+          ? "px-4 py-2 pr-10 rounded-md text-sm"
+          : "px-2 py-1.5 rounded-md text-xs"
+        } ${className}`}
     />
   )
 }

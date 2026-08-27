@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { FaRegCopy, FaCheck, FaBus } from "react-icons/fa";
-import { Menu, Package, Plane, Download } from "lucide-react";
+import { FaBus } from "react-icons/fa";
+import { Menu, Plane, Download, XCircle } from "lucide-react";
 import { FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import { toast } from "react-toastify";
 import MaskedDatePicker from "../../../components/MaskedDatePicker";
 import { theme } from "../../../theme/theme";
-import TopBar from "../../../components/TopBar/TopBar";
 import { generateUmrahPackagesPDF, generateBatchPDF } from "../../../utils/umrahPDFGen";
 
 const MONTHS_TITLE = [
@@ -995,78 +994,63 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
 
   return (
     <>
-      <TopBar
-        title={"Umrah Packages"}
-        icon={<Package className="text-white w-5 h-5 sm:w-6 sm:h-6" />}
-      />
       <div className="w-full min-h-screen umrah-groups-page">
-        {/* NEW: Combined Header Row for Tabs and PDF Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 mb-4 gap-4">
-
-          {/* Duration Tabs - overflow-x-auto allows scrolling on tiny screens */}
-          <div className="flex overflow-x-auto no-scrollbar">
-            {[
-              { id: "all", label: "All", count: getCountForDuration("all") },
-              { id: "14", label: "14 Days", count: getCountForDuration(14) },
-              { id: "21", label: "21 Days", count: getCountForDuration(21) },
-              { id: "28", label: "28 Days", count: getCountForDuration(28) },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveDurationTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap border-b-2 ${activeDurationTab === tab.id
-                  ? "text-primary border-primary"
-                  : "text-gray-600 border-transparent hover:text-gray-800 hover:bg-gray-50"
-                  }`}
-                style={
-                  activeDurationTab === tab.id
-                    ? { color: theme.colors.primary, borderColor: theme.colors.primary }
-                    : {}
-                }
-              >
-                {tab.label} ({tab.count})
-              </button>
-            ))}
+        {/* Modern Header Section */}
+        <div className="relative overflow-hidden bg-linear-to-r from-[#09B0FF] via-[#0e7ad8] to-[#09B0FF] rounded-lg shadow-xl mb-6">
+          <div className="absolute inset-0 opacity-10">
+            <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
           </div>
 
-          {/* PDF Download Button - hidden on mobile if needed, or just shrunk */}
-          {headerType === "dashboard" && groups.length > 0 && (
-            <div className="pb-2 sm:pb-0 pr-2">
-              <button
-                onClick={handleDownloadPDF}
-                className="px-4 py-2 rounded-lg text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shrink-0 shadow-sm"
-                style={{
-                  background: downloadingPDF ? "#94a3b8" : "#dc2626",
-                  marginBottom: '2px' // Aligns visually with the tab border
-                }}
-                disabled={downloadingPDF}
-              >
-                {downloadingPDF ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span>Download PDF</span>
-                  </>
-                )}
-              </button>
+          <div className="relative p-4 sm:p-6">
+            {/* Title and PDF Button Row */}
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-3">
+              Umrah Packages
+            </h1>
+
+            {/* Duration Tabs */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: "all", label: "All Packages", count: getCountForDuration("all") },
+                { id: "14", label: "14 Days", count: getCountForDuration(14) },
+                { id: "21", label: "21 Days", count: getCountForDuration(21) },
+                { id: "28", label: "28 Days", count: getCountForDuration(28) },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveDurationTab(tab.id)}
+                  className={`px-4 py-2.5 rounded-lg text-xs! font-semibold transition-all whitespace-nowrap backdrop-blur-sm ${activeDurationTab === tab.id
+                    ? 'bg-white text-indigo-600 shadow-lg'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                >
+                  <span className="flex items-center gap-2">
+                    {tab.label}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${activeDurationTab === tab.id
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'bg-white/20 text-white'
+                      }`}>
+                      {tab.count}
+                    </span>
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <div
-          className={`flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 py-3 ${headerType === "dashboard" ? "rounded-t-2xl" : ""}`}
-        >
-          <div className="w-full xl:w-auto">{header}</div>
-          <div className="flex flex-col lg:flex-row items-center gap-3 w-full xl:w-auto">
-            <div className="flex items-center justify-between w-full lg:w-auto gap-4">
-              <label className="flex items-center cursor-pointer">
+        {/* Search and Filter Section */}
+        <div>
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Advanced Search Toggle */}
+            <div className="flex items-center justify-between lg:justify-start gap-4 lg:border-r lg:border-gray-200 lg:pr-6">
+              <label className="flex items-center cursor-pointer group">
                 <div className="relative">
                   <input
                     type="checkbox"
@@ -1075,53 +1059,96 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
                     className="sr-only"
                   />
                   <div
-                    className="w-9 h-5 rounded-full transition-all"
+                    className="w-11 h-6 rounded-full transition-all relative"
                     style={{
                       background: showAdvancedSearch
                         ? theme.colors.primary
-                        : "#d1d5db",
+                        : "#e2e8f0",
                     }}
                   >
                     <div
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${showAdvancedSearch ? "translate-x-4" : ""}`}
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-md ${showAdvancedSearch ? "translate-x-5" : ""
+                        }`}
                     />
                   </div>
                 </div>
-                <span className="ml-2 text-xs font-medium text-gray-700 whitespace-nowrap">
+                <span className="ml-3 text-sm font-medium text-gray-700 group-hover:text-gray-900 whitespace-nowrap">
                   Advanced Search
                 </span>
               </label>
+
               {showAdvancedSearch && (
                 <button
                   onClick={() => setIsMobileFilterOpen(true)}
-                  className="lg:hidden p-2 rounded-lg bg-gray-100 text-gray-700"
+                  className="lg:hidden p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                  aria-label="Open filters"
                 >
-                  <Menu size={16} />
+                  <Menu size={18} />
                 </button>
               )}
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-              <div className="w-full sm:w-48">
-                <MaskedDatePicker
-                  value={filters.departDate}
-                  onChange={(date) => handleFilterChange("departDate", date)}
-                  placeholderText="Departure Date"
-                  minDate={new Date()}
-                  size="small"
-                />
+
+            {/* Search Inputs */}
+            <div className="flex-1 flex flex-col sm:flex-row gap-3">
+              <div className="w-full sm:w-56">
+                <div className="relative">
+                  <MaskedDatePicker
+                    value={filters.departDate}
+                    onChange={(date) => handleFilterChange("departDate", date)}
+                    placeholderText="Departure Date"
+                    minDate={new Date()}
+                    size="small"
+                    className="bg-gray-50 py-2.5 border-gray-200 focus:bg-white"
+                  />
+                </div>
               </div>
-              <div className="flex-1 lg:w-52 relative">
+
+              <div className="flex-1 relative">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder="Search by airline, sector, flight number..."
                   value={filters.searchKeyword}
                   onChange={(e) =>
                     handleFilterChange("searchKeyword", e.target.value)
                   }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 text-sm"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all bg-gray-50 focus:bg-white"
                 />
-                <FaSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                {filters.searchKeyword && (
+                  <button
+                    onClick={() => handleFilterChange("searchKeyword", "")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    aria-label="Clear search"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                )}
               </div>
+
+              {headerType === "dashboard" && groups.length > 0 && (
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={downloadingPDF}
+                  className="px-4 py-0! rounded-lg bg-[#df1c1c]! text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-lg hover:shadow-xl active:scale-95"
+                  style={{
+                    background: downloadingPDF ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)'
+                  }}
+                >
+                  {downloadingPDF ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} className="shrink-0" />
+                      <span>Download PDF</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

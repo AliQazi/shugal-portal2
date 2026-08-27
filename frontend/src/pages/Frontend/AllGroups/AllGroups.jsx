@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { DashboardUIContext } from "../../../components/Dashboard/DashboardLayout";
-import { Ticket, Menu, X, ArrowRight } from "lucide-react";
-import { FaSuitcase, FaSearch, FaPlaneDeparture } from "react-icons/fa";
+import { Ticket, Menu, X, Plane, Luggage } from "lucide-react";
+import { FaSearch, FaPlaneDeparture } from "react-icons/fa";
 import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import { streamNdjson } from "../../../utils/streamNdjson";
@@ -976,10 +976,12 @@ export default function AllGroupsPackages({
       : theme.colors.intermediate;
 
     return (
-      <div className="grid w-full max-w-95 items-center gap-1.5 xl:gap-2 grid-cols-[minmax(0,1fr)_minmax(28px,90px)_minmax(0,1fr)]">
+      <div
+        className="grid w-full max-w-95 items-center gap-1.5 xl:gap-2.5 px-2 py-1 grid-cols-[minmax(0,1fr)_minmax(34px,64px)_minmax(0,1fr)]"
+      >
         <div className="text-right min-w-0">
           <div
-            className="text-xs xl:text-sm font-bold truncate"
+            className="text-xs xl:text-sm font-extrabold truncate tracking-wide"
             style={{ color: theme.colors.textPrimary }}
           >
             {origin || "—"}
@@ -992,32 +994,51 @@ export default function AllGroupsPackages({
           </div>
         </div>
 
-        <div className="flex items-center justify-center w-full relative">
-          <span
-            className="shrink-0 rounded-full"
-            style={{
-              width: "5px",
-              height: "5px",
-              background: accentColor,
-            }}
-          />
-          <span
-            className="flex-1"
-            style={{
-              height: "1px",
-              background: theme.colors.borderDark,
-            }}
-          />
-          <ArrowRight
-            size={12}
-            strokeWidth={2.25}
-            style={{ color: accentColor, flexShrink: 0 }}
-          />
+        <div className="flex flex-col items-center justify-center w-full relative">
+          <div className="flex items-center w-full">
+            <span
+              className="flex-1"
+              style={{
+                height: "1px",
+                borderTop: `1.5px dashed ${accentColor}80`,
+              }}
+            />
+            <span
+              className="flex items-center justify-center shrink-0 rounded-full"
+              style={{
+                width: "18px",
+                height: "18px",
+                background: accentColor,
+                transform: isReturn ? "rotate(220deg)" : "rotate(45deg)",
+              }}
+            >
+              <Plane
+                size={10}
+                strokeWidth={2.5}
+                style={{ color: "#fff" }}
+              />
+            </span>
+            <span
+              className="flex-1"
+              style={{
+                height: "1px",
+                borderTop: `1.5px dashed ${accentColor}80`,
+              }}
+            />
+          </div>
+          {isReturn && (
+            <span
+              className="text-[7px] xl:text-[7.5px] font-semibold uppercase tracking-wider mt-0.5"
+              style={{ color: accentColor }}
+            >
+              Return
+            </span>
+          )}
         </div>
 
         <div className="text-left min-w-0">
           <div
-            className="text-xs xl:text-sm font-bold truncate"
+            className="text-xs xl:text-sm font-extrabold truncate tracking-wide"
             style={{ color: theme.colors.textPrimary }}
           >
             {destination || "—"}
@@ -1099,7 +1120,7 @@ export default function AllGroupsPackages({
                 borderRadius: theme.borderRadius.sm,
               }}
             >
-              <FaSuitcase /> {flight.baggage}KG
+              <Luggage size={12} /> {flight.baggage}KG
             </span>
           )}
 
@@ -1770,7 +1791,8 @@ export default function AllGroupsPackages({
                                           <div className="w-full flex justify-center">
                                             {d.baggage ? (
                                               <div className="inline-flex items-center gap-1 text-xs font-medium">
-                                                <FaSuitcase
+                                                <Luggage
+                                                  size={13}
                                                   className="shrink-0"
                                                   style={{
                                                     color:
@@ -1804,7 +1826,8 @@ export default function AllGroupsPackages({
                                     </div>
                                   ) : flight?.baggage ? (
                                     <div className="inline-flex items-center gap-1 text-xs font-medium">
-                                      <FaSuitcase
+                                      <Luggage
+                                        size={13}
                                         className="shrink-0"
                                         style={{
                                           color: theme.colors.textTertiary,

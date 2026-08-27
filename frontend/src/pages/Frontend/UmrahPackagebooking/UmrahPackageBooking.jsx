@@ -186,7 +186,7 @@ export default function UmrahBooking() {
     Math.max(
       0,
       getPayableTotal(booking) -
-        (Number(booking?.paymentStatus?.paidAmount) || 0),
+      (Number(booking?.paymentStatus?.paidAmount) || 0),
     );
 
   const getId = (value) => {
@@ -213,7 +213,7 @@ export default function UmrahBooking() {
   });
 
   const buildUmrahTicketPrintBooking = (booking, packageData, groupTicket) => {
-    const source = groupTicket || packageData || {};
+    const source = { ...(packageData || {}), ...(groupTicket || {}) };
     const rawFlights = source.flights || packageData?.flights || [];
     const flights = rawFlights.map(normalizePrintFlight);
     const firstFlight = flights[0] || {};
@@ -228,13 +228,13 @@ export default function UmrahBooking() {
       source.sector ||
       (flights.length
         ? [
-            firstFlight.sectorFrom || firstFlight.originCode,
-            ...flights.map(
-              (flight) => flight.sectorTo || flight.destinationCode,
-            ),
-          ]
-            .filter(Boolean)
-            .join("-")
+          firstFlight.sectorFrom || firstFlight.originCode,
+          ...flights.map(
+            (flight) => flight.sectorTo || flight.destinationCode,
+          ),
+        ]
+          .filter(Boolean)
+          .join("-")
         : "");
 
     return {
@@ -279,6 +279,20 @@ export default function UmrahBooking() {
       agencyName: booking.user?.companyName,
       contactPersonName: booking.user?.name,
       phone: booking.user?.phone,
+      printType: "umrah-package",
+      showPackageDetails: true,
+      hideTravelItineraryTitle: true,
+      roomType: booking.roomType,
+      packageData,
+      hotels: packageData?.hotels || [],
+      transport:
+        (packageData?.transport?.length
+          ? packageData.transport
+          : packageData?.transports) || [],
+      transports:
+        (packageData?.transports?.length
+          ? packageData.transports
+          : packageData?.transport) || [],
     };
   };
 
@@ -327,7 +341,7 @@ export default function UmrahBooking() {
           pnr: booking.travelNetworkBookingData?.data?.group?.pnr || "",
         };
 
-        const printBooking = buildUmrahTicketPrintBooking(booking, tntSource, null);
+        const printBooking = buildUmrahTicketPrintBooking(booking, packageData, tntSource);
 
         if (!printBooking.flights?.length) {
           toast.error("No flight data found for this Travel Network booking");
@@ -338,17 +352,21 @@ export default function UmrahBooking() {
         return;
       }
 
-      if (!packageData && booking.packageId) {
+      const hasPackageDetailsForPrint =
+        packageData?.hotels?.length &&
+        (packageData?.transport?.length || packageData?.transports?.length);
+
+      if ((!packageData || !hasPackageDetailsForPrint) && packageId) {
         const packageRes = await axiosInstance.get(
-          `/umrahpackages/${booking.packageId}`,
+          `/umrahpackages/${packageId}`,
         );
         packageData = packageRes.data?.package || packageRes.data?.data;
       }
 
       const groupTicketId = getId(
         packageData?.selectedGroupTicketId ||
-          packageData?.groupTicket?._id ||
-          packageData?.groupTicket?.id,
+        packageData?.groupTicket?._id ||
+        packageData?.groupTicket?.id,
       );
 
       let groupTicket = packageData?.groupTicket || null;
@@ -429,8 +447,8 @@ export default function UmrahBooking() {
 
       const groupTicketId = getId(
         packageData?.selectedGroupTicketId ||
-          packageData?.groupTicket?._id ||
-          packageData?.groupTicket?.id,
+        packageData?.groupTicket?._id ||
+        packageData?.groupTicket?.id,
       );
 
       if (groupTicketId) {
@@ -690,9 +708,8 @@ export default function UmrahBooking() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter((booking) => {
-        const passengerName = `${booking.passengers?.[0]?.givenName || ""} ${
-          booking.passengers?.[0]?.surName || ""
-        }`.toLowerCase();
+        const passengerName = `${booking.passengers?.[0]?.givenName || ""} ${booking.passengers?.[0]?.surName || ""
+          }`.toLowerCase();
 
         return (
           booking.bookingNumber?.toLowerCase().includes(term) ||
@@ -1075,35 +1092,34 @@ export default function UmrahBooking() {
                           (sum, p) => sum + (p.discount || 0),
                           0,
                         ) > 0 && (
-                          <div className="text-[11px] text-gray-500">
-                            After discount: {booking.pricing?.currency}{" "}
-                            {Math.max(
-                              0,
-                              (booking.pricing?.totalPrice || 0) -
+                            <div className="text-[11px] text-gray-500">
+                              After discount: {booking.pricing?.currency}{" "}
+                              {Math.max(
+                                0,
+                                (booking.pricing?.totalPrice || 0) -
                                 booking.passengers.reduce(
                                   (sum, p) => sum + (p.discount || 0),
                                   0,
                                 ),
-                            ).toLocaleString()}
-                          </div>
-                        )}
+                              ).toLocaleString()}
+                            </div>
+                          )}
                       </td>
 
                       {/* Booking Status */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col gap-1.5">
                           <span
-                            className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${
-                              booking.overallStatus === "Confirmed" ||
+                            className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.overallStatus === "Confirmed" ||
                               booking.overallStatus === "Completed"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : booking.overallStatus === "On Hold" ||
-                                    booking.overallStatus === "Pending"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : booking.overallStatus === "In Progress"
-                                    ? "bg-blue-50 text-blue-700"
-                                    : "bg-red-50 text-red-700"
-                            }`}
+                              ? "bg-emerald-50 text-emerald-700"
+                              : booking.overallStatus === "On Hold" ||
+                                booking.overallStatus === "Pending"
+                                ? "bg-amber-50 text-amber-700"
+                                : booking.overallStatus === "In Progress"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-red-50 text-red-700"
+                              }`}
                           >
                             {booking.overallStatus}
                           </span>
@@ -1135,50 +1151,48 @@ export default function UmrahBooking() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-fit flex flex-col gap-1">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              booking.paymentStatus?.status === "Approved"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : booking.paymentStatus?.status === "Pending" &&
-                                    booking.paymentStatus?.paymentHistory
-                                      ?.length > 0
-                                  ? "bg-blue-50 text-blue-700"
-                                  : booking.paymentStatus?.status === "Pending"
-                                    ? "bg-amber-50 text-amber-700"
-                                    : "bg-red-50 text-red-700"
-                            }`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${booking.paymentStatus?.status === "Approved"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : booking.paymentStatus?.status === "Pending" &&
+                                booking.paymentStatus?.paymentHistory
+                                  ?.length > 0
+                                ? "bg-blue-50 text-blue-700"
+                                : booking.paymentStatus?.status === "Pending"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-red-50 text-red-700"
+                              }`}
                           >
                             {booking.paymentStatus?.status === "Pending" &&
-                            booking.paymentStatus?.paymentHistory?.length > 0
+                              booking.paymentStatus?.paymentHistory?.length > 0
                               ? "Review"
                               : booking.paymentStatus?.status || "N/A"}
                           </span>
                           {booking.paymentStatus?.paymentHistory?.some(
                             (p) => p.paymentStatus === "Rejected",
                           ) && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-300">
-                              {
-                                booking.paymentStatus.paymentHistory.filter(
-                                  (p) => p.paymentStatus === "Rejected",
-                                ).length
-                              }{" "}
-                              Rejected
-                            </span>
-                          )}
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-300">
+                                {
+                                  booking.paymentStatus.paymentHistory.filter(
+                                    (p) => p.paymentStatus === "Rejected",
+                                  ).length
+                                }{" "}
+                                Rejected
+                              </span>
+                            )}
                         </div>
                       </td>
 
                       {/* Visa */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${
-                            booking.visaStatus?.status === "Approved"
-                              ? "bg-blue-50 text-blue-700"
-                              : booking.visaStatus?.status === "Pending"
-                                ? "bg-amber-50 text-amber-700"
-                                : booking.visaStatus?.status === "Rejected"
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-gray-50 text-gray-600"
-                          }`}
+                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.visaStatus?.status === "Approved"
+                            ? "bg-blue-50 text-blue-700"
+                            : booking.visaStatus?.status === "Pending"
+                              ? "bg-amber-50 text-amber-700"
+                              : booking.visaStatus?.status === "Rejected"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-gray-50 text-gray-600"
+                            }`}
                         >
                           {booking.visaStatus?.status || "N/A"}
                         </span>
@@ -1187,15 +1201,14 @@ export default function UmrahBooking() {
                       {/* Hotel */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${
-                            booking.hotelStatus?.status === "Confirmed"
-                              ? "bg-purple-50 text-purple-700"
-                              : booking.hotelStatus?.status === "Pending"
-                                ? "bg-amber-50 text-amber-700"
-                                : booking.hotelStatus?.status === "Cancelled"
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-gray-50 text-gray-600"
-                          }`}
+                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.hotelStatus?.status === "Confirmed"
+                            ? "bg-purple-50 text-purple-700"
+                            : booking.hotelStatus?.status === "Pending"
+                              ? "bg-amber-50 text-amber-700"
+                              : booking.hotelStatus?.status === "Cancelled"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-gray-50 text-gray-600"
+                            }`}
                         >
                           {booking.hotelStatus?.status || "N/A"}
                         </span>
@@ -1253,7 +1266,7 @@ export default function UmrahBooking() {
                           )}
 
                           {isOnHoldBooking(booking) &&
-                          timers[booking._id]?.expired ? (
+                            timers[booking._id]?.expired ? (
                             <button
                               disabled
                               className="inline-flex items-center gap-1 px-2! py-1! bg-red-100 text-red-700 rounded-md text-xs! font-medium whitespace-nowrap"
@@ -1270,8 +1283,8 @@ export default function UmrahBooking() {
                               Cancelled
                             </button>
                           ) : booking.paymentStatus?.paymentHistory?.some(
-                              (p) => p.paymentStatus === "Pending",
-                            ) ? (
+                            (p) => p.paymentStatus === "Pending",
+                          ) ? (
                             <button
                               disabled
                               className="inline-flex items-center gap-1 px-2! py-1! bg-yellow-100 text-yellow-700 rounded-md text-xs! font-medium whitespace-nowrap"
@@ -1411,16 +1424,15 @@ export default function UmrahBooking() {
                               </p>
                             </div>
                             <span
-                              className={`text-[10px] font-bold px-2 py-1 rounded-md ${
-                                payment.paymentStatus === "Approved" ||
+                              className={`text-[10px] font-bold px-2 py-1 rounded-md ${payment.paymentStatus === "Approved" ||
                                 payment.paymentStatus === "Received"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : payment.paymentStatus === "Pending"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : payment.paymentStatus === "Rejected"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-amber-100 text-amber-700"
-                              }`}
+                                ? "bg-emerald-100 text-emerald-700"
+                                : payment.paymentStatus === "Pending"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : payment.paymentStatus === "Rejected"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-amber-100 text-amber-700"
+                                }`}
                             >
                               {payment.paymentStatus === "Pending"
                                 ? "Pending Review"
@@ -1500,13 +1512,12 @@ export default function UmrahBooking() {
                           Status:
                         </span>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            selectedBooking.visaStatus.status === "Approved"
-                              ? "bg-blue-50 text-blue-700"
-                              : selectedBooking.visaStatus.status === "Rejected"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-amber-50 text-amber-700"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-bold ${selectedBooking.visaStatus.status === "Approved"
+                            ? "bg-blue-50 text-blue-700"
+                            : selectedBooking.visaStatus.status === "Rejected"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-700"
+                            }`}
                         >
                           {selectedBooking.visaStatus.status}
                         </span>
@@ -1585,14 +1596,13 @@ export default function UmrahBooking() {
                           Status:
                         </span>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            selectedBooking.hotelStatus.status === "Confirmed"
-                              ? "bg-purple-50 text-purple-700"
-                              : selectedBooking.hotelStatus.status ===
-                                  "Cancelled"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-amber-50 text-amber-700"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-bold ${selectedBooking.hotelStatus.status === "Confirmed"
+                            ? "bg-purple-50 text-purple-700"
+                            : selectedBooking.hotelStatus.status ===
+                              "Cancelled"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-700"
+                            }`}
                         >
                           {selectedBooking.hotelStatus.status}
                         </span>
@@ -2257,8 +2267,8 @@ export default function UmrahBooking() {
                               Dep:{" "}
                               {formatDate(
                                 flight.depDate ||
-                                  flight.departureDate ||
-                                  flight.flightDate,
+                                flight.departureDate ||
+                                flight.flightDate,
                               )}{" "}
                               {flight.depTime || flight.departureTime || ""}
                             </span>
@@ -2388,13 +2398,12 @@ export default function UmrahBooking() {
                           Status:
                         </span>
                         <span
-                          className={`px-3 py-1 rounded-full text-sm font-bold ${
-                            selectedBooking.visaStatus.status === "Approved"
-                              ? "bg-blue-600 text-white"
-                              : selectedBooking.visaStatus.status === "Rejected"
-                                ? "bg-red-600 text-white"
-                                : "bg-amber-600 text-white"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-sm font-bold ${selectedBooking.visaStatus.status === "Approved"
+                            ? "bg-blue-600 text-white"
+                            : selectedBooking.visaStatus.status === "Rejected"
+                              ? "bg-red-600 text-white"
+                              : "bg-amber-600 text-white"
+                            }`}
                         >
                           {selectedBooking.visaStatus.status}
                         </span>
@@ -2460,14 +2469,13 @@ export default function UmrahBooking() {
                           Status:
                         </span>
                         <span
-                          className={`px-3 py-1 rounded-full text-sm font-bold ${
-                            selectedBooking.hotelStatus.status === "Confirmed"
-                              ? "bg-purple-600 text-white"
-                              : selectedBooking.hotelStatus.status ===
-                                  "Cancelled"
-                                ? "bg-red-600 text-white"
-                                : "bg-amber-600 text-white"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-sm font-bold ${selectedBooking.hotelStatus.status === "Confirmed"
+                            ? "bg-purple-600 text-white"
+                            : selectedBooking.hotelStatus.status ===
+                              "Cancelled"
+                              ? "bg-red-600 text-white"
+                              : "bg-amber-600 text-white"
+                            }`}
                         >
                           {selectedBooking.hotelStatus.status}
                         </span>
@@ -2776,11 +2784,10 @@ export default function UmrahBooking() {
                           />
                           <label
                             htmlFor={`edit-pax-doc-${i}`}
-                            className={`flex items-center justify-center gap-1 px-2 py-1 rounded border text-[10px] font-semibold cursor-pointer whitespace-nowrap ${
-                              pax.documentFileName
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
-                            }`}
+                            className={`flex items-center justify-center gap-1 px-2 py-1 rounded border text-[10px] font-semibold cursor-pointer whitespace-nowrap ${pax.documentFileName
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                              }`}
                             title={pax.documentFileName || "Upload new document"}
                           >
                             <Upload className="w-3 h-3" />

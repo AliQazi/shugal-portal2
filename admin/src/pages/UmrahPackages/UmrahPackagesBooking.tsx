@@ -51,9 +51,15 @@ interface UmrahPackageDetails {
         baggage?: string; meal?: string;
     }[];
     hotels?: {
-        name?: string; location?: { city?: string };
-        nights?: number; nightCount?: number; rating?: number;
+        name?: string;
+        city?: string;
+        location?: { city?: string };
+        nights?: number;
+        nightCount?: number;
+        rating?: number;
+        originalHotel?: { name?: string; location?: { city?: string } };
     }[];
+    transport?: { route?: string; transportType?: string }[];
     transports?: { route?: string; transportType?: string }[];
     visa?: { visaType?: string; sellingPrice?: number; buyingPrice?: number };
 }
@@ -301,7 +307,7 @@ export default function UmrahPackagesBooking() {
         packageData: UmrahPackageDetails | null,
         groupTicket: GroupTicketPrintData | null,
     ) => {
-        const source = (groupTicket || packageData || {}) as PrintSource;
+        const source = ({ ...(packageData || {}), ...(groupTicket || {}) }) as PrintSource;
         const rawFlights = source.flights || packageData?.flights || [];
         const flights = rawFlights.map(normalizePrintFlight);
         const firstFlight = flights[0] || {};
@@ -313,6 +319,9 @@ export default function UmrahPackagesBooking() {
 
         return {
             ...source,
+            printType: "umrah-package",
+            showPackageDetails: true,
+            hideTravelItineraryTitle: true,
             _id: booking._id,
             travelType: "Umrah Group",
             bookingReference:
@@ -353,6 +362,17 @@ export default function UmrahPackagesBooking() {
             userId: booking.user,
             contactPersonName: booking.user?.name,
             phone: booking.user?.phone,
+            roomType: booking.roomType,
+            packageData,
+            hotels: packageData?.hotels || [],
+            transport:
+                ((packageData as any)?.transport?.length
+                    ? (packageData as any).transport
+                    : packageData?.transports) || [],
+            transports:
+                (packageData?.transports?.length
+                    ? packageData.transports
+                    : (packageData as any)?.transport) || [],
         };
     };
 
@@ -380,6 +400,8 @@ export default function UmrahPackagesBooking() {
                 booking.packageId && typeof booking.packageId === "object"
                     ? booking.packageId
                     : booking.packageData || null;
+
+            const packageId = getId(booking.packageId || packageData?._id);
 
             // Travel Network booking: TNT stored/live data se flights lo
             if (booking.packageSource === "travel-network") {
@@ -413,10 +435,14 @@ export default function UmrahPackagesBooking() {
                 return;
             }
 
-            if (packageData?._id && !packageData.flightLogo) {
+            const hasPackageDetailsForPrint =
+                packageData?.hotels?.length &&
+                ((packageData as any)?.transport?.length || packageData?.transports?.length);
+
+            if (packageId && (!packageData || !hasPackageDetailsForPrint || !packageData.flightLogo)) {
                 try {
-                    const packageRes = await axiosInstance.get(`/umrahpackages/${packageData._id}`);
-                    packageData = packageRes.data?.package || packageData;
+                    const packageRes = await axiosInstance.get(`/umrahpackages/${packageId}`);
+                    packageData = packageRes.data?.package || packageRes.data?.data || packageData;
                 } catch (error) {
                     console.warn("Umrah package fetch failed, using populated package data", error);
                 }
@@ -542,6 +568,10 @@ export default function UmrahPackagesBooking() {
                                 {paginated.map((b, i) => {
                                     const timer = timers[b._id] || calculateTimer(b.expiresAt);
                                     const isOnHold = ["On Hold", "Pending"].includes(b.overallStatus);
+                                    const isCancelled = ["cancelled", "canceled"].includes(
+                                        (b.overallStatus || "").toLowerCase(),
+                                    );
+                                    const isPrintDisabled = printingTicketId === b._id || isCancelled;
                                     return (
                                         <tr
                                             key={b._id}
@@ -663,14 +693,23 @@ export default function UmrahPackagesBooking() {
                                                             </button>
                                                         )}
                                                         <button
-                                                            onClick={() => handlePrintTicket(b)}
-                                                            disabled={printingTicketId === b._id}
+                                                            onClick={() => {
+                                                                if (!isCancelled) handlePrintTicket(b);
+                                                            }}
+                                                            disabled={isPrintDisabled}
                                                             style={{
-                                                                padding: "5px 11px", background: "#F8FAFC", border: "1px solid #CBD5E1",
-                                                                borderRadius: "7px", cursor: printingTicketId === b._id ? "not-allowed" : "pointer",
-                                                                fontSize: "0.72rem", fontWeight: 600, color: "#475569",
-                                                                display: "flex", alignItems: "center", gap: "4px",
-                                                                opacity: printingTicketId === b._id ? 0.6 : 1,
+                                                                padding: "5px 11px",
+                                                                background: isCancelled ? "#F1F5F9" : "#F8FAFC",
+                                                                border: "1px solid #CBD5E1",
+                                                                borderRadius: "7px",
+                                                                cursor: isPrintDisabled ? "not-allowed" : "pointer",
+                                                                fontSize: "0.72rem",
+                                                                fontWeight: 600,
+                                                                color: isCancelled ? "#94A3B8" : "#475569",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                gap: "4px",
+                                                                opacity: isPrintDisabled ? 0.55 : 1,
                                                                 transition: "all 0.15s",
                                                             }}
                                                             title="Print Ticket"

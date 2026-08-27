@@ -26,6 +26,18 @@ const ICON_MAIL = (color: string) =>
 const ICON_PLANE = (color: string) =>
   `<svg width="15" height="15" viewBox="0 0 24 24" fill="${color}"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>`;
 
+const ICON_KAABA = (color: string) =>
+  `<svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 19.5 32 9l23 10.5v29L32 58 9 48.5v-29Z" fill="${color}"/><path d="M18 24.5 32 18l14 6.5v5.5H18v-5.5Z" fill="#ffffff" opacity=".22"/><path d="M17 33h30v17.5L32 56.7l-15-6.2V33Z" fill="${color}"/><path d="M22 38h20M22 44h20" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" opacity=".85"/></svg>`;
+
+const ICON_MOSQUE = (color: string) =>
+  `<svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 30c0-8.8 7.2-16 16-16s16 7.2 16 16v17H15V30Z" fill="${color}"/><path d="M31 9c4 0 7.5 2.4 9 5.8A15.9 15.9 0 0 0 31 12a15.9 15.9 0 0 0-9 2.8C23.5 11.4 27 9 31 9Z" fill="${color}"/><path d="M47 19h6v28h-6V19Z" fill="${color}"/><path d="M50 11l5 8H45l5-8Z" fill="${color}"/><path d="M11 24h5v23h-5V24Z" fill="${color}"/><path d="M13.5 17l4.5 7H9l4.5-7Z" fill="${color}"/><path d="M26 47V36a5 5 0 0 1 10 0v11" fill="#ffffff" opacity=".92"/></svg>`;
+
+const ICON_BUS = (color: string) =>
+  `<svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="14" width="46" height="33" rx="5" fill="${color}"/><path d="M15 21h34v12H15V21Z" fill="#ffffff" opacity=".9"/><path d="M15 38h7M42 38h7" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="50" r="5" fill="${color}"/><circle cx="44" cy="50" r="5" fill="${color}"/><circle cx="20" cy="50" r="2" fill="#ffffff"/><circle cx="44" cy="50" r="2" fill="#ffffff"/></svg>`;
+
+const ICON_BED = (color: string) =>
+  `<svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 18h8v26h36v8H10V18Z" fill="${color}"/><path d="M22 30h12a5 5 0 0 1 5 5v9H22V30Z" fill="${color}"/><path d="M39 28h8a7 7 0 0 1 7 7v9H39V28Z" fill="${color}"/><circle cx="27" cy="25" r="5" fill="${color}"/></svg>`;
+
 // Booking objects often carry an embedded airline snapshot whose logoUrl was
 // blank at the time the booking was made. Look the airline up fresh so a
 // logo added/updated afterwards is still picked up; falls back to "" so the
@@ -35,6 +47,28 @@ const fetchAirlineLogo = async (airlineId?: string): Promise<string> => {
   try {
     const res = await axiosInstance.get(`/airline/${airlineId}`);
     return res?.data?.data?.logo || "";
+  } catch {
+    return "";
+  }
+};
+
+// Umrah package/group-ticket bookings don't reference the master Airline
+// collection by id - they only carry a free-text airline name (from the
+// package's own "flightLogo" upload, which is often left blank). Fall back
+// to matching that name against the master Airline list so the same logo
+// used on GDS bookings shows up here too.
+const fetchAirlineLogoByName = async (airlineName?: string): Promise<string> => {
+  const name = (airlineName || "").trim().toLowerCase();
+  if (!name || name === "airline") return "";
+  try {
+    const res = await axiosInstance.get(`/airline`);
+    const airlines: any[] = res?.data?.data || [];
+    const match = airlines.find(
+      (a) =>
+        (a.airlineName || "").trim().toLowerCase() === name ||
+        (a.shortCode || "").trim().toLowerCase() === name,
+    );
+    return match?.logo || "";
   } catch {
     return "";
   }
@@ -107,6 +141,9 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
   if (!airlineLogo && airlineId) {
     airlineLogo = await fetchAirlineLogo(airlineId);
   }
+  if (!airlineLogo && !airlineId) {
+    airlineLogo = await fetchAirlineLogoByName(airlineName);
+  }
 
   const pnr = booking.pnr || booking.bookingReference || "N/A";
   const bookingId =
@@ -120,6 +157,158 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
     booking.passengers && booking.passengers.length > 0
       ? booking.passengers
       : [{ type: "Adult", title: "", givenName: "PASSENGER", surName: "NAME" }];
+
+  const escapeHTML = (value: any): string =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  const titleCase = (value: string): string =>
+    value
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const packageSource =
+    booking.packageData ||
+    booking.package ||
+    booking.umrahPackage ||
+    (booking.packageId && typeof booking.packageId === "object"
+      ? booking.packageId
+      : {}) ||
+    {};
+
+  const packageHotels: any[] =
+    booking.hotels ||
+    packageSource.hotels ||
+    packageSource.metadata?.hotels ||
+    [];
+
+  const toArray = (value: any): any[] => {
+    if (Array.isArray(value)) return value;
+    if (value) return [value];
+    return [];
+  };
+
+  const firstNonEmptyArray = (...values: any[]): any[] => {
+    return values.map(toArray).find((items) => items.length > 0) || [];
+  };
+
+  const packageTransports: any[] = firstNonEmptyArray(
+    booking.transport,
+    booking.transports,
+    packageSource.transport,
+    packageSource.transports,
+    packageSource.metadata?.transport,
+    packageSource.metadata?.transports,
+  );
+
+  const getHotelCity = (hotel: any): string =>
+    (
+      hotel?.city ||
+      hotel?.location?.city ||
+      hotel?.originalHotel?.city ||
+      hotel?.originalHotel?.location?.city ||
+      hotel?.hotel?.city ||
+      hotel?.hotel?.location?.city ||
+      ""
+    ).toString();
+
+  const getHotelName = (hotel: any): string =>
+    (
+      hotel?.name ||
+      hotel?.hotelName ||
+      hotel?.originalHotel?.name ||
+      hotel?.hotel?.name ||
+      ""
+    ).toString();
+
+  const joinUnique = (values: string[], fallback = "N/A"): string => {
+    const cleaned = values
+      .map((value) => value?.toString().trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(cleaned));
+    return unique.length ? unique.join(", ") : fallback;
+  };
+
+  const makkahHotels = packageHotels.filter((hotel) =>
+    /makkah|mecca/i.test(getHotelCity(hotel)),
+  );
+  const madinahHotels = packageHotels.filter((hotel) =>
+    /madinah|madina|medina/i.test(getHotelCity(hotel)),
+  );
+
+  const makkahHotelText = joinUnique(makkahHotels.map(getHotelName));
+  const madinahHotelText = joinUnique(madinahHotels.map(getHotelName));
+  const transportText = joinUnique(
+    packageTransports.map((transport) => {
+      const route = (
+        transport?.route ||
+        transport?.travelRoute ||
+        transport?.name ||
+        ""
+      ).toString();
+      const type = (
+        transport?.transportType ||
+        transport?.vehicleType ||
+        transport?.type ||
+        ""
+      ).toString();
+      if (route && type) return `${type} (${route})`;
+      return route || type;
+    }),
+  );
+  const roomTypeText = titleCase(
+    (
+      booking.roomType ||
+      booking.selectedRoomType ||
+      packageSource.roomType ||
+      packageSource.selectedRoomType ||
+      ""
+    ).toString(),
+  ) || "N/A";
+
+  const packageDetailsHTML = `
+    <div class="package-details">
+        <div class="package-title">Package Details</div>
+        <div class="package-grid">
+            <div class="package-item">
+                <div class="package-icon">${ICON_KAABA(NAVY)}</div>
+                <div>
+                    <div class="package-label">Makkah Hotel</div>
+                    <div class="package-value">${escapeHTML(makkahHotelText)}</div>
+                </div>
+            </div>
+            <div class="package-item">
+                <div class="package-icon">${ICON_MOSQUE("#098642")}</div>
+                <div>
+                    <div class="package-label">Madinah Hotel</div>
+                    <div class="package-value">${escapeHTML(madinahHotelText)}</div>
+                </div>
+            </div>
+            <div class="package-item">
+                <div class="package-icon">${ICON_BUS(NAVY)}</div>
+                <div>
+                    <div class="package-label">Transport</div>
+                    <div class="package-value">${escapeHTML(transportText)}</div>
+                </div>
+            </div>
+            <div class="package-item">
+                <div class="package-icon">${ICON_BED(NAVY)}</div>
+                <div>
+                    <div class="package-label">Room Type</div>
+                    <div class="package-value">${escapeHTML(roomTypeText)}</div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+  const isUmrahPackagePrint =
+    booking.printType === "umrah-package" || booking.showPackageDetails === true;
 
   const travelType =
     booking.groupType ||
@@ -189,11 +378,11 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
 
       const fDepDate = formatDateOnly(
         f.departureDate ||
-          f.depDate ||
-          f.date ||
-          (index === 0
-            ? booking.departureDate
-            : booking.returnDate || booking.arrivalDate),
+        f.depDate ||
+        f.date ||
+        (index === 0
+          ? booking.departureDate
+          : booking.returnDate || booking.arrivalDate),
       );
 
       const baggageRaw = (
@@ -285,7 +474,7 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Travel Itinerary</title>
+    <title>Booking Print</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -315,7 +504,16 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
         .info-box .info-label { font-size: 11px; font-weight: 700; color: ${NAVY}; margin-bottom: 4px; }
         .info-box .info-value { font-size: 13px; color: ${BODY_TEXT}; font-weight: 600; }
 
-        .section-title { font-size: 15px; font-weight: 800; color: ${NAVY}; letter-spacing: 0.5px; margin: 22px 0 10px; text-transform: uppercase; }
+        .package-details { border: 1px solid ${BORDER_BLUE}; margin: 12px 0 16px; padding: 9px 10px 10px; }
+        .package-title { font-size: 12px; font-weight: 800; color: ${NAVY}; text-transform: uppercase; margin-bottom: 8px; }
+        .package-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+        .package-item { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 3px 10px; border-right: 1px solid ${BORDER_BLUE}; }
+        .package-item:last-child { border-right: 0; }
+        .package-icon { flex: 0 0 34px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+        .package-label { font-size: 10.5px; font-weight: 800; color: ${NAVY}; margin-bottom: 2px; }
+        .package-value { font-size: 9.2px; color: ${BODY_TEXT}; font-weight: 600; line-height: 1.25; word-break: break-word; }
+
+        .section-title { font-size: 15px; font-weight: 800; color: ${NAVY}; letter-spacing: 0.5px; margin: 16px 0 10px; text-transform: uppercase; }
 
         table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
         table.data-table thead tr { background: ${NAVY}; color: #fff; }
@@ -351,11 +549,10 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
     <div class="doc">
         <div class="top-header">
             <div class="brand-left">
-                ${
-                  airlineLogo
-                    ? `<img src="${airlineLogo}" alt="${airlineName}" onerror="this.outerHTML='<span class=&quot;airline-fallback&quot;>${airlineName}</span>'" />`
-                    : `<span class="airline-fallback">${airlineName}</span>`
-                }
+                ${airlineLogo
+      ? `<img src="${airlineLogo}" alt="${airlineName}" onerror="this.outerHTML='<span class=&quot;airline-fallback&quot;>${airlineName}</span>'" />`
+      : `<span class="airline-fallback">${airlineName}</span>`
+    }
                 <!-- <div class="airline-name">${airlineName}</div> -->
             </div>
             <div class="brand-right">
@@ -364,7 +561,7 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
             </div>
         </div>
 
-        <div class="doc-title">TRAVEL ITINERARY</div>
+        ${isUmrahPackagePrint ? "" : `<div class="doc-title">TRAVEL ITINERARY</div>`}
 
         <div class="info-box">
             <div class="info-col">
@@ -396,6 +593,8 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
                 ${passengersHTML}
             </tbody>
         </table>
+
+        ${isUmrahPackagePrint ? packageDetailsHTML : ""}
 
         <div class="section-title">Itinerary</div>
         <table class="data-table itinerary-table">

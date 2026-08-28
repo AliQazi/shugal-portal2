@@ -43,7 +43,7 @@ const features = [
 
 export default function ChooseUsSection() {
   return (
-    <section className="w-full flex flex-col lg:flex-row min-h-[80vh] bg-white font-sans overflow-hidden">
+    <section className="font-home w-full flex flex-col lg:flex-row min-h-[80vh] bg-white font-sans overflow-hidden">
       {/* --- LEFT SIDE: Sticky Parallax Background Panel --- */}
       <div className="w-full lg:w-2/5 relative min-h-100 lg:min-h-[80vh] overflow-hidden">
         {/* Parallax Background Engine */}
@@ -87,7 +87,7 @@ export default function ChooseUsSection() {
         {/* Simple & Decent Header */}
         <div>
           <h3
-            className="text-2xl md:text-3xl font-black tracking-tight uppercase"
+            className="text-2xl md:text-3xl font-bold tracking-tight uppercase"
             style={{ color: theme?.colors?.primary || "#1a417a" }}
           >
             Abid Air Travel & Tours Advantage

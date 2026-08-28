@@ -29,7 +29,7 @@ export default function Footer({ user }) {
         <div
           /* FIXED: Linear gradient render karne ke liye background use kiya hai */
           style={{ background: theme.colors.primaryDark }}
-          className="relative py-20 px-6 overflow-hidden"
+          className="font-home relative px-6 overflow-hidden"
         >
           {/* Subtle Graphic Grid Lines Layer */}
           <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-size[32px_32px]" />
@@ -77,13 +77,13 @@ export default function Footer({ user }) {
           {/* Brand Panel Column - Span 4 */}
           <div className="lg:col-span-4 flex flex-col justify-between space-y-6">
             <div>
-              <div className="inline-block p-2.5 bg-white rounded-xl mb-4 shadow-md">
+              {/* <div className="inline-block p-2.5 bg-white rounded-xl mb-4 shadow-md">
                 <img
                   src={logo}
                   alt="Abid Air Travel & Tours LOGO"
                   className="h-20! w-auto object-contain"
                 />
-              </div>
+              </div> */}
               <h3
                 style={{ color: theme.colors.sidebarTextLight }}
                 className="text-lg font-bold tracking-tight uppercase"

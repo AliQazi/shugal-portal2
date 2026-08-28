@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   getMyBookings,
   submitPayment,
@@ -44,6 +44,10 @@ export default function UmrahBooking() {
   const [detailsPackageData, setDetailsPackageData] = useState(null);
   const [detailsGroupTicket, setDetailsGroupTicket] = useState(null);
   const [loadingDetailsData, setLoadingDetailsData] = useState(false);
+  // Group tickets referenced by a package's selectedGroupTicketId, fetched in
+  // bulk for the whole table (Flight PNR lives on the group ticket, not on
+  // the package itself), keyed by group ticket id.
+  const [groupTicketsMap, setGroupTicketsMap] = useState({});
 
   const { data3, subheadAccounts } = useAccountsList();
   // console.log(subheadAccounts);
@@ -147,6 +151,17 @@ export default function UmrahBooking() {
       (booking?.packageId && typeof booking.packageId === "object"
         ? booking.packageId
         : booking?.packageData || {});
+    return applyPackageDetailsOverride(base, booking?.packageDetailsOverride);
+  };
+
+  // Same as getPackageDetails, but for a table row rather than the open
+  // details modal - never reads detailsPackageData (that's scoped to
+  // whichever single booking the modal currently has open).
+  const getRowPackageData = (booking) => {
+    const base =
+      booking?.packageId && typeof booking.packageId === "object"
+        ? booking.packageId
+        : booking?.packageData || {};
     return applyPackageDetailsOverride(base, booking?.packageDetailsOverride);
   };
 
@@ -715,6 +730,50 @@ export default function UmrahBooking() {
     fetchBookings();
   }, []);
 
+  // Fetch the group ticket(s) backing any booking's package, so the table
+  // can show its Flight PNR (a GroupTicketing-only field, not stored on the
+  // package). Only fetches ids we haven't already cached.
+  useEffect(() => {
+    const idsNeeded = new Set();
+    bookings.forEach((booking) => {
+      const rowPackageData = getRowPackageData(booking);
+      const groupTicketId = getId(
+        rowPackageData?.selectedGroupTicketId ||
+        rowPackageData?.groupTicket?._id ||
+        rowPackageData?.groupTicket?.id,
+      );
+      if (groupTicketId && !groupTicketsMap[groupTicketId]) {
+        idsNeeded.add(groupTicketId);
+      }
+    });
+
+    if (idsNeeded.size === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      Array.from(idsNeeded).map((id) =>
+        axiosInstance
+          .get(`/group-ticketing/${id}`)
+          .then((res) => [id, res.data?.data || null])
+          .catch(() => [id, null]),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      setGroupTicketsMap((prev) => {
+        const next = { ...prev };
+        results.forEach(([id, data]) => {
+          if (data) next[id] = data;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   useEffect(() => {
     const onHoldBookings = bookings.filter(
       (booking) => isOnHoldBooking(booking) && booking.expiresAt,
@@ -853,15 +912,12 @@ export default function UmrahBooking() {
     ...new Set(bookings.map((b) => b.hotelStatus?.status).filter(Boolean)),
   ];
 
-  const totalBookings = bookings.length;
+  // Stats Cards (Total Bookings / Total Spent / Active Bookings) are
+  // commented out above, so these derived totals are unused for now.
+  // const totalBookings = bookings.length;
   // const totalSpent = bookings
   //   .filter((b) => b.overallStatus !== "Cancelled")
-  //   .reduce((sum, b) => sum + (b.pricing?.totalPrice || 0), 0);
-  const totalSpent = bookings
-    .filter((b) => b.overallStatus !== "Cancelled")
-    .reduce((sum, b) => {
-      return sum + getPayableTotal(b);
-    }, 0);
+  //   .reduce((sum, b) => sum + getPayableTotal(b), 0);
   const selectedBookingDiscountTotal = getDiscountTotal(selectedBooking);
   const selectedBookingAfterDiscountTotal = getPayableTotal(selectedBooking);
   const selectedPackageDetails = getPackageDetails(selectedBooking);
@@ -922,7 +978,7 @@ export default function UmrahBooking() {
         </div> */}
 
         {/* Stats Cards */}
-        <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="border border-slate-200 bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               Total Bookings
@@ -954,219 +1010,222 @@ export default function UmrahBooking() {
               }
             </p>
           </div>
-        </div>
+        </div> */}
 
-        {/* Filters & Search */}
-        <div className="mb-4 border border-slate-200 bg-white p-4">
-          <div className="flex flex-col lg:flex-row gap-4 items-end">
-            {/* Search */}
-            <div className="flex-1 relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by Booking ID, Package or Passenger..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-            </div>
+        {/* Table */}
+        <div className="overflow-hidden border border-slate-300 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-white px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              {filteredAndSortedBookings.length} booking
+              {filteredAndSortedBookings.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 rounded-md border border-slate-200 bg-slate-50 px-2 text-sm! font-medium text-slate-700 focus:border-emerald-500 focus:outline-none"
+              >
+                {statusOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "All" ? "Booking Status" : opt}
+                  </option>
+                ))}
+              </select>
 
-            {/* Filters */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full lg:w-auto">
-              {[
-                {
-                  label: "Booking Status",
-                  val: statusFilter,
-                  set: setStatusFilter,
-                  opts: statusOptions,
-                },
-                {
-                  label: "Payment Status",
-                  val: paymentFilter,
-                  set: setPaymentFilter,
-                  opts: paymentOptions,
-                },
-                {
-                  label: "Visa Status",
-                  val: visaFilter,
-                  set: setVisaFilter,
-                  opts: visaOptions,
-                },
-                {
-                  label: "Hotel Status",
-                  val: hotelFilter,
-                  set: setHotelFilter,
-                  opts: hotelOptions,
-                },
-              ].map((filter, idx) => (
-                <div key={idx} className="flex flex-col">
-                  <label className="text-xs font-semibold text-gray-600 ml-1 mb-1">
-                    {filter.label}
-                  </label>
-                  <select
-                    value={filter.val}
-                    onChange={(e) => filter.set(e.target.value)}
-                    className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 focus:border-emerald-500 focus:outline-none"
-                  >
-                    {filter.opts.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="h-9 rounded-md border border-slate-200 bg-slate-50 px-2 text-sm! font-medium text-slate-700 focus:border-emerald-500 focus:outline-none"
+              >
+                {paymentOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "All" ? "Payment Status" : opt}
+                  </option>
+                ))}
+              </select>
 
-              {/* Clear Button */}
+              <select
+                value={visaFilter}
+                onChange={(e) => setVisaFilter(e.target.value)}
+                className="h-9 rounded-md border border-slate-200 bg-slate-50 px-2 text-sm! font-medium text-slate-700 focus:border-emerald-500 focus:outline-none"
+              >
+                {visaOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "All" ? "Visa Status" : opt}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={hotelFilter}
+                onChange={(e) => setHotelFilter(e.target.value)}
+                className="h-9 rounded-md border border-slate-200 bg-slate-50 px-2 text-sm! font-medium text-slate-700 focus:border-emerald-500 focus:outline-none"
+              >
+                {hotelOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "All" ? "Hotel Status" : opt}
+                  </option>
+                ))}
+              </select>
+
+              <div className="relative w-64 max-w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search bookings..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-medium transition-all focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
               <button
                 onClick={resetFilters}
-                className="mt-5.5 flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-500 transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-600"
+                title="Clear filters"
+                className="flex h-9 items-center justify-center gap-1 rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-500 transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-600"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
                 Clear
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-hidden border border-slate-200 bg-white">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-295 text-sm">
+            <table className="w-full min-w-295 border-collapse text-sm">
               {/* HEADER */}
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead className="bg-slate-100">
                 <tr className="whitespace-nowrap">
                   <th
                     onClick={() => handleSort("bookingNumber")}
-                    className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 cursor-pointer hover:text-emerald-600"
+                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
                   >
-                    Booking #{" "}
+                    Id{" "}
                     {sortConfig.key === "bookingNumber" &&
                       (sortConfig.direction === "asc" ? "↑" : "↓")}
                   </th>
 
                   <th
                     onClick={() => handleSort("packageName")}
-                    className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 cursor-pointer hover:text-emerald-600"
+                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
                   >
-                    Package{" "}
+                    Name{" "}
                     {sortConfig.key === "packageName" &&
                       (sortConfig.direction === "asc" ? "↑" : "↓")}
                   </th>
 
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Passenger
-                  </th>
-
                   <th
                     onClick={() => handleSort("totalPrice")}
-                    className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 cursor-pointer hover:text-emerald-600"
+                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
                   >
-                    Price{" "}
+                    Flight Detail{" "}
                     {sortConfig.key === "totalPrice" &&
                       (sortConfig.direction === "asc" ? "↑" : "↓")}
                   </th>
 
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Booking
+                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                    Departure
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Payment
+
+                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                    Arrival
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Visa
+
+                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                    Dept. Date Time
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+
+                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                    Arr. Date Time
+                  </th>
+
+                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                     Hotel
                   </th>
 
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <th className="border border-slate-300 px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-600">
                     Action
                   </th>
                 </tr>
               </thead>
 
               {/* BODY */}
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {filteredAndSortedBookings.length > 0 ? (
-                  filteredAndSortedBookings.map((booking) => (
-                    <tr
-                      key={booking._id}
-                      className="hover:bg-gray-50/80 transition-colors"
-                    >
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-mono font-semibold text-gray-900">
-                          {booking.bookingNumber}
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-1">
-                          <CalendarDays className="h-3 w-3 text-emerald-600" />
-                          {formatDate(booking.createdAt)}
-                        </div>
-                        <div className="text-[11px] text-gray-500 capitalize">
-                          {booking.roomType || "Room N/A"}
-                        </div>
-                      </td>
+                  filteredAndSortedBookings.map((booking) => {
+                    const rowPackageData = getRowPackageData(booking);
+                    const rowGroupTicketId = getId(
+                      rowPackageData?.selectedGroupTicketId ||
+                      rowPackageData?.groupTicket?._id ||
+                      rowPackageData?.groupTicket?.id,
+                    );
+                    const rowGroupTicket =
+                      groupTicketsMap[rowGroupTicketId] ||
+                      rowPackageData?.groupTicket ||
+                      null;
+                    const rowFlights = rowPackageData?.flights?.length
+                      ? rowPackageData.flights
+                      : rowGroupTicket?.flights || [];
+                    const rowFirstFlight = rowFlights[0] || {};
+                    // Flight PNR lives on the group ticket, not the package.
+                    const rowPnr =
+                      rowPackageData?.pnr ||
+                      rowGroupTicket?.pnr ||
+                      rowFirstFlight.pnr ||
+                      booking.pnr ||
+                      "N/A";
+                    const rowAirline =
+                      rowFirstFlight.airline ||
+                      rowFirstFlight.airlineName ||
+                      rowPackageData?.airlineName ||
+                      rowGroupTicket?.airline ||
+                      "N/A";
+                    const rowFlightNumbers = rowFlights
+                      .map((f) => f.flightNo || f.flightNumber)
+                      .filter(Boolean)
+                      .join(" / ");
+                    const rowHotels = rowPackageData?.hotels || [];
+                    const makkahHotel = rowHotels.find((h) =>
+                      /makkah|mecca/i.test(h.location?.city || h.city || ""),
+                    );
+                    const madinaHotel = rowHotels.find((h) =>
+                      /madina|medina/i.test(h.location?.city || h.city || ""),
+                    );
+                    const totalPassengers =
+                      booking.passengerCount?.total ||
+                      booking.passengers?.length ||
+                      0;
 
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 truncate max-w-35">
-                            {booking.packageName}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="flex flex-col gap-1 px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {booking.passengers?.[0]?.givenName}{" "}
-                          {booking.passengers?.[0]?.surName}
-                        </div>
-                        <div className="text-[10px] text-gray-600">
-                          ({booking.passengerCount?.total} passengers)
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
-                        <div>
-                          {booking.pricing?.currency}{" "}
-                          {booking.pricing?.totalPrice?.toLocaleString()}
-                        </div>
-                        {booking.passengers?.reduce(
-                          (sum, p) => sum + (p.discount || 0),
-                          0,
-                        ) > 0 && (
-                            <div className="text-[11px] text-gray-500">
-                              After discount: {booking.pricing?.currency}{" "}
-                              {Math.max(
-                                0,
-                                (booking.pricing?.totalPrice || 0) -
-                                booking.passengers.reduce(
-                                  (sum, p) => sum + (p.discount || 0),
-                                  0,
-                                ),
-                              ).toLocaleString()}
-                            </div>
-                          )}
-                      </td>
-
-                      {/* Booking Status */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex flex-col gap-1.5">
-                          <span
-                            className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.overallStatus === "Confirmed" ||
-                              booking.overallStatus === "Completed"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : booking.overallStatus === "On Hold" ||
-                                booking.overallStatus === "Pending"
-                                ? "bg-amber-50 text-amber-700"
-                                : booking.overallStatus === "In Progress"
-                                  ? "bg-blue-50 text-blue-700"
-                                  : "bg-red-50 text-red-700"
-                              }`}
-                          >
-                            {booking.overallStatus}
-                          </span>
+                    return (
+                      <tr
+                        key={booking._id}
+                        className="align-top hover:bg-gray-50/80 transition-colors"
+                      >
+                        {/* Id */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          <div className="font-mono font-bold text-gray-900">
+                            {booking.bookingNumber}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <CalendarDays className="h-3 w-3 text-emerald-600" />
+                            {formatDate(booking.createdAt)}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            <span
+                              className={`w-fit rounded px-1.5 py-0.5 text-[10px] font-bold ${booking.overallStatus === "Confirmed" ||
+                                booking.overallStatus === "Completed"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : booking.overallStatus === "On Hold" ||
+                                  booking.overallStatus === "Pending"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : booking.overallStatus === "In Progress"
+                                    ? "bg-blue-50 text-blue-700"
+                                    : "bg-red-50 text-red-700"
+                                }`}
+                            >
+                              {booking.overallStatus || "N/A"}
+                            </span>
+                          </div>
                           {isOnHoldBooking(booking) && (
-                            <div className="w-fit rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
+                            <div className="mt-1.5 w-fit rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                               {timers[booking._id]?.expired ? (
                                 <span className="text-red-600">EXPIRED</span>
                               ) : (
@@ -1186,183 +1245,330 @@ export default function UmrahBooking() {
                               )}
                             </div>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Payment Status */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="w-fit flex flex-col gap-1">
+                        {/* Name */}
+                        <td className="border border-slate-300 px-3 py-2.5 min-w-45">
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Package:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {booking.packageName || "N/A"}
+                            </span>
+                          </div>
+                          {booking.user?.companyName && (
+                            <div className="text-xs text-gray-500 leading-relaxed">
+                              Agency:{" "}
+                              <span className="font-semibold text-gray-800">
+                                {booking.user.companyName}
+                              </span>
+                            </div>
+                          )}
+                          {rowPackageData?.days && (
+                            <div className="text-xs text-gray-500 leading-relaxed">
+                              Package Days:{" "}
+                              <span className="font-semibold text-gray-800">
+                                {rowPackageData.days}
+                              </span>
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Name:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {booking.passengers?.[0]?.givenName}{" "}
+                              {booking.passengers?.[0]?.surName}{" "}
+                              {totalPassengers > 1 && `x ${totalPassengers}`}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs font-semibold text-gray-700">
+                            Persons:
+                          </div>
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Adults: {booking.passengerCount?.adults || 0}
+                            {booking.passengerCount?.children > 0 &&
+                              ` · Children: ${booking.passengerCount.children}`}
+                            {booking.passengerCount?.infants > 0 &&
+                              ` · Infants: ${booking.passengerCount.infants}`}
+                          </div>
+                        </td>
+
+                        {/* Flight Detail */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Flight PNR:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {rowPnr}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Flight Number:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {rowFlightNumbers || "N/A"}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Airline:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {rowAirline}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 leading-relaxed">
+                            Price:{" "}
+                            <span className="font-semibold text-gray-800">
+                              {formatMoney(
+                                getPayableTotal(booking),
+                                booking.pricing?.currency,
+                              )}
+                            </span>
+                          </div>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${booking.paymentStatus?.status === "Approved"
+                            className={`w-fit rounded px-1.5 py-0.5 text-[10px] font-bold ${booking.paymentStatus?.status === "Approved"
                               ? "bg-emerald-50 text-emerald-700"
-                              : booking.paymentStatus?.status === "Pending" &&
-                                booking.paymentStatus?.paymentHistory
-                                  ?.length > 0
-                                ? "bg-blue-50 text-blue-700"
-                                : booking.paymentStatus?.status === "Pending"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-red-50 text-red-700"
+                              : booking.paymentStatus?.status === "Pending"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-red-50 text-red-700"
                               }`}
                           >
-                            {booking.paymentStatus?.status === "Pending" &&
-                              booking.paymentStatus?.paymentHistory?.length > 0
-                              ? "Review"
-                              : booking.paymentStatus?.status || "N/A"}
+                            Pay: {booking.paymentStatus?.status || "N/A"}
                           </span>
-                          {booking.paymentStatus?.paymentHistory?.some(
-                            (p) => p.paymentStatus === "Rejected",
-                          ) && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-300">
-                                {
-                                  booking.paymentStatus.paymentHistory.filter(
-                                    (p) => p.paymentStatus === "Rejected",
-                                  ).length
-                                }{" "}
-                                Rejected
-                              </span>
-                            )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Visa */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.visaStatus?.status === "Approved"
-                            ? "bg-blue-50 text-blue-700"
-                            : booking.visaStatus?.status === "Pending"
-                              ? "bg-amber-50 text-amber-700"
-                              : booking.visaStatus?.status === "Rejected"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-gray-50 text-gray-600"
-                            }`}
-                        >
-                          {booking.visaStatus?.status || "N/A"}
-                        </span>
-                      </td>
+                        {/* Departure */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          {rowFlights.length > 0 ? (
+                            rowFlights.map((f, idx) => (
+                              <div
+                                key={`dep-${idx}`}
+                                className="font-semibold text-gray-800"
+                              >
+                                {f.sectorFrom ||
+                                  f.origin ||
+                                  f.originCode ||
+                                  "N/A"}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
 
-                      {/* Hotel */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${booking.hotelStatus?.status === "Confirmed"
-                            ? "bg-purple-50 text-purple-700"
-                            : booking.hotelStatus?.status === "Pending"
-                              ? "bg-amber-50 text-amber-700"
-                              : booking.hotelStatus?.status === "Cancelled"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-gray-50 text-gray-600"
-                            }`}
-                        >
-                          {booking.hotelStatus?.status || "N/A"}
-                        </span>
-                      </td>
+                        {/* Arrival */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          {rowFlights.length > 0 ? (
+                            rowFlights.map((f, idx) => (
+                              <div
+                                key={`arr-${idx}`}
+                                className="font-semibold text-gray-800"
+                              >
+                                {f.sectorTo ||
+                                  f.destination ||
+                                  f.destinationCode ||
+                                  "N/A"}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
 
-                      {/* Action */}
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleOpenDetailsModal(booking)}
-                            className="inline-flex items-center gap-1 px-2! py-1! bg-blue-50 text-blue-700 border border-blue-100 rounded-md hover:bg-blue-100 text-xs! font-medium whitespace-nowrap"
-                            title="View Details"
+                        {/* Dept Date Time */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          {rowFlights.length > 0 ? (
+                            rowFlights.map((f, idx) => (
+                              <div
+                                key={`deptdt-${idx}`}
+                                className="text-gray-700"
+                              >
+                                {formatDate(
+                                  f.depDate ||
+                                  f.departureDate ||
+                                  f.flightDate,
+                                )}{" "}
+                                {f.depTime || f.departureTime || ""}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+
+                        {/* Arr Date Time */}
+                        <td className="border border-slate-300 px-3 py-2.5 whitespace-nowrap">
+                          {rowFlights.length > 0 ? (
+                            rowFlights.map((f, idx) => (
+                              <div
+                                key={`arrdt-${idx}`}
+                                className="text-gray-700"
+                              >
+                                {formatDate(f.arrDate || f.arrivalDate)}{" "}
+                                {f.arrTime || f.arrivalTime || ""}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+
+                        {/* Hotel */}
+                        <td className="border border-slate-300 px-3 py-2.5 min-w-40">
+                          {makkahHotel || madinaHotel ? (
+                            <>
+                              {makkahHotel && (
+                                <div className="mb-1">
+                                  <div className="text-xs text-gray-500">
+                                    Stay in Makkah
+                                  </div>
+                                  <div className="font-semibold text-gray-800">
+                                    {makkahHotel.name}
+                                  </div>
+                                </div>
+                              )}
+                              {madinaHotel && (
+                                <div>
+                                  <div className="text-xs text-gray-500">
+                                    Stay in Madina
+                                  </div>
+                                  <div className="font-semibold text-gray-800">
+                                    {madinaHotel.name}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : rowHotels.length > 0 ? (
+                            rowHotels.map((hotel, idx) => (
+                              <div key={`hotel-${idx}`} className="mb-1">
+                                <div className="font-semibold text-gray-800">
+                                  {hotel.name || "Hotel N/A"}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                          <span
+                            className={`mt-1 inline-block w-fit rounded px-1.5 py-0.5 text-[10px] font-bold ${booking.hotelStatus?.status === "Confirmed"
+                              ? "bg-purple-50 text-purple-700"
+                              : booking.hotelStatus?.status === "Pending"
+                                ? "bg-amber-50 text-amber-700"
+                                : booking.hotelStatus?.status === "Cancelled"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-gray-50 text-gray-600"
+                              }`}
                           >
-                            <Eye className="w-3 h-3" />
-                            Details
-                          </button>
+                            {booking.hotelStatus?.status || "N/A"}
+                          </span>
+                        </td>
 
-                          {booking.passengersLocked ? (
+                        {/* Action */}
+                        <td className="border border-slate-300 px-3 py-2.5 text-center whitespace-nowrap">
+                          <div className="flex flex-wrap items-center justify-center gap-1.5">
                             <button
-                              disabled
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-gray-100 text-gray-400 border border-gray-200 rounded-md text-xs! font-medium whitespace-nowrap cursor-not-allowed"
-                              title="Passenger editing is locked by admin"
+                              onClick={() => handleOpenDetailsModal(booking)}
+                              className="inline-flex items-center gap-1 px-2! py-1! bg-blue-50 text-blue-700 border border-blue-100 rounded-md hover:bg-blue-100 text-xs! font-medium whitespace-nowrap"
+                              title="View Details"
                             >
-                              <Lock className="w-3 h-3" />
-                              Edit
+                              <Eye className="w-3 h-3" />
+                              Details
                             </button>
-                          ) : (
-                            <button
-                              onClick={() =>
-                                handleOpenEditPassengersModal(booking)
-                              }
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-amber-50 text-amber-700 border border-amber-100 rounded-md hover:bg-amber-100 text-xs! font-medium whitespace-nowrap"
-                              title="Edit Passenger Details"
-                            >
-                              <Pencil className="w-3 h-3" />
-                              Edit
-                            </button>
-                          )}
 
-                          {booking.overallStatus !== "Cancelled" && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePrintTicket(booking);
-                              }}
-                              disabled={printingTicketId === booking._id}
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-slate-100 text-slate-700 border border-gray-200 rounded-md hover:bg-slate-200 text-xs! font-medium whitespace-nowrap disabled:opacity-60"
-                              title="Print Ticket"
-                            >
-                              <Printer className="w-3 h-3" />
-                              {printingTicketId === booking._id
-                                ? "Printing..."
-                                : "Print Ticket"}
-                            </button>
-                          )}
+                            {booking.passengersLocked ? (
+                              <button
+                                disabled
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-gray-100 text-gray-400 border border-gray-200 rounded-md text-xs! font-medium whitespace-nowrap cursor-not-allowed"
+                                title="Passenger editing is locked by admin"
+                              >
+                                <Lock className="w-3 h-3" />
+                                Edit
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  handleOpenEditPassengersModal(booking)
+                                }
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-amber-50 text-amber-700 border border-amber-100 rounded-md hover:bg-amber-100 text-xs! font-medium whitespace-nowrap"
+                                title="Edit Passenger Details"
+                              >
+                                <Pencil className="w-3 h-3" />
+                                Edit
+                              </button>
+                            )}
 
-                          {isOnHoldBooking(booking) &&
-                            timers[booking._id]?.expired ? (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-red-100 text-red-700 rounded-md text-xs! font-medium whitespace-nowrap"
-                            >
-                              <XCircle className="w-3 h-3" />
-                              Expired
-                            </button>
-                          ) : booking.overallStatus === "Cancelled" ? (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-red-100 text-red-700 rounded-md text-xs! font-medium whitespace-nowrap"
-                            >
-                              <XCircle className="w-3 h-3" />
-                              Cancelled
-                            </button>
-                          ) : booking.paymentStatus?.paymentHistory?.some(
-                            (p) => p.paymentStatus === "Pending",
-                          ) ? (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-yellow-100 text-yellow-700 rounded-md text-xs! font-medium whitespace-nowrap"
-                            >
-                              <Clock className="w-3 h-3" />
-                              Pending Review
-                            </button>
-                          ) : getPayableRemainingAmount(booking) === 0 ? (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-emerald-100 text-emerald-700 rounded-md text-xs! font-medium whitespace-nowrap"
-                            >
-                              <CheckCircle className="w-3 h-3" />
-                              Fully Paid
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenPaymentModal(booking);
-                              }}
-                              className="inline-flex items-center gap-1 px-2! py-1! bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-xs! font-medium whitespace-nowrap"
-                            >
-                              <Plus className="w-3 h-3" />
-                              {booking.paymentStatus?.paidAmount > 0
-                                ? "Add Payment"
-                                : "Pay"}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {booking.overallStatus !== "Cancelled" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrintTicket(booking);
+                                }}
+                                disabled={printingTicketId === booking._id}
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-slate-100 text-slate-700 border border-gray-200 rounded-md hover:bg-slate-200 text-xs! font-medium whitespace-nowrap disabled:opacity-60"
+                                title="Print Ticket"
+                              >
+                                <Printer className="w-3 h-3" />
+                                {printingTicketId === booking._id
+                                  ? "Printing..."
+                                  : "Print Ticket"}
+                              </button>
+                            )}
+
+                            {isOnHoldBooking(booking) &&
+                              timers[booking._id]?.expired ? (
+                              <button
+                                disabled
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-red-100 text-red-700 rounded-md text-xs! font-medium whitespace-nowrap"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Expired
+                              </button>
+                            ) : booking.overallStatus === "Cancelled" ? (
+                              <button
+                                disabled
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-red-100 text-red-700 rounded-md text-xs! font-medium whitespace-nowrap"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Cancelled
+                              </button>
+                            ) : booking.paymentStatus?.paymentHistory?.some(
+                              (p) => p.paymentStatus === "Pending",
+                            ) ? (
+                              <button
+                                disabled
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-yellow-100 text-yellow-700 rounded-md text-xs! font-medium whitespace-nowrap"
+                              >
+                                <Clock className="w-3 h-3" />
+                                Pending Review
+                              </button>
+                            ) : getPayableRemainingAmount(booking) === 0 ? (
+                              <button
+                                disabled
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-emerald-100 text-emerald-700 rounded-md text-xs! font-medium whitespace-nowrap"
+                              >
+                                <CheckCircle className="w-3 h-3" />
+                                Fully Paid
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPaymentModal(booking);
+                                }}
+                                className="inline-flex items-center gap-1 px-2! py-1! bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-xs! font-medium whitespace-nowrap"
+                              >
+                                <Plus className="w-3 h-3" />
+                                {booking.paymentStatus?.paidAmount > 0
+                                  ? "Add Payment"
+                                  : "Pay"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="9" className="px-6 py-16 text-center">
+                    <td
+                      colSpan="9"
+                      className="border border-slate-300 px-6 py-16 text-center"
+                    >
                       <Filter className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                       <p className="text-sm font-semibold text-gray-900">
                         No bookings

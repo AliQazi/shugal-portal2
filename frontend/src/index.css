@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* ── Stolzl font — used exclusively on the Home page ─────────────────────── */
+@font-face {
+    font-family: "Stolzl";
+    src: url("./assets/font/stolzl_regular.otf") format("opentype");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Scopes the Stolzl font to the Home page only; every element inside
+   inherits it, so it never leaks onto other pages/layouts. */
+.font-home {
+    font-family: "Stolzl", "Roboto", sans-serif;
+}
+
 h1,
 h2,
 h3,

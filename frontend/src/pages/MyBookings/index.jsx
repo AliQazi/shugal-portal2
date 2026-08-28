@@ -251,7 +251,7 @@ export default function MyBookings() {
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
-              className={`px-4 py-2.5 text-sm text-neutral-500 rounded font-semibold tracking-wide transition-colors hover:bg-neutral-100`}
+              className={`px-3 py-2.5! text-sm text-neutral-500 rounded font-semibold tracking-wide transition-colors hover:bg-neutral-100`}
               style={
                 activeTab === tab.key
                   ? { color: '#ffffff', background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.primaryDark})` }

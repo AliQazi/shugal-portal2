@@ -272,7 +272,7 @@ const Dashboard = () => {
           <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
           <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
           
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-14">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-4">
@@ -287,13 +287,10 @@ const Dashboard = () => {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3">
                   Welcome Back, Agent
                 </h1>
-                <p className="text-white/80 text-sm sm:text-base max-w-xl">
-                  Your travel booking dashboard is ready. Explore destinations, manage bookings, and discover exclusive deals.
-                </p>
               </div>
               <div className="hidden lg:block animate-float">
-                <div className="w-26 h-26 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-                  <Plane className="w-12 h-12 text-white/80" />
+                <div className="w-22 h-22 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Plane className="w-10 h-10 text-white/80" />
                 </div>
               </div>
             </div>
@@ -365,8 +362,15 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
-                {groupTypes.map((group, index) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Only showing "All Groups" and "Umrah Packages" for now.
+                    Other destination cards are commented out below (in groupTypes order):
+                    - Umrah Groups (Only Seats)
+                    - UAE (United Arab Emirates)
+                    - KSA (Saudia Arabia) one way
+                    - Kuwait (KWI)
+                */}
+                {groupTypes.slice(0, 2).map((group, index) => {
                   const style = groupStyles[group.label] ?? groupStyles["All Groups"];
                   const GroupIcon = style.icon;
 
@@ -407,14 +411,6 @@ const Dashboard = () => {
                           <h3 className="text-start text-lg font-bold text-white mb-2">
                             {group.label}
                           </h3>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-white/70 font-medium">
-                              View
-                            </span>
-                            <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                              <ArrowRight size={14} className="text-white" />
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </button>

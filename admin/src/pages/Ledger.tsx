@@ -52,6 +52,7 @@ const Ledger = () => {
   const statementRef = useRef<HTMLDivElement>(null);
 
   const userName = location.state?.companyname || "User";
+  const COMPANY_NAME = "Abid Air Travel & Tours";
 
   useEffect(() => {
     if (canView && dateFrom && dateTo) {
@@ -177,6 +178,8 @@ const Ledger = () => {
         color: #111827; background: #ffffff;
         font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt;
       }
+      * { box-sizing: border-box; }
+      .ledger-print-body { padding: 0; }
       .ledger-print-topline { text-align: right; color: #555; font-size: 8pt; margin-bottom: 14px; }
       .ledger-print-company { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
       .ledger-print-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -185,15 +188,19 @@ const Ledger = () => {
       .ledger-print-company-text strong { display: inline-block; font-size: 9pt; margin-bottom: 2px; }
       .ledger-print-opening { width: 210px; border: 1px solid #9ca3af; text-align: center; flex: 0 0 auto; }
       .ledger-print-opening div { padding: 7px 10px; font-weight: 700; }
-      .ledger-print-opening div:first-child { border-bottom: 1px solid #9ca3af; background: #f9fafb; }
-      .ledger-print-titlebar { display: flex; justify-content: space-between; align-items: center; background: #56b4ee; border: 1px solid #111827; color: #000; font-weight: 700; padding: 7px 8px; }
+      .ledger-print-opening div:first-child { border-bottom: 1px solid #173a68; background: #173a68; color: #ffffff; }
+      .ledger-print-titlebar {
+        display: flex; justify-content: space-between; align-items: center;
+        width: 100%; background: #0e2a4d; border: none; color: #ffffff;
+        font-weight: 700; font-size: 10pt; padding: 10px 16px; margin: 0 0 16px;
+      }
       .ledger-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
-      .ledger-print-table th { background: #d1d5db; color: #111827; border: 1px solid #9ca3af; padding: 5px 4px; font-weight: 700; text-align: left; }
+      .ledger-print-table th { background: #173a68; color: #ffffff; border: 1px solid #173a68; padding: 5px 4px; font-weight: 700; text-align: left; }
       .ledger-print-table td { border: 1px solid #b6b6b6; color: #1f2937; padding: 5px 4px; vertical-align: top; line-height: 1.3; word-break: break-word; }
       .ledger-print-table .text-right { text-align: right; }
       .ledger-print-table .ledger-print-voucher { color: #0070c0; }
       .ledger-print-table .ledger-print-balance { color: #ff0000; font-weight: 700; white-space: nowrap; }
-      .ledger-print-table tfoot td { background: #f3f4f6; font-weight: 700; }
+      .ledger-print-table tfoot td { background: #173a68; color: #ffffff; font-weight: 700; }
     `;
 
     Object.assign(wrapper.style, {
@@ -362,7 +369,8 @@ const Ledger = () => {
 
       <style>{`
         @media print {
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box !important; }
           nav, aside, header, footer, .no-print, .print-hide,
           .ledger-screen-content, [class*="sidebar"], [class*="breadcrumb"] {
             display: none !important;
@@ -373,6 +381,7 @@ const Ledger = () => {
           }
           .print-only { display: block !important; }
           .ledger-print-page { display: block !important; width: 100% !important; color: #111827 !important; font-family: Arial, Helvetica, sans-serif !important; font-size: 8.5pt !important; }
+          .ledger-print-body { padding: 0mm 5mm !important; }
           .ledger-print-topline { text-align: right !important; color: #555 !important; font-size: 8pt !important; margin-bottom: 14px !important; }
           .ledger-print-company { display: flex !important; align-items: flex-start !important; justify-content: space-between !important; gap: 18px !important; margin-bottom: 18px !important; }
           .ledger-print-brand { display: flex !important; align-items: center !important; gap: 12px !important; min-width: 0 !important; }
@@ -381,85 +390,97 @@ const Ledger = () => {
           .ledger-print-company-text strong { display: inline-block !important; font-size: 9pt !important; margin-bottom: 2px !important; }
           .ledger-print-opening { width: 210px !important; border: 1px solid #9ca3af !important; text-align: center !important; flex: 0 0 auto !important; }
           .ledger-print-opening div { padding: 7px 10px !important; font-weight: 700 !important; }
-          .ledger-print-opening div:first-child { border-bottom: 1px solid #9ca3af !important; background: #f9fafb !important; }
-          .ledger-print-titlebar { display: flex !important; justify-content: space-between !important; align-items: center !important; background: #56b4ee !important; border: 1px solid #111827 !important; color: #000 !important; font-weight: 700 !important; padding: 7px 8px !important; margin-bottom: 0 !important; }
+          .ledger-print-opening div:first-child { border-bottom: 1px solid #173a68 !important; background: #173a68 !important; color: #ffffff !important; }
+          .ledger-print-titlebar {
+            display: flex !important; justify-content: space-between !important; align-items: center !important;
+            width: 100% !important; background: #0e2a4d !important; border: none !important; color: #ffffff !important;
+            font-weight: 700 !important; font-size: 10pt !important; padding: 10px 10mm !important; margin: 0 0 16px !important;
+            margin-inline: -10mm !important;
+            margin-top: -10mm !important;
+            padding-inline: 10mm !important;
+            padding-top: 10mm !important;
+            width: 100% !important;
+            box-sizing: content-box !important;
+          }
           .ledger-print-table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; font-size: 8pt !important; }
           .ledger-print-table thead { display: table-header-group !important; }
-          .ledger-print-table th { background: #d1d5db !important; color: #111827 !important; border: 1px solid #9ca3af !important; padding: 5px 4px !important; font-weight: 700 !important; text-align: left !important; }
+          .ledger-print-table th { background: #173a68 !important; color: #ffffff !important; border: 1px solid #173a68 !important; padding: 5px 4px !important; font-weight: 700 !important; text-align: left !important; }
           .ledger-print-table td { border: 1px solid #b6b6b6 !important; color: #1f2937 !important; padding: 5px 4px !important; vertical-align: top !important; line-height: 1.3 !important; word-break: break-word !important; }
           .ledger-print-table .text-right { text-align: right !important; }
           .ledger-print-table .ledger-print-voucher { color: #0070c0 !important; }
           .ledger-print-table .ledger-print-balance { color: #ff0000 !important; font-weight: 700 !important; white-space: nowrap !important; }
-          .ledger-print-table tfoot td { background: #f3f4f6 !important; font-weight: 700 !important; }
+          .ledger-print-table tfoot td { background: #173a68 !important; color: #ffffff !important; font-weight: 700 !important; }
         }
       `}</style>
 
       {/* Print-only layout */}
       <div className="print-only" style={{ display: "none" }}>
         <div ref={statementRef} className="ledger-print-page">
-          <div className="ledger-print-topline">Print Date: {formatPrintDate()}</div>
-          <div className="ledger-print-company">
-            <div className="ledger-print-brand">
-              <img src={logo} alt="Company logo" className="ledger-print-logo" />
-              <div className="ledger-print-company-text">
-                <strong>{userName.toUpperCase()}</strong>
-                <div>Abid Air Travel & Tours</div>
-                <div>Email: abid_intl@msn.com</div>
-                <div>Account statement generated from Abid Air Travel & Tours portal</div>
-              </div>
-            </div>
-            <div className="ledger-print-opening">
-              <div>Opening Balance</div>
-              <div>{formatBalance(openingBalance)}</div>
-            </div>
-          </div>
-
           <div className="ledger-print-titlebar">
-            <span>Account Statement of Ledger</span>
+            <span>Account Statement of {userName}</span>
             <span>
               From {formatPrintDate(new Date(dateFrom))} To{" "}
               {formatPrintDate(new Date(dateTo))}
             </span>
           </div>
 
-          <table className="ledger-print-table">
-            <thead>
-              <tr>
-                <th style={{ width: "13%" }}>Date</th>
-                <th style={{ width: "9%" }}>V.no</th>
-                <th>Details</th>
-                <th className="text-right" style={{ width: "11%" }}>Debit</th>
-                <th className="text-right" style={{ width: "11%" }}>Credit</th>
-                <th className="text-right" style={{ width: "13%" }}>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rowsWithBalance.length === 0 ? (
+          <div className="ledger-print-body">
+            <div className="ledger-print-topline">Print Date: {formatPrintDate()}</div>
+            <div className="ledger-print-company">
+              <div className="ledger-print-brand">
+                <img src={logo} alt="Company logo" className="ledger-print-logo" />
+                <div className="ledger-print-company-text">
+                  <strong>{userName.toUpperCase()}</strong>
+                  <div>{COMPANY_NAME}</div>
+                  <div>Email: abid_intl@msn.com</div>
+                  <div>Account statement generated from {COMPANY_NAME} portal</div>
+                </div>
+              </div>
+              <div className="ledger-print-opening">
+                <div>Opening Balance</div>
+                <div>{formatBalance(openingBalance)}</div>
+              </div>
+            </div>
+
+            <table className="ledger-print-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="text-center">No data available</td>
+                  <th style={{ width: "13%" }}>Date</th>
+                  <th style={{ width: "9%" }}>V.no</th>
+                  <th>Details</th>
+                  <th className="text-right" style={{ width: "11%" }}>Debit</th>
+                  <th className="text-right" style={{ width: "11%" }}>Credit</th>
+                  <th className="text-right" style={{ width: "13%" }}>Balance</th>
                 </tr>
-              ) : (
-                rowsWithBalance.map((entry, index) => (
-                  <tr key={index}>
-                    <td>{new Date(entry.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                    <td className="ledger-print-voucher">{entry.voucherId || "-"}</td>
-                    <td>{entry.description || "-"}</td>
-                    <td className="text-right">{entry.debit > 0 ? formatAmount(entry.debit) : "0"}</td>
-                    <td className="text-right">{entry.credit > 0 ? formatAmount(entry.credit) : "0"}</td>
-                    <td className="text-right ledger-print-balance">{formatBalance(entry.runningBalance)}</td>
+              </thead>
+              <tbody>
+                {rowsWithBalance.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center">No data available</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={3}>Total</td>
-                <td className="text-right">{formatAmount(totalDebit)}</td>
-                <td className="text-right">{formatAmount(totalCredit)}</td>
-                <td className="text-right">{formatBalance(closingBalance)}</td>
-              </tr>
-            </tfoot>
-          </table>
+                ) : (
+                  rowsWithBalance.map((entry, index) => (
+                    <tr key={index}>
+                      <td>{new Date(entry.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                      <td className="ledger-print-voucher">{entry.voucherId || "-"}</td>
+                      <td>{entry.description || "-"}</td>
+                      <td className="text-right">{entry.debit > 0 ? formatAmount(entry.debit) : "0"}</td>
+                      <td className="text-right">{entry.credit > 0 ? formatAmount(entry.credit) : "0"}</td>
+                      <td className="text-right ledger-print-balance">{formatBalance(entry.runningBalance)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3}>Total</td>
+                  <td className="text-right">{formatAmount(totalDebit)}</td>
+                  <td className="text-right">{formatAmount(totalCredit)}</td>
+                  <td className="text-right">{formatBalance(closingBalance)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -468,7 +489,7 @@ const Ledger = () => {
         <div className="px-4 py-6 md:px-6 xl:px-7.5">
 
           {/* Date filter */}
-          <div className="bg-blue-600 dark:bg-blue-700 rounded-lg p-6 mb-6 no-print">
+          <div className="mb-4 no-print">
             <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end">
               <div className="flex-1">
                 <label className="block mb-2 text-sm font-medium text-white">Date From</label>
@@ -477,7 +498,7 @@ const Ledger = () => {
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   onClick={(e) => e.currentTarget.showPicker()}
-                  className="w-full h-11 rounded-lg border border-blue-400 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full h-11 rounded-lg border border-blue-400 bg-white px-4 py-2.5 text-sm text-gray-800 cursor-pointer shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   required
                 />
               </div>
@@ -488,7 +509,7 @@ const Ledger = () => {
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   onClick={(e) => e.currentTarget.showPicker()}
-                  className="w-full h-11 rounded-lg border border-blue-400 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full h-11 rounded-lg border border-blue-400 bg-white px-4 py-2.5 text-sm text-gray-800 cursor-pointer shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   required
                 />
               </div>
@@ -499,41 +520,6 @@ const Ledger = () => {
                 Submit
               </button>
             </form>
-          </div>
-
-          {/* Title + Opening Balance box — mirrors agent side layout */}
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-red-600 dark:text-red-500 mb-2">
-                Ledger of {userName.toUpperCase()}
-              </h2>
-              <p className="text-green-600 dark:text-green-500 font-semibold">
-                From{" "}
-                {new Date(dateFrom).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}{" "}
-                To{" "}
-                {new Date(dateTo).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-
-            {/* Opening Balance box — same style as agent ledger */}
-            <div className="shrink-0 border border-gray-300 dark:border-gray-600 text-center min-w-45">
-              <div className="bg-gray-50 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-200">
-                Opening Balance
-              </div>
-              <div className="px-4 py-2 text-sm font-bold text-gray-900 dark:text-white">
-                {formatBalance(openingBalance)}
-              </div>
-            </div>
           </div>
 
           {/* Export buttons */}
@@ -555,108 +541,133 @@ const Ledger = () => {
             >
               Print
             </button>
-            <button
-              disabled={!canUseActions}
-              className={`px-4 py-2 text-sm rounded ml-auto ${actionButtonClass()}`}
-            >
-              Column visibility ▼
-            </button>
           </div>
 
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <div className="text-gray-500 dark:text-gray-400">Loading ledger...</div>
+          {/* Statement card — mirrors the agent-side ledger design */}
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-[#0e2a4d] text-white font-bold px-4 sm:px-6 py-3 sm:py-3.5 text-base sm:text-lg">
+              <span>Account Statement of {userName}</span>
+              <span className="text-sm sm:text-base font-semibold">
+                From {formatPrintDate(new Date(dateFrom))} To{" "}
+                {formatPrintDate(new Date(dateTo))}
+              </span>
             </div>
-          ) : (
-            <>
-              {/* Table — now with Balance column */}
-              <div className="overflow-x-auto">
-                <table className="w-full table-auto">
-                  <thead className="bg-gray-800 dark:bg-gray-900">
-                    <tr>
-                      <th className="px-4 py-4 text-left text-sm font-medium text-white">Voucher Id</th>
-                      <th className="px-4 py-4 text-left text-sm font-medium text-white">Date</th>
-                      <th className="px-4 py-4 text-left text-sm font-medium text-white">Description</th>
-                      <th className="px-4 py-4 text-right text-sm font-medium text-white">Debit</th>
-                      <th className="px-4 py-4 text-right text-sm font-medium text-white">Credit</th>
-                      <th className="px-4 py-4 text-right text-sm font-medium text-white">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800/50">
-                    {rowsWithBalance.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                          No data available in table
-                        </td>
-                      </tr>
-                    ) : (
-                      rowsWithBalance.map((entry, index) => (
-                        <tr
-                          key={index}
-                          className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/80"
-                        >
-                          <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
-                            {entry.voucherId || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-800 dark:text-white/90">
-                            {new Date(entry.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-800 dark:text-white/90">
-                            {entry.description || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white/90">
-                            {entry.debit > 0 ? formatAmount(entry.debit) : ""}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white/90">
-                            {entry.credit > 0 ? formatAmount(entry.credit) : ""}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
-                            {formatBalance(entry.runningBalance)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  <tfoot className="bg-gray-100 dark:bg-gray-800 font-semibold">
-                    <tr className="border-t-2 border-gray-300 dark:border-gray-600">
-                      <td colSpan={3} className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white">
-                        Total:
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white">
-                        {formatAmount(totalDebit)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white">
-                        {formatAmount(totalCredit)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap">
-                        {formatBalance(closingBalance)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
 
-              {/* Summary box */}
-              <div className="mt-6 max-w-md ml-auto">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
-                  {/* <div className="flex justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Total Debit</span>
-                    <span className="text-gray-900 dark:text-white font-semibold">{formatAmount(totalDebit)}</span>
+            <div className="p-4 sm:p-6 bg-white dark:bg-white/3">
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <img src={logo} alt="Company logo" className="w-20 h-auto object-contain shrink-0" />
+                  <div>
+                    <h2 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                      {userName.toUpperCase()}
+                    </h2>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{COMPANY_NAME}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">Email: abid_intl@msn.com</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Account statement generated from {COMPANY_NAME} portal
+                    </p>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">Total Credit</span>
-                    <span className="text-gray-900 dark:text-white font-semibold">{formatAmount(totalCredit)}</span>
-                  </div> */}
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-800 dark:text-gray-200 font-bold">Closing Balance</span>
-                    <span className="font-bold text-red-600 dark:text-red-400">
-                      {formatBalance(closingBalance)}
-                    </span>
+                </div>
+
+                {/* Opening Balance box */}
+                <div className="shrink-0 border border-[#173a68] text-center min-w-45">
+                  <div className="bg-[#173a68] px-4 py-2 text-sm font-bold text-white">
+                    Opening Balance
+                  </div>
+                  <div className="px-4 py-2 text-sm font-bold text-[#173a68] dark:text-white">
+                    {formatBalance(openingBalance)}
                   </div>
                 </div>
               </div>
-            </>
-          )}
+
+              {loading ? (
+                <div className="flex justify-center py-10">
+                  <div className="text-gray-500 dark:text-gray-400">Loading ledger...</div>
+                </div>
+              ) : (
+                <>
+                  {/* Table — with Balance column */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto">
+                      <thead>
+                        <tr className="bg-[#173a68]">
+                          <th className="px-4 py-4 text-left text-sm font-medium text-white">Voucher Id</th>
+                          <th className="px-4 py-4 text-left text-sm font-medium text-white">Date</th>
+                          <th className="px-4 py-4 text-left text-sm font-medium text-white">Description</th>
+                          <th className="px-4 py-4 text-right text-sm font-medium text-white">Debit</th>
+                          <th className="px-4 py-4 text-right text-sm font-medium text-white">Credit</th>
+                          <th className="px-4 py-4 text-right text-sm font-medium text-white">Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800/50">
+                        {rowsWithBalance.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                              No data available in table
+                            </td>
+                          </tr>
+                        ) : (
+                          rowsWithBalance.map((entry, index) => (
+                            <tr
+                              key={index}
+                              className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/80"
+                            >
+                              <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
+                                {entry.voucherId || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-800 dark:text-white/90">
+                                {new Date(entry.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-800 dark:text-white/90">
+                                {entry.description || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white/90">
+                                {entry.debit > 0 ? formatAmount(entry.debit) : ""}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-800 dark:text-white/90">
+                                {entry.credit > 0 ? formatAmount(entry.credit) : ""}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                                {formatBalance(entry.runningBalance)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-[#173a68] text-white font-semibold">
+                          <td colSpan={3} className="px-4 py-3 text-sm text-right">
+                            Total:
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {formatAmount(totalDebit)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {formatAmount(totalCredit)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold whitespace-nowrap">
+                            {formatBalance(closingBalance)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Summary box */}
+                  <div className="mt-6 max-w-md ml-auto">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-800 dark:text-gray-200 font-bold">Closing Balance</span>
+                        <span className="font-bold text-red-600 dark:text-red-400">
+                          {formatBalance(closingBalance)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>

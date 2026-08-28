@@ -3,7 +3,6 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import axiosInstance from "../../api/axios";
 import MaskedDatePicker from "../../components/MaskedDatePicker";
-import TopBar from "../../components/TopBar/TopBar";
 import logo from "../../assets/images/logo.png";
 import {
   getFrontendUserName,
@@ -38,6 +37,9 @@ const Ledger = () => {
   const storedUser = getStoredFrontendUser();
   const userName = getFrontendUserName(storedUser);
   const accountName = ledgerMeta.account?.account_name || userName;
+  const userCompanyName =
+    storedUser?.companyName || storedUser?.user?.companyName || userName;
+  const COMPANY_NAME = "Abid Air Travel & Tours";
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-PK", {
@@ -243,14 +245,19 @@ const Ledger = () => {
         padding: 7px 10px !important;
       }
       .ledger-opening-box div {
-        background: #f9fafb !important;
-        border-bottom: 1px solid #9ca3af !important;
+        background: #173a68 !important;
+        color: #ffffff !important;
+        border-bottom: 1px solid #173a68 !important;
       }
       .ledger-opening-box strong {
         border-top: 0 !important;
+        color: #173a68 !important;
       }
       .ledger-divider {
         display: none !important;
+      }
+      .ledger-body {
+        padding: 0 !important;
       }
       .ledger-title-bar {
         display: flex !important;
@@ -258,12 +265,12 @@ const Ledger = () => {
         justify-content: space-between !important;
         gap: 18px !important;
         min-height: 0 !important;
-        margin-bottom: 0 !important;
-        border: 1px solid #111827 !important;
-        background: #56b4ee !important;
-        padding: 7px 8px !important;
-        color: #000 !important;
-        font-size: 8.5pt !important;
+        margin: 0 0 16px !important;
+        border: none !important;
+        background: #0e2a4d !important;
+        padding: 10px 16px !important;
+        color: #ffffff !important;
+        font-size: 10pt !important;
         font-weight: 700 !important;
         line-height: 1.25 !important;
       }
@@ -291,9 +298,9 @@ const Ledger = () => {
         word-break: break-word !important;
       }
       .ledger-report-table th {
-        background: #d1d5db !important;
-        color: #111827 !important;
-        border-color: #9ca3af !important;
+        background: #173a68 !important;
+        color: #ffffff !important;
+        border-color: #173a68 !important;
         text-align: left !important;
         font-weight: 700 !important;
       }
@@ -307,7 +314,8 @@ const Ledger = () => {
         font-weight: 400 !important;
       }
       .ledger-report-table tfoot td {
-        background: #f3f4f6 !important;
+        background: #173a68 !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
       }
       .ledger-number {
@@ -320,6 +328,10 @@ const Ledger = () => {
       .ledger-balance {
         color: #ff0000 !important;
         font-weight: 700 !important;
+      }
+      .ledger-report-table tfoot td.ledger-balance,
+      .ledger-report-table tfoot td.ledger-number {
+        color: #ffffff !important;
       }
     `;
 
@@ -420,7 +432,7 @@ const Ledger = () => {
 
         const header = "Date\tV.no\tDetails\tDebit\tCredit\tBalance\n";
         const totalLine = `\nTotal\t\t\t${formatCurrency(totals.debit)}\t${formatCurrency(totals.credit)}\t${formatBalance(totals.closingBalance)}`;
-        const fullText = `Account Statement of ${accountName}\nFrom ${formatStatementDate(filters.dateFrom)} To ${formatStatementDate(filters.dateTo)}\n\n${header}${tableData}${totalLine}`;
+        const fullText = `Account Statement of ${userCompanyName}\nFrom ${formatStatementDate(filters.dateFrom)} To ${formatStatementDate(filters.dateTo)}\n\n${header}${tableData}${totalLine}`;
 
         await navigator.clipboard.writeText(fullText);
         alert("Table data copied to clipboard!");
@@ -511,10 +523,11 @@ const Ledger = () => {
         }
 
         @media print {
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4; margin: 0; }
           * {
             box-shadow: none !important;
             text-shadow: none !important;
+            box-sizing: border-box !important;
           }
           html, body, #root {
             margin: 0 !important;
@@ -549,6 +562,9 @@ const Ledger = () => {
             color: #111827 !important;
             font-family: Arial, Helvetica, sans-serif !important;
             font-size: 8.5pt !important;
+          }
+          .agent-ledger-print-body {
+            padding: 0mm 10mm !important;
           }
           .agent-ledger-print-topline {
             text-align: right !important;
@@ -595,19 +611,22 @@ const Ledger = () => {
             font-weight: 700 !important;
           }
           .agent-ledger-print-opening div:first-child {
-            border-bottom: 1px solid #9ca3af !important;
-            background: #f9fafb !important;
+            border-bottom: 1px solid #173a68 !important;
+            background: #173a68 !important;
+            color: #ffffff !important;
           }
           .agent-ledger-print-titlebar {
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            background: #56b4ee !important;
-            border: 1px solid #111827 !important;
-            color: #000 !important;
+            width: 100% !important;
+            background: #0e2a4d !important;
+            border: none !important;
+            color: #ffffff !important;
             font-weight: 700 !important;
-            padding: 7px 8px !important;
-            margin-bottom: 0 !important;
+            font-size: 10pt !important;
+            padding: 10px 10mm !important;
+            margin: 0 0 16px !important;
           }
           .agent-ledger-print-table {
             width: 100% !important;
@@ -619,9 +638,9 @@ const Ledger = () => {
             display: table-header-group !important;
           }
           .agent-ledger-print-table th {
-            background: #d1d5db !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
+            background: #173a68 !important;
+            color: #ffffff !important;
+            border: 1px solid #173a68 !important;
             padding: 5px 4px !important;
             font-weight: 700 !important;
             text-align: left !important;
@@ -646,121 +665,122 @@ const Ledger = () => {
             white-space: nowrap !important;
           }
           .agent-ledger-print-table tfoot td {
-            background: #f3f4f6 !important;
+            background: #173a68 !important;
+            color: #ffffff !important;
             font-weight: 700 !important;
+            border: 1px solid #173a68 !important;
           }
-            .agent-ledger-print-table tfoot td {
-            background: #f3f4f6 !important;
-            font-weight: 700 !important;
-            border: 1px solid #b6b6b6 !important;
+          .agent-ledger-print-table tfoot td.agent-ledger-print-balance,
+          .agent-ledger-print-table tfoot td.text-right {
+            color: #ffffff !important;
           }
         }
       `}</style>
 
       <div className="agent-ledger-print-only">
         <div className="agent-ledger-print-page">
-          <div className="agent-ledger-print-topline">
-            Print Date:{formatPrintDate()}
-          </div>
-
-          <div className="agent-ledger-print-company">
-            <div className="agent-ledger-print-brand">
-              <img
-                src={logo}
-                alt="Company logo"
-                className="agent-ledger-print-logo"
-              />
-              <div className="agent-ledger-print-company-text">
-                <strong>{accountName.toUpperCase()}</strong>
-                <div>Abid Air Travel & Tours</div>
-                <div>Email: abid_intl@msn.com</div>
-                <div>
-                  Account statement generated from Abid Air Travel & Tours portal
-                </div>
-              </div>
-            </div>
-
-            <div className="agent-ledger-print-opening">
-              <div>Opening Balance</div>
-              <div>{formatBalance(totals.openingBalance)}</div>
-            </div>
-          </div>
-
           <div className="agent-ledger-print-titlebar">
-            <span>Account Statement of Ledger</span>
+            <span>Account Statement of {userCompanyName}</span>
             <span>
               From {formatStatementDate(filters.dateFrom)} To{" "}
               {formatStatementDate(filters.dateTo)}
             </span>
           </div>
 
-          <table className="agent-ledger-print-table">
-            <thead>
-              <tr>
-                <th style={{ width: "13%" }}>Date</th>
-                <th style={{ width: "10%" }}>V.no</th>
-                <th>Details</th>
-                <th className="text-right" style={{ width: "11%" }}>
-                  Debit
-                </th>
-                <th className="text-right" style={{ width: "11%" }}>
-                  Credit
-                </th>
-                <th className="text-right" style={{ width: "13%" }}>
-                  Balance
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rowsWithBalance.length === 0 ? (
+          <div className="agent-ledger-print-body">
+            <div className="agent-ledger-print-topline">
+              Print Date:{formatPrintDate()}
+            </div>
+
+            <div className="agent-ledger-print-company">
+              <div className="agent-ledger-print-brand">
+                <img
+                  src={logo}
+                  alt="Company logo"
+                  className="agent-ledger-print-logo"
+                />
+                <div className="agent-ledger-print-company-text">
+                  <strong>{userCompanyName.toUpperCase()}</strong>
+                  <div>{COMPANY_NAME}</div>
+                  <div>Email: abid_intl@msn.com</div>
+                  <div>
+                    Account statement generated from {COMPANY_NAME} portal
+                  </div>
+                </div>
+              </div>
+
+              <div className="agent-ledger-print-opening">
+                <div>Opening Balance</div>
+                <div>{formatBalance(totals.openingBalance)}</div>
+              </div>
+            </div>
+
+            <table className="agent-ledger-print-table">
+              <thead>
                 <tr>
-                  <td colSpan="6" className="text-center">
-                    No data available in table
-                  </td>
+                  <th style={{ width: "13%" }}>Date</th>
+                  <th style={{ width: "10%" }}>V.no</th>
+                  <th>Details</th>
+                  <th className="text-right" style={{ width: "11%" }}>
+                    Debit
+                  </th>
+                  <th className="text-right" style={{ width: "11%" }}>
+                    Credit
+                  </th>
+                  <th className="text-right" style={{ width: "13%" }}>
+                    Balance
+                  </th>
                 </tr>
-              ) : (
-                rowsWithBalance.map((entry, index) => (
-                  <tr key={`${entry.voucherId || "print-entry"}-${index}`}>
-                    <td>{formatStatementDate(entry.date)}</td>
-                    <td className="agent-ledger-print-voucher">
-                      {entry.voucherId || "-"}
-                    </td>
-                    <td>{entry.description || entry.ticketNumber || "-"}</td>
-                    <td className="text-right">
-                      {entry.debit > 0 ? formatPrintAmount(entry.debit) : "0"}
-                    </td>
-                    <td className="text-right">
-                      {entry.credit > 0 ? formatPrintAmount(entry.credit) : "0"}
-                    </td>
-                    <td className="text-right agent-ledger-print-balance">
-                      {formatBalance(entry.runningBalance)}
+              </thead>
+              <tbody>
+                {rowsWithBalance.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center">
+                      No data available in table
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan="3">Total</td>
-                <td className="text-right">
-                  {formatPrintAmount(totals.debit)}
-                </td>
-                <td className="text-right">
-                  {formatPrintAmount(totals.credit)}
-                </td>
-                <td className="text-right agent-ledger-print-balance">
-                  {formatBalance(totals.closingBalance)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                ) : (
+                  rowsWithBalance.map((entry, index) => (
+                    <tr key={`${entry.voucherId || "print-entry"}-${index}`}>
+                      <td>{formatStatementDate(entry.date)}</td>
+                      <td className="agent-ledger-print-voucher">
+                        {entry.voucherId || "-"}
+                      </td>
+                      <td>{entry.description || entry.ticketNumber || "-"}</td>
+                      <td className="text-right">
+                        {entry.debit > 0 ? formatPrintAmount(entry.debit) : "0"}
+                      </td>
+                      <td className="text-right">
+                        {entry.credit > 0 ? formatPrintAmount(entry.credit) : "0"}
+                      </td>
+                      <td className="text-right agent-ledger-print-balance">
+                        {formatBalance(entry.runningBalance)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="3">Total</td>
+                  <td className="text-right">
+                    {formatPrintAmount(totals.debit)}
+                  </td>
+                  <td className="text-right">
+                    {formatPrintAmount(totals.credit)}
+                  </td>
+                  <td className="text-right text-white">
+                    {formatBalance(totals.closingBalance)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </div>
 
       <div className="no-print">
-        <TopBar title={`Ledger of ${userName.toUpperCase()}`} />
-
-        <div className="mb-5 bg-white rounded-lg shadow p-4 sm:p-6">
+        <div className="mb-5 bg-white rounded-lg shadow p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               Date Range & Export
@@ -844,94 +864,94 @@ const Ledger = () => {
             </div>
           )}
 
-          <div className="ledger-print-date">
-            Print Date:{formatPrintDate()}
-          </div>
-
-          <div className="ledger-company-row">
-            <div className="ledger-company">
-              <img src={logo} alt="Company logo" />
-              <div>
-                <h1>{accountName.toUpperCase()}</h1>
-                <p>Abid Air Travel & Tours</p>
-                <p>Email: abid_intl@msn.com</p>
-                <p>Account statement generated from Abid Air Travel & Tours portal</p>
-              </div>
-            </div>
-
-            <div className="ledger-opening-box">
-              <div>Opening Balance</div>
-              <strong>{formatBalance(totals.openingBalance)}</strong>
-            </div>
-          </div>
-
-          <div className="ledger-divider" />
-
           <div className="ledger-title-bar">
-            <strong>Account Statement of Ledger</strong>
+            <strong>Account Statement of {userCompanyName}</strong>
             <span>
               From {formatStatementDate(filters.dateFrom)} To{" "}
               {formatStatementDate(filters.dateTo)}
             </span>
           </div>
 
-          <div className="ledger-table-scroll">
-            <table className="ledger-report-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>V.no</th>
-                  <th>Details</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rowsWithBalance.length === 0 ? (
+          <div className="ledger-body">
+            <div className="ledger-print-date">
+              Print Date:{formatPrintDate()}
+            </div>
+
+            <div className="ledger-company-row">
+              <div className="ledger-company">
+                <img src={logo} alt="Company logo" />
+                <div>
+                  <h1>{userCompanyName.toUpperCase()}</h1>
+                  <p>{COMPANY_NAME}</p>
+                  <p>Email: abid_intl@msn.com</p>
+                  <p>Account statement generated from {COMPANY_NAME} portal</p>
+                </div>
+              </div>
+
+              <div className="ledger-opening-box">
+                <div>Opening Balance</div>
+                <strong>{formatBalance(totals.openingBalance)}</strong>
+              </div>
+            </div>
+
+            <div className="ledger-table-scroll">
+              <table className="ledger-report-table">
+                <thead>
                   <tr>
-                    <td colSpan="6" className="ledger-closing-row">
-                      Closing Balance as on{" "}
-                      {formatStatementDate(filters.dateTo)}
-                      <strong>{formatBalance(totals.closingBalance)}</strong>
-                    </td>
+                    <th>Date</th>
+                    <th>V.no</th>
+                    <th>Details</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                    <th>Balance</th>
                   </tr>
-                ) : (
-                  rowsWithBalance.map((entry, index) => (
-                    <tr key={`${entry.voucherId || "entry"}-${index}`}>
-                      <td>{formatStatementDate(entry.date)}</td>
-                      <td className="ledger-voucher">
-                        {entry.voucherId || "-"}
-                      </td>
-                      <td>{entry.description || entry.ticketNumber || "-"}</td>
-                      <td className="ledger-number">
-                        {entry.debit ? formatCurrency(entry.debit) : ""}
-                      </td>
-                      <td className="ledger-number">
-                        {entry.credit ? formatCurrency(entry.credit) : ""}
-                      </td>
-                      <td className="ledger-number ledger-balance">
-                        {formatBalance(entry.runningBalance)}
+                </thead>
+                <tbody>
+                  {rowsWithBalance.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="ledger-closing-row">
+                        Closing Balance as on{" "}
+                        {formatStatementDate(filters.dateTo)}
+                        <strong>{formatBalance(totals.closingBalance)}</strong>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="3">Total</td>
-                  <td className="ledger-number">
-                    {formatCurrency(totals.debit)}
-                  </td>
-                  <td className="ledger-number">
-                    {formatCurrency(totals.credit)}
-                  </td>
-                  <td className="ledger-number">
-                    {formatBalance(totals.closingBalance)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                  ) : (
+                    rowsWithBalance.map((entry, index) => (
+                      <tr key={`${entry.voucherId || "entry"}-${index}`}>
+                        <td>{formatStatementDate(entry.date)}</td>
+                        <td className="ledger-voucher">
+                          {entry.voucherId || "-"}
+                        </td>
+                        <td>{entry.description || entry.ticketNumber || "-"}</td>
+                        <td className="ledger-number">
+                          {entry.debit ? formatCurrency(entry.debit) : ""}
+                        </td>
+                        <td className="ledger-number">
+                          {entry.credit ? formatCurrency(entry.credit) : ""}
+                        </td>
+                        <td className="ledger-number ledger-balance">
+                          {formatBalance(entry.runningBalance)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="3">Total</td>
+                    <td className="ledger-number">
+                      {formatCurrency(totals.debit)}
+                    </td>
+                    <td className="ledger-number">
+                      {formatCurrency(totals.credit)}
+                    </td>
+                    <td className="ledger-number text-white">
+                      {formatBalance(totals.closingBalance)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </section>
       </div>

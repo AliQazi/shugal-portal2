@@ -8,10 +8,15 @@
   width: 100%;
   min-height: 560px;
   margin: 0 auto;
-  padding: 48px 46px 24px;
+  padding: 0;
   background: #ffffff;
   color: #17213a;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.ledger-body {
+  padding: 32px 46px 24px;
 }
 
 .ledger-fetching {
@@ -70,7 +75,7 @@
 
 .ledger-opening-box {
   margin-top: 10px;
-  border: 1px solid #454545;
+  border: 1px solid #173a68;
   text-align: center;
   color: #17213a;
   font-size: 13px;
@@ -84,14 +89,17 @@
   padding: 7px 12px;
 }
 
+.ledger-opening-box div {
+  background: #173a68;
+  color: #ffffff;
+}
+
 .ledger-opening-box strong {
-  border-top: 1px solid #454545;
+  color: #173a68;
 }
 
 .ledger-divider {
-  height: 1px;
-  margin: 20px 0 16px;
-  background: #2365b6;
+  display: none;
 }
 
 .ledger-title-bar {
@@ -100,11 +108,11 @@
   justify-content: space-between;
   gap: 18px;
   min-height: 50px;
-  margin-bottom: 8px;
-  border: 1px solid #111827;
-  background: #5bb3e9;
-  padding: 8px 8px;
-  color: #050910;
+  margin: 0;
+  border: none;
+  background: #0e2a4d;
+  padding: 14px 46px;
+  color: #ffffff;
   font-size: 20px;
   font-weight: 800;
   line-height: 1.25;
@@ -136,7 +144,9 @@
 }
 
 .ledger-report-table th {
-  background: #cfcfcf;
+  background: #173a68;
+  color: #ffffff;
+  border-color: #173a68;
   text-align: center;
   font-weight: 800;
 }
@@ -164,6 +174,9 @@
 }
 
 .ledger-report-table tfoot td {
+  background: #173a68;
+  color: #ffffff;
+  border-color: #173a68;
   font-weight: 800;
   text-align: center;
 }
@@ -171,6 +184,15 @@
 .ledger-number {
   text-align: right;
   white-space: nowrap;
+}
+
+.ledger-balance {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.ledger-report-table tfoot td.ledger-balance {
+  color: #ffffff;
 }
 
 .ledger-closing-row {
@@ -205,7 +227,7 @@
 }
 
 @media (max-width: 900px) {
-  .ledger-statement {
+  .ledger-body {
     padding: 28px 18px 22px;
   }
 
@@ -225,6 +247,8 @@
   .ledger-title-bar {
     align-items: flex-start;
     flex-direction: column;
+    gap: 6px;
+    padding: 12px 18px;
     font-size: 17px;
   }
 }
@@ -234,8 +258,12 @@
     padding: 16px 0;
   }
 
-  .ledger-statement {
+  .ledger-body {
     padding: 20px 12px;
+  }
+
+  .ledger-title-bar {
+    padding: 12px;
   }
 
   .ledger-company {

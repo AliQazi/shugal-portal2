@@ -3,11 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { format } from "date-fns"
 import axiosInstance from '../../Api/axios'
 import MaskedDatePicker from '../../components/maskedDatePicker'
-import { toast } from 'react-toastify'
+// import { toast } from 'react-toastify'
 import { printGDSBooking } from '../../utils/bookingPDFService'
 import { useAuth } from '../../context/AuthContext'
 import { hasPermission } from '../../utils/permissions'
 import dayjs from 'dayjs'
+
+// Match the brand gradient used across the customer-facing app (frontend/src/theme/theme.js)
+const BRAND_GRADIENT = 'linear-gradient(to right, #09B0FF, #0064BC)'
 
 interface Booking {
     _id: string
@@ -51,54 +54,54 @@ interface Booking {
     }
 }
 
-const getSourceBadge = (source?: string) => {
-    if (source === "travel-network") {
-        return {
-            label: "Travel Network",
-            className: "border-sky-200 bg-sky-50 text-sky-700",
-        };
-    }
-    if (source === "al-haider") {
-        return {
-            label: "Al-Haider",
-            className: "border-violet-200 bg-violet-50 text-violet-700",
-        };
-    }
-    if (source === "skypass") {
-        return {
-            label: "SkyPass",
-            className: "border-violet-200 bg-violet-50 text-violet-700",
-        };
-    }
-    if (source === "upsky") {
-        return {
-            label: "UpSky",
-            className: "border-amber-200 bg-amber-50 text-amber-700",
-        };
-    }
-    if (source === "mct") {
-        return {
-            label: "MCT",
-            className: "border-violet-200 bg-violet-50 text-violet-700",
-        };
-    }
-    if (source === "ALSABOOR") {
-        return {
-            label: "ALSABOOR",
-            className: "border-violet-200 bg-violet-50 text-violet-700",
-        };
-    }
-    if (source === "amaar-shoaib") {
-        return {
-            label: "amaar-shoaib",
-            className: "border-red-200 bg-red-50 text-red-700",
-        };
-    }
-    return {
-        label: "Own",
-        className: "border-slate-200 bg-slate-50 text-slate-600",
-    };
-};
+// const getSourceBadge = (source?: string) => {
+//     if (source === "travel-network") {
+//         return {
+//             label: "Travel Network",
+//             className: "border-sky-200 bg-sky-50 text-sky-700",
+//         };
+//     }
+//     if (source === "al-haider") {
+//         return {
+//             label: "Al-Haider",
+//             className: "border-violet-200 bg-violet-50 text-violet-700",
+//         };
+//     }
+//     if (source === "skypass") {
+//         return {
+//             label: "SkyPass",
+//             className: "border-violet-200 bg-violet-50 text-violet-700",
+//         };
+//     }
+//     if (source === "upsky") {
+//         return {
+//             label: "UpSky",
+//             className: "border-amber-200 bg-amber-50 text-amber-700",
+//         };
+//     }
+//     if (source === "mct") {
+//         return {
+//             label: "MCT",
+//             className: "border-violet-200 bg-violet-50 text-violet-700",
+//         };
+//     }
+//     if (source === "ALSABOOR") {
+//         return {
+//             label: "ALSABOOR",
+//             className: "border-violet-200 bg-violet-50 text-violet-700",
+//         };
+//     }
+//     if (source === "amaar-shoaib") {
+//         return {
+//             label: "amaar-shoaib",
+//             className: "border-red-200 bg-red-50 text-red-700",
+//         };
+//     }
+//     return {
+//         label: "Own",
+//         className: "border-slate-200 bg-slate-50 text-slate-600",
+//     };
+// };
 
 interface StatusOption {
     value: string
@@ -113,42 +116,45 @@ interface BookingsTableProps {
     navigate: (path: string) => void
     timers: { [key: string]: { hours: number; minutes: number; seconds: number; expired: boolean } }
     setBookings: React.Dispatch<React.SetStateAction<Booking[]>>
-    canUseActions: boolean
+    canUseActions: boolean,
+    canSeeProfitLoss: boolean,
 }
 
-const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, setBookings, canUseActions }: BookingsTableProps) => {
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, setBookings, canUseActions, canSeeProfitLoss }: BookingsTableProps) => {
+    // const [deletingId, setDeletingId] = useState<string | null>(null);
     return (
         <table className="min-w-full border-collapse">
-            <thead className="bg-linear-to-r from-[#1e3a5f] to-[#2d5a8f]">
+            <thead style={{ background: BRAND_GRADIENT }}>
                 <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         Booking Details
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         <div className="flex items-center gap-1">
                             <span>Group</span>
                             <span>✈</span>
                         </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         <div className="flex items-center gap-1">
                             <span>Passengers</span>
                         </div>
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         Price (PKR)
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         <span>Status</span>
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
-                        Profit / Loss
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                    {canSeeProfitLoss &&
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
+                            Profit / Loss
+                        </th>
+                    }
+                    {/* <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         <span>Source</span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-white">
+                    </th> */}
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-100 tracking-wide uppercase">
                         Action
                     </th>
                 </tr>
@@ -156,7 +162,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
             <tbody className="bg-white">
                 {bookings.length === 0 ? (
                     <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500 text-sm border">
+                        <td colSpan={8} className="px-4 py-8 text-center text-slate-400 text-sm border">
                             No bookings found
                         </td>
                     </tr>
@@ -165,46 +171,49 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                         const statusBadge = getStatusBadge(booking.status)
                         const userId = typeof booking.userId === 'object' ? booking.userId : null
                         const firstPassenger = booking.passengers?.[0]
-                        const sourceBadge = getSourceBadge(booking.source)
+                        // const sourceBadge = getSourceBadge(booking.source)
                         return (
-                            <tr key={booking._id} className="border-b border-gray-300 hover:bg-blue-50/20 transition-colors">
+                            <tr key={booking._id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
                                 {/* Booking Details */}
-                                <td className="px-4 py-4 align-top border-r border-gray-300">
+                                <td className="px-4 py-4 align-top border-r border-slate-200">
                                     <div className="space-y-1.5">
                                         <div className="flex items-center gap-2">
-                                            <span className="inline-block bg-linear-to-r from-amber-600 to-amber-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow-md">
+                                            <span
+                                                className="inline-block text-white px-3 py-1.5 text-xs font-semibold"
+                                                style={{ background: BRAND_GRADIENT, borderRadius: '4px' }}
+                                            >
                                                 Airline PNR #: {booking.pnr || 'N/A'}
                                             </span>
-                                            <span className={`inline-block px-2 py-1 rounded-md text-[10px] font-bold ${sourceBadge.className}`}>
+                                            {/* <span className={`inline-block px-2 py-1 text-[10px] font-bold ${sourceBadge.className}`}>
                                                 {sourceBadge.label}
-                                            </span>
+                                            </span> */}
                                         </div>
-                                        <div className="text-xs text-gray-700 leading-relaxed">
-                                            <span className="font-semibold text-gray-800">Agency:</span> {userId?.companyName || 'N/A'}
+                                        <div className="text-xs text-slate-600 leading-relaxed">
+                                            <span className="font-semibold text-slate-700">Agency:</span> {userId?.companyName || 'N/A'}
                                         </div>
-                                        <div className="text-xs text-gray-700 leading-relaxed">
-                                            <span className="font-semibold text-gray-800">BK#: {booking.bookingReference}</span>
+                                        <div className="text-xs text-slate-600 leading-relaxed">
+                                            <span className="font-semibold text-slate-700">BK#: {booking.bookingReference}</span>
                                         </div>
-                                        <div className="text-xs text-gray-600 pt-0.5">
+                                        <div className="text-xs text-slate-400 pt-0.5">
                                             Created: {dayjs(booking.createdAt).format('DD MMM YYYY, hh:mm A')}
                                         </div>
                                     </div>
                                 </td>
 
                                 {/* Group */}
-                                <td className="px-4 py-4 align-top border-r border-gray-300">
+                                <td className="px-4 py-4 align-top border-r border-slate-200">
                                     <div className="space-y-1.5">
-                                        <div className="font-bold text-sm text-gray-900">
+                                        <div className="font-semibold text-sm text-slate-800">
                                             {booking.airline?.name || 'N/A'}
                                         </div>
-                                        <div className="text-xs text-gray-700 font-medium">
+                                        <div className="text-xs text-slate-600 font-medium">
                                             {booking.sector}
                                         </div>
-                                        <div className="text-xs text-gray-700">
+                                        <div className="text-xs text-slate-600">
                                             {formatDate(booking.departureDate)}
                                         </div>
-                                        <div className="text-xs text-gray-600 font-medium pt-0.5">
-                                            <div className="text-xs text-gray-600 font-medium pt-0.5">
+                                        <div className="text-xs text-slate-500 font-medium pt-0.5">
+                                            <div className="text-xs text-slate-500 font-medium pt-0.5">
                                                 {firstPassenger
                                                     ? `${firstPassenger.givenName} ${firstPassenger.surName}`
                                                     : 'N/A'}{' '}
@@ -215,21 +224,21 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                 </td>
 
                                 {/* Passengers */}
-                                <td className="px-4 py-4 align-top border-r border-gray-300">
+                                <td className="px-4 py-4 align-top border-r border-slate-200">
                                     <div className="inline-block w-full">
-                                        <table className="w-full text-xs border border-slate-300 rounded-lg overflow-hidden">
-                                            <thead className="bg-[#2d5a8f] text-white">
+                                        <table className="w-full text-xs border border-slate-300">
+                                            <thead className="bg-slate-100 text-slate-600">
                                                 <tr>
-                                                    <th className="px-3 py-2 text-left font-semibold border-r border-slate-600">
+                                                    <th className="px-3 py-2 text-left font-semibold border-r border-slate-300">
                                                         Status
                                                     </th>
-                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-600">
+                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-300">
                                                         Adults
                                                     </th>
-                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-600">
+                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-300">
                                                         Child
                                                     </th>
-                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-600">
+                                                    <th className="px-3 py-2 text-center font-semibold border-r border-slate-300">
                                                         Infants
                                                     </th>
                                                     <th className="px-3 py-2 text-center font-semibold">
@@ -251,27 +260,24 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                     const seats = adults + children
 
                                                     return (
-                                                        <tr
-                                                            key={key}
-                                                            className="hover:bg-slate-50 transition-colors"
-                                                        >
-                                                            <td className="px-3 py-2 font-medium text-slate-700 bg-slate-50 border-r border-slate-200">
+                                                        <tr key={key}>
+                                                            <td className="px-3 py-2 font-medium text-slate-600 bg-slate-50 border-r border-slate-200">
                                                                 {label}
                                                             </td>
 
-                                                            <td className="px-3 py-2 text-center font-semibold border-r border-slate-200">
+                                                            <td className="px-3 py-2 text-center font-semibold text-slate-700 border-r border-slate-200">
                                                                 {adults}
                                                             </td>
 
-                                                            <td className="px-3 py-2 text-center font-semibold border-r border-slate-200">
+                                                            <td className="px-3 py-2 text-center font-semibold text-slate-700 border-r border-slate-200">
                                                                 {children}
                                                             </td>
 
-                                                            <td className="px-3 py-2 text-center font-semibold border-r border-slate-200">
+                                                            <td className="px-3 py-2 text-center font-semibold text-slate-700 border-r border-slate-200">
                                                                 {infants}
                                                             </td>
 
-                                                            <td className="px-3 py-2 text-center font-bold text-slate-900">
+                                                            <td className="px-3 py-2 text-center font-bold text-slate-800">
                                                                 {seats}
                                                             </td>
                                                         </tr>
@@ -283,21 +289,21 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                 </td>
 
                                 {/* Price */}
-                                <td className={`px-4 py-4 ${(booking.status === 'on hold' || booking.status === 'pending') ? "align-bottom" : "align-middle"} text-center border-r border-gray-300`}>
+                                <td className={`px-4 py-4 ${(booking.status === 'on hold' || booking.status === 'pending') ? "align-bottom" : "align-middle"} text-center border-r border-slate-200`}>
                                     {(() => {
                                         const totalDiscount = booking.passengers?.reduce((sum, p) => sum + (Number(p.discount) || 0), 0) || 0;
                                         const adjustedTotal = (booking.pricing?.grandTotal || 0) - totalDiscount;
                                         return (
-                                            <div className="font-bold text-base text-gray-900">
+                                            <div className="font-semibold text-base text-slate-800">
                                                 {(booking.status === 'on hold' || booking.status === 'pending') ? (
-                                                    <div className="text-xs text-yellow-700 font-semibold bg-yellow-50 px-2.5 py-1.5 rounded-md border border-yellow-300">
+                                                    <div className="text-xs text-amber-800 font-semibold bg-amber-50 px-2.5 py-1.5 border border-amber-300">
                                                         Admin Review<br />Required
                                                     </div>
                                                 ) : (
                                                     <>
                                                         PKR {adjustedTotal.toLocaleString()}
                                                         {/* {totalDiscount > 0 && (
-                                                            <div className="text-xs text-red-500 font-normal mt-0.5">
+                                                            <div className="text-xs text-rose-600 font-normal mt-0.5">
                                                                 -{totalDiscount.toLocaleString()} disc
                                                             </div>
                                                         )} */}
@@ -309,47 +315,54 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                 </td>
 
                                 {/* Status */}
-                                <td className="px-2 py-4 align-top border-r border-gray-300">
+                                <td className="px-2 py-4 align-top border-r border-slate-200">
                                     <div className="flex flex-col gap-2 items-center">
                                         {booking.status === 'cancelled' && booking.autoCancelled && booking.cancelledAt ? (
-                                            <span className="inline-block px-3 py-1.5 rounded-md text-xs shadow-sm bg-red-50 text-red-700 border border-red-300 text-center leading-relaxed">
+                                            <span className="inline-block px-3 py-1.5 text-xs font-medium bg-rose-50 text-rose-800 border border-rose-300 text-center leading-relaxed">
                                                 Auto-cancelled on<br />
                                                 {dayjs(booking.cancelledAt).format('DD MMM YYYY, hh:mm A')}
                                             </span>
                                         ) : (
-                                            <span className={`inline-block px-3 py-1.5 rounded-md text-xs shadow-sm ${statusBadge.color}`}>
+                                            <span className={`inline-block px-3 py-1.5 text-xs font-medium ${statusBadge.color}`}>
                                                 {statusBadge.label}
                                             </span>
                                         )}
                                         {(booking.status === 'on hold' || booking.status === 'pending' || booking.status === 'partially confirmed') && (
-                                            <div className="flex flex-col gap-2 items-center text-xs">
-                                                <div className="font-bold text-gray-800">Booking Expiry Time</div>
-                                                {/* <div className="flex items-center gap-1.5"> */}
+                                            <div className="pt-1.5 flex flex-col items-center gap-1">
+                                                <div className="text-[10px] font-semibold text-slate-500 tracking-wide uppercase">
+                                                    Booking Expiry
+                                                </div>
                                                 {timers[booking._id] && timers[booking._id].expired ? (
-                                                    <div className="text-red-600 font-bold text-xs">EXPIRED</div>
+                                                    <span className="text-xs font-semibold text-rose-700">EXPIRED</span>
                                                 ) : (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="bg-linear-to-br from-rose-500 to-rose-600 text-white px-3 py-2 rounded-lg shadow-md text-center min-w-10">
-                                                            <div className="text-xl font-bold leading-none">
-                                                                {String(timers[booking._id]?.hours || 0).padStart(2, '0')}
+                                                    <div className="flex items-center gap-1">
+                                                        {[
+                                                            { label: 'HRS', value: timers[booking._id]?.hours || 0 },
+                                                            { label: 'MIN', value: timers[booking._id]?.minutes || 0 },
+                                                            { label: 'SEC', value: timers[booking._id]?.seconds || 0 },
+                                                        ].map(({ label, value }, idx) => (
+                                                            <div key={label} className="flex items-center gap-1">
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="flex gap-0.5">
+                                                                        {String(value).padStart(2, '0').split('').map((digit, di) => (
+                                                                            <div
+                                                                                key={di}
+                                                                                className="bg-[#334155] text-white flex items-center justify-center rounded-sm"
+                                                                                style={{ width: 22, height: 30, fontSize: 15 }}
+                                                                            >
+                                                                                {digit}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    <div className="text-[9px] font-semibold text-slate-500 mt-1 uppercase">
+                                                                        {label}
+                                                                    </div>
+                                                                </div>
+                                                                {idx < 2 && <span className="text-slate-500 text-xl font-bold pb-3.5">:</span>}
                                                             </div>
-                                                            <div className="text-[9px] font-medium mt-1 opacity-90">HOURS</div>
-                                                        </div>
-                                                        <div className="bg-linear-to-br from-amber-500 to-amber-600 text-white px-3 py-2 rounded-lg shadow-md text-center min-w-10">
-                                                            <div className="text-xl font-bold leading-none">
-                                                                {String(timers[booking._id]?.minutes || 0).padStart(2, '0')}
-                                                            </div>
-                                                            <div className="text-[9px] font-medium mt-1 opacity-90">MINS</div>
-                                                        </div>
-                                                        <div className="bg-linear-to-br from-indigo-500 to-indigo-600 text-white px-3 py-2 rounded-lg shadow-md text-center min-w-10">
-                                                            <div className="text-xl font-bold leading-none">
-                                                                {String(timers[booking._id]?.seconds || 0).padStart(2, '0')}
-                                                            </div>
-                                                            <div className="text-[9px] font-medium mt-1 opacity-90">SECS</div>
-                                                        </div>
+                                                        ))}
                                                     </div>
                                                 )}
-                                                {/* </div> */}
                                             </div>
                                         )}
                                     </div>
@@ -357,98 +370,100 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
 
 
                                 {/* Profit / Loss */}
-                                <td className="px-2 align-middle text-center border-r border-gray-300">
-                                    {(() => {
-                                        const gt = booking.groupTicketData;
+                                {canSeeProfitLoss &&
+                                    <td className="px-2 align-middle text-center border-r border-slate-200">
+                                        {(() => {
+                                            const gt = booking.groupTicketData;
 
-                                        if (!gt) {
-                                            return <span className="text-xs text-gray-400">N/A</span>;
-                                        }
+                                            if (!gt) {
+                                                return <span className="text-xs text-slate-400">N/A</span>;
+                                            }
 
-                                        const adultBuy = gt.buyingAdultPrice || 0;
-                                        const childBuy = gt.buyingChildPrice || 0;
-                                        const infantBuy = gt.buyingInfantPrice || 0;
+                                            const adultBuy = gt.buyingAdultPrice || 0;
+                                            const childBuy = gt.buyingChildPrice || 0;
+                                            const infantBuy = gt.buyingInfantPrice || 0;
 
-                                        const adultSell = gt.sellingAdultPriceB2B || 0;
-                                        const childSell = gt.sellingChildPriceB2B || 0;
-                                        const infantSell = gt.sellingInfantPriceB2B || 0;
+                                            const adultSell = gt.sellingAdultPriceB2B || 0;
+                                            const childSell = gt.sellingChildPriceB2B || 0;
+                                            const infantSell = gt.sellingInfantPriceB2B || 0;
 
-                                        const adults = booking.adultsCount || 0;
-                                        const children = booking.childrenCount || 0;
-                                        const infants = booking.infantsCount || 0;
+                                            const adults = booking.adultsCount || 0;
+                                            const children = booking.childrenCount || 0;
+                                            const infants = booking.infantsCount || 0;
 
-                                        const totalBuy =
-                                            adultBuy * adults +
-                                            childBuy * children +
-                                            infantBuy * infants;
+                                            const totalBuy =
+                                                adultBuy * adults +
+                                                childBuy * children +
+                                                infantBuy * infants;
 
-                                        const totalSellBeforeDiscount =
-                                            adultSell * adults +
-                                            childSell * children +
-                                            infantSell * infants;
+                                            const totalSellBeforeDiscount =
+                                                adultSell * adults +
+                                                childSell * children +
+                                                infantSell * infants;
 
-                                        // const totalDiscount =
-                                        //     booking.passengers?.reduce((sum, passenger) => {
-                                        //         return sum + (Number(passenger.discount) || 0);
-                                        //     }, 0) || 0;
+                                            // const totalDiscount =
+                                            //     booking.passengers?.reduce((sum, passenger) => {
+                                            //         return sum + (Number(passenger.discount) || 0);
+                                            //     }, 0) || 0;
 
-                                        const totalSell = totalSellBeforeDiscount;
+                                            const totalSell = totalSellBeforeDiscount;
 
-                                        const profitLoss = totalSell - totalBuy;
-                                        const isLoss = profitLoss < 0;
+                                            const profitLoss = totalSell - totalBuy;
+                                            const isLoss = profitLoss < 0;
 
-                                        return (
-                                            <div className="inline-block min-w-42.5 overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
-                                                <table className="w-full text-[11px] border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-gray-50">
-                                                            <th className="px-2 py-1.5 text-center font-bold text-amber-600 border-r border-gray-200">
-                                                                BUY
-                                                            </th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-green-600 border-r border-gray-200">
-                                                                SELL
-                                                            </th>
-                                                            <th className="px-2 py-1.5 text-center font-bold text-gray-800">
-                                                                P/L
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
+                                            return (
+                                                <div className="inline-block min-w-42.5 border border-slate-300 bg-white">
+                                                    <table className="w-full text-[11px] border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-100">
+                                                                <th className="px-2 py-1.5 text-center font-bold text-amber-700 border-r border-slate-200">
+                                                                    BUY
+                                                                </th>
+                                                                <th className="px-2 py-1.5 text-center font-bold text-emerald-700 border-r border-slate-200">
+                                                                    SELL
+                                                                </th>
+                                                                <th className="px-2 py-1.5 text-center font-bold text-slate-700">
+                                                                    P/L
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
 
-                                                    <tbody>
-                                                        <tr>
-                                                            <td className="px-2 py-1.5 text-center font-semibold text-gray-700 border-r border-gray-200">
-                                                                {totalBuy.toLocaleString()}
-                                                            </td>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td className="px-2 py-1.5 text-center font-semibold text-slate-600 border-r border-slate-200">
+                                                                    {totalBuy.toLocaleString()}
+                                                                </td>
 
-                                                            <td className="px-2 py-1.5 text-center font-semibold text-gray-700 border-r border-gray-200">
-                                                                {totalSell.toLocaleString()}
-                                                            </td>
+                                                                <td className="px-2 py-1.5 text-center font-semibold text-slate-600 border-r border-slate-200">
+                                                                    {totalSell.toLocaleString()}
+                                                                </td>
 
-                                                            <td
-                                                                className={`px-2 py-1.5 text-center font-bold ${isLoss ? "text-red-600" : "text-green-600"
-                                                                    }`}
-                                                            >
-                                                                {isLoss ? "-" : ""}
-                                                                {Math.abs(profitLoss).toLocaleString()}
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        );
-                                    })()}
-                                </td>
+                                                                <td
+                                                                    className={`px-2 py-1.5 text-center font-bold ${isLoss ? "text-rose-700" : "text-emerald-700"
+                                                                        }`}
+                                                                >
+                                                                    {isLoss ? "-" : ""}
+                                                                    {Math.abs(profitLoss).toLocaleString()}
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            );
+                                        })()}
+                                    </td>
+                                }
 
-                                <td className="px-3 py-4 align-top text-center border-r border-gray-300">
+                                {/* <td className="px-3 py-4 align-top text-center border-r border-slate-200">
                                     <div className="flex flex-col items-center gap-1">
-                                        <span className={`inline-block px-2 py-1 rounded text-[10px] font-bold ${sourceBadge.className}`}>
+                                        <span className={`inline-block px-2 py-1 text-[10px] font-bold ${sourceBadge.className}`}>
                                             {sourceBadge.label}
                                         </span>
                                         {booking.sabaoonTransactionId && (
-                                            <span className="text-[10px] text-gray-500">Txn #{booking.sabaoonTransactionId}</span>
+                                            <span className="text-[10px] text-slate-500">Txn #{booking.sabaoonTransactionId}</span>
                                         )}
                                     </div>
-                                </td>
+                                </td> */}
 
                                 {/* Action */}
                                 <td className="py-4 align-middle text-center">
@@ -462,7 +477,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                         `/booking-detail/${booking._id}`,
                                                     )
                                                 }
-                                                className="p-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-slate-200"
+                                                className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
                                                 title="View Details"
                                             >
                                                 <svg
@@ -495,7 +510,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                     `/dashboard/edit-booking/${booking._id}`,
                                                                 )
                                                             }
-                                                            className="p-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-slate-200"
+                                                            className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
                                                             title="Edit Booking"
                                                         >
                                                             <svg
@@ -512,14 +527,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                 />
                                                             </svg>
                                                         </button> */}
-                                                        <button
-                                                            // onClick={() => {
-                                                            //     if (window.confirm('Are you sure you want to delete this booking?')) {
-                                                            //         // Handle delete booking
-                                                            //         toast.info('Delete functionality to be implemented')
-                                                            //     }
-                                                            // }}
-
+                                                        {/* <button
                                                             onClick={async () => {
                                                                 if (!canUseActions) {
                                                                     toast.error("You don't have permission to manage bookings");
@@ -556,7 +564,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                 }
                                                             }}
                                                             disabled={deletingId === booking._id || !canUseActions}
-                                                            className="p-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                                             title={canUseActions ? "Delete Booking" : "You don't have permission to manage bookings"}
                                                         >
                                                             <svg
@@ -572,7 +580,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                                                 />
                                                             </svg>
-                                                        </button>
+                                                        </button> */}
                                                     </>
                                                 )}
                                         </div>
@@ -590,10 +598,10 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                 toast.error("Failed to generate PDF");
                                                             });
                                                         }}
-                                                        className="p-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-slate-200"
+                                                        className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
                                                         title="Download Full Ticket"
                                                     >
-                                                        
+
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                         </svg>
@@ -606,10 +614,10 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                                 toast.error("Failed to generate Client PDF");
                                                             });
                                                         }}
-                                                        className="flex flex-col items-center justify-center p-2.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-red-200"
+                                                        className="flex flex-col items-center justify-center p-2.5 text-rose-700 hover:bg-rose-100 border border-rose-300 transition-colors"
                                                         title="Download Client Copy (No Agency Info)"
                                                     >
-                                                    
+
                                                         <svg
                                                             className="w-4 h-4"
                                                             fill="none"
@@ -624,7 +632,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                             />
                                                         </svg>
 
-                                                     
+
                                                         <span className="text-[9px] font-semibold mt-1 leading-none">
                                                             PDF 2
                                                         </span>
@@ -632,7 +640,7 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                     {/* 3. PRINT TICKET */}
                                                     <button
                                                         onClick={() => printGDSBooking(booking)}
-                                                        className="p-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-all shadow-sm hover:shadow-md border border-slate-200 cursor-pointer"
+                                                        className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors cursor-pointer"
                                                         title="Print Ticket"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -672,6 +680,7 @@ export default function AllBookings() {
     const { user } = useAuth()
     const canView = hasPermission(user, "view_bookings")
     const canUseActions = hasPermission(user, "bookings_action_buttons")
+    const canSeeProfitLoss = hasPermission(user, "can_see_profit_loss")
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const [bookings, setBookings] = useState<Booking[]>([])
@@ -694,11 +703,11 @@ export default function AllBookings() {
     const activeStatus = searchParams.get('status') || ''
 
     const statusOptions: StatusOption[] = [
-        { value: 'on hold', label: 'On Hold', color: 'bg-yellow-50 text-yellow-700 border border-yellow-300' },
-        { value: 'pending', label: 'On Hold', color: 'bg-yellow-50 text-yellow-700 border border-yellow-300' },
-        { value: 'confirmed', label: 'Confirmed', color: 'bg-green-50 text-green-700 border border-green-300' },
-        { value: 'partially confirmed', label: 'Partially Confirmed', color: 'bg-indigo-50 text-indigo-700 border border-indigo-300' },
-        { value: 'cancelled', label: 'Cancelled', color: 'bg-red-50 text-red-700 border border-red-300' }
+        { value: 'on hold', label: 'On Hold', color: 'bg-amber-50 text-amber-800 border border-amber-300' },
+        { value: 'pending', label: 'On Hold', color: 'bg-amber-50 text-amber-800 border border-amber-300' },
+        { value: 'confirmed', label: 'Confirmed', color: 'bg-emerald-50 text-emerald-800 border border-emerald-300' },
+        { value: 'partially confirmed', label: 'Partially Confirmed', color: 'bg-indigo-50 text-indigo-800 border border-indigo-300' },
+        { value: 'cancelled', label: 'Cancelled', color: 'bg-rose-50 text-rose-800 border border-rose-300' }
     ]
 
     // Calculate remaining time for a booking (2 hours from creation)
@@ -837,8 +846,8 @@ export default function AllBookings() {
         return (
             <div className="w-full min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading bookings...</p>
+                    <div className="animate-spin h-10 w-10 border-2 border-slate-300 border-t-slate-700 mx-auto"></div>
+                    <p className="mt-4 text-sm text-slate-500 tracking-wide">Loading bookings...</p>
                 </div>
             </div>
         )
@@ -846,7 +855,7 @@ export default function AllBookings() {
 
     if (!canView) {
         return (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-sm text-red-700 shadow-sm">
+            <div className="border border-rose-200 bg-rose-50 px-5 py-8 text-sm text-rose-700">
                 You do not have permission to view Bookings.
             </div>
         )
@@ -856,12 +865,12 @@ export default function AllBookings() {
         <div className="w-full min-h-screen mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">All Bookings</h1>
-                <p className="text-gray-600">Manage all customer flight bookings</p>
+                <h1 className="text-3xl font-bold text-slate-800 mb-2">All Bookings</h1>
+                <p className="text-slate-500">Manage all customer flight bookings</p>
             </div>
 
             {/* Search and Filters in One Row */}
-            <div className="mb-4 bg-white rounded-lg shadow p-3 sm:p-4">
+            <div className="mb-4 bg-white border border-slate-200 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Search Input */}
                     <div className="flex-1 min-w-50">
@@ -870,7 +879,7 @@ export default function AllBookings() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search by reference, PNR, or customer, agent, or company name..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
                         />
                     </div>
 
@@ -879,7 +888,7 @@ export default function AllBookings() {
                         <select
                             value={filters.sector}
                             onChange={(e) => handleFilterChange('sector', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 text-sm text-slate-700 focus:outline-none focus:border-slate-500"
                         >
                             <option value="">All Sectors</option>
                             {uniqueSectors.map(sector => (
@@ -895,7 +904,7 @@ export default function AllBookings() {
                         <select
                             value={filters.airline}
                             onChange={(e) => handleFilterChange('airline', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 text-sm text-slate-700 focus:outline-none focus:border-slate-500"
                         >
                             <option value="">All Airlines</option>
                             {uniqueAirlines.map(airline => (
@@ -919,7 +928,7 @@ export default function AllBookings() {
                     {/* Reset Button */}
                     <button
                         onClick={resetFilters}
-                        className="px-4 py-2 text-sm text-red-600 hover:text-red-800 font-medium border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                        className="px-4 py-2 text-sm text-slate-600 font-medium border border-slate-300 hover:transition-colors"
                     >
                         Reset
                     </button>
@@ -927,10 +936,10 @@ export default function AllBookings() {
             </div>
 
             {/* Bookings Table */}
-            <div className="bg-white rounded-lg shadow overflow-hidden relative">
+            <div className="bg-white border border-slate-200 overflow-hidden relative">
                 {fetching && (
-                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <div className="absolute inset-0 bg-white/75 flex items-center justify-center z-10">
+                        <div className="animate-spin h-8 w-8 border-2 border-slate-300 border-t-slate-700"></div>
                     </div>
                 )}
                 <div className="overflow-x-auto">
@@ -942,6 +951,7 @@ export default function AllBookings() {
                         timers={timers}
                         setBookings={setBookings}
                         canUseActions={canUseActions}
+                        canSeeProfitLoss={canSeeProfitLoss}
                     />
                 </div>
             </div>

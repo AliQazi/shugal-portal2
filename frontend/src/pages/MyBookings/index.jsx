@@ -31,7 +31,7 @@ export default function MyBookings() {
 
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [uniqueAirlines, setUniqueAirlines] = useState([]);
-  const [deletingId, setDeletingId] = useState(null);
+  // const [deletingId, setDeletingId] = useState(null);
 
   // --- MODAL STATE ---
   const [successModalData, setSuccessModalData] = useState(null);
@@ -180,30 +180,30 @@ export default function MyBookings() {
     );
   };
 
-  const getSourceBadge = (source) => {
-    if (source === "travel-network") {
-      return {
-        label: "Travel Network",
-        className: "bg-orange-50 text-slate-600 border border-slate-300",
-      };
-    }
-    if (source === "al-haider") {
-      return {
-        label: "Al-Haider",
-        className: "bg-orange-50 text-slate-600 border border-slate-300",
-      };
-    }
-    if (source === "skypass") {
-      return {
-        label: "Skypass",
-        className: "bg-orange-50 text-slate-600 border border-slate-300",
-      };
-    }
-    return {
-      label: "Own",
-      className: "bg-orange-50 text-slate-600 border border-slate-300",
-    };
-  };
+  // const getSourceBadge = (source) => {
+  //   if (source === "travel-network") {
+  //     return {
+  //       label: "Travel Network",
+  //       className: "bg-orange-50 text-slate-600 border border-slate-300",
+  //     };
+  //   }
+  //   if (source === "al-haider") {
+  //     return {
+  //       label: "Al-Haider",
+  //       className: "bg-orange-50 text-slate-600 border border-slate-300",
+  //     };
+  //   }
+  //   if (source === "skypass") {
+  //     return {
+  //       label: "Skypass",
+  //       className: "bg-orange-50 text-slate-600 border border-slate-300",
+  //     };
+  //   }
+  //   return {
+  //     label: "Own",
+  //     className: "bg-orange-50 text-slate-600 border border-slate-300",
+  //   };
+  // };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -391,7 +391,7 @@ export default function MyBookings() {
                     bookings.map((booking) => {
                       const statusBadge = getStatusBadge(booking.status);
                       const firstPassenger = booking.passengers?.[0];
-                      const sourceBadge = getSourceBadge(booking.source);
+                      // const sourceBadge = getSourceBadge(booking.source);
                       return (
                         <tr
                           key={booking._id}
@@ -658,7 +658,7 @@ export default function MyBookings() {
                                           />
                                         </svg>
                                       </button>
-                                      <button
+                                      {/* <button
                                         onClick={async () => {
                                           const confirmDelete = window.confirm(
                                             "Are you sure you want to delete this booking? This action cannot be undone.",
@@ -706,7 +706,7 @@ export default function MyBookings() {
                                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                           />
                                         </svg>
-                                      </button>
+                                      </button> */}
                                     </>
                                   )}
                               </div>

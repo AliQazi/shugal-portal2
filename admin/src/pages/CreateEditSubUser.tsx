@@ -56,6 +56,7 @@ const AVAILABLE_PERMISSIONS: PermissionItem[] = [
   { key: "bookings_action_buttons", label: "Bookings Action Buttons" },
   { key: "update_bookings_status", label: "Update Bookings Status" },
   { key: "update_bookings_discount", label: "Update Bookings Discount" },
+  { key: "can_see_profit_loss", label: "Can See Profit/Loss" },
 
   { key: "view_special_offers", label: "View Special Offers" },
   { key: "add_special_offers", label: "Add Special Offers" },
@@ -160,6 +161,7 @@ const PERMISSION_GROUPS = [
       "bookings_action_buttons",
       "update_bookings_status",
       "update_bookings_discount",
+      "can_see_profit_loss",
     ]),
   },
   {

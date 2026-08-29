@@ -115,12 +115,10 @@ interface BookingsTableProps {
     formatDate: (dateStr: string | undefined) => string
     navigate: (path: string) => void
     timers: { [key: string]: { hours: number; minutes: number; seconds: number; expired: boolean } }
-    setBookings: React.Dispatch<React.SetStateAction<Booking[]>>
-    canUseActions: boolean,
     canSeeProfitLoss: boolean,
 }
 
-const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, setBookings, canUseActions, canSeeProfitLoss }: BookingsTableProps) => {
+const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, canSeeProfitLoss }: BookingsTableProps) => {
     // const [deletingId, setDeletingId] = useState<string | null>(null);
     return (
         <table className="min-w-full border-collapse">
@@ -679,7 +677,6 @@ export default function AllBookings() {
 
     const { user } = useAuth()
     const canView = hasPermission(user, "view_bookings")
-    const canUseActions = hasPermission(user, "bookings_action_buttons")
     const canSeeProfitLoss = hasPermission(user, "can_see_profit_loss")
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
@@ -949,8 +946,6 @@ export default function AllBookings() {
                         formatDate={formatDate}
                         navigate={navigate}
                         timers={timers}
-                        setBookings={setBookings}
-                        canUseActions={canUseActions}
                         canSeeProfitLoss={canSeeProfitLoss}
                     />
                 </div>

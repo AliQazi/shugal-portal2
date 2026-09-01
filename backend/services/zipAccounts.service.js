@@ -244,6 +244,61 @@ class ZipAccountsService {
   }
 
   /**
+   * Zip Account Voucher Void and Post (settle a voided voucher out of the
+   * "Unposted" queue). ZIP Accounts' UnPosted Portal J.Voucher list matches
+   * on is_void:true AND is_posted:false, while its Void list just matches
+   * is_void:true. So a voucher that is voided while still unposted (e.g. a
+   * booking un-confirmed before anyone reviewed its journal voucher) would
+   * otherwise sit in the Unposted queue forever. Flipping is_posted:true too
+   * — safe, since is_void already excludes it from every balance/ledger view
+   * — moves it straight into the Void list and off the Unposted one,
+   * matching what happens when a voucher is voided *after* being posted.
+   * @param {string} id - ZIP voucher id
+   * @returns {Promise<Object>} { voidRes, postRes }
+   */
+  async voidAndPostVoucher(id) {
+    try {
+      const [voidRes, postRes] = await Promise.all([
+        this.voidUnvoidVoucher(id, "void"),
+        this.postUnpostVoucher(id, "post"),
+      ]);
+      return { voidRes, postRes };
+    } catch (error) {
+      throw new Error(`Failed to void and post voucher: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a journal voucher and put it in ZIP Accounts' "Unposted" state.
+   * ZIP Accounts creates journalPortal vouchers as posted (and not void) by
+   * default. Its own PortalJournalVoucher screen's "unpost" flow — and the
+   * query that its UnPosted Portal J.Voucher list runs (is_void:true AND
+   * is_posted:false) — requires BOTH flags to be flipped, not just
+   * is_posted. So mirror that exactly: create, then void, then unpost.
+   * @param {Object} data - Voucher payload (see createVoucher)
+   * @returns {Promise<Object>} The createVoucher response
+   */
+  async createUnpostedVoucher(data) {
+    const response = await this.createVoucher(data);
+    const voucherId = response?.newVoucher?._id;
+
+    if (voucherId) {
+      try {
+        await this.voidAndUnpostVoucher(voucherId);
+      } catch (unpostError) {
+        console.error(
+          `Failed to void/unpost ZIP voucher ${voucherId}:`,
+          unpostError.message,
+        );
+        // Non-fatal: the voucher was created, just leave it posted rather
+        // than failing the caller (e.g. booking confirmation).
+      }
+    }
+
+    return response;
+  }
+
+  /**
    * Fetch vouchers with their entries for a given account and date range.
    * @param {string} accountId - ZIP Accounts account ID
    * @param {string|null} dateFrom - ISO date string (inclusive start)

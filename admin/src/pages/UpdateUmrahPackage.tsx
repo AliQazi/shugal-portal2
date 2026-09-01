@@ -1371,12 +1371,18 @@ const UpdateUmrahPackage = () => {
                 disabled={loadingGroups}
               >
                 <option value="">{loadingGroups ? "Loading Umrah groups..." : "Select Umrah group"}</option>
-                {umrahGroups.map((group) => (
-                  <option key={group._id} value={group._id}>
-                    {(group.groupName || group.groupBookingId || group.sector || "Untitled Group") +
-                      ` | Seats: ${group.totalSeats || 0}`}
-                  </option>
-                ))}
+                {umrahGroups.map((group) => {
+                  const firstFlight = group.flights?.[0];
+                  const lastFlight = group.flights?.[group.flights.length - 1];
+                  const depLabel = formatFlightDate(firstFlight?.depDate);
+                  const arrLabel = formatFlightDate(lastFlight?.arrDate);
+                  return (
+                    <option key={group._id} value={group._id}>
+                      {(group.groupName || group.groupBookingId || group.sector || "Untitled Group") +
+                        ` | Seats: ${group.totalSeats || 0} | PNR: ${group.pnr || "N/A"} | SUPPLIER: ${group.user?.name || "N/A"} | Dep: ${depLabel} | Arr: ${arrLabel}`}
+                    </option>
+                  );
+                })}
               </select>
               {formik.touched.selectedGroupTicketId && formik.errors.selectedGroupTicketId && (
                 <p className="text-red-500 text-xs mt-1">{formik.errors.selectedGroupTicketId}</p>

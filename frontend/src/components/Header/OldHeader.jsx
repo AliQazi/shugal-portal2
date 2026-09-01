@@ -20,6 +20,8 @@ function OldHeader({ user, handleLogout }) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
+  const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!profileRef.current?.contains(e.target)) {
@@ -30,20 +32,33 @@ function OldHeader({ user, handleLogout }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Navbar scroll effect
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 30);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const currentGroupType = searchParams.get("group_type")?.trim() || "";
 
   return (
-    <header className="fixed w-full top-0 left-0 z-50 shadow-sm">
+    <header className={`fixed w-full top-0 left-0 z-50 shadow-sm transition-all duration-500 ${scrolled
+      ? "bg-white/95 backdrop-blur-md shadow-lg"
+      : "bg-transparent"
+      }`}>
       {/* SOLID PROFESSIONAL NAV BAR */}
       <div
-        className="border-b"
-        style={{
-          background: theme.colors.card,
-          borderColor: theme.colors.border,
-        }}
+      // className="border-b"
+      // style={{
+      //   background: theme.colors.card,
+      //   borderColor: theme.colors.border,
+      // }}
       >
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between py-3">
-          
+        <div className={`px-4 sm:px-6 md:px-10 flex items-center justify-between py-3 transition-all duration-300 ${scrolled
+          ? "bg-black/5 border border-black/5"
+          : "bg-white/10 border border-white/15 backdrop-blur-sm"
+          }`}>
+
           {/* LEFT: Logo & Navigation Links */}
           <div className="flex items-center gap-8">
             {user && (
@@ -52,11 +67,11 @@ function OldHeader({ user, handleLogout }) {
                   style={{ height: "60px" }}
                   src={logo}
                   alt="Abid Air Travel & Tours"
-                  className="object-contain"
+                  className="object-contain bg-white/90 rounded-full px-2.5 py-1"
                 />
               </Link>
             )}
-            
+
             {/* CENTRAL NAV LINKS (Ref: image_ee0aa3.png style) */}
             {/* {user && (
               <div className="hidden xl:flex items-center gap-8">
@@ -96,10 +111,9 @@ function OldHeader({ user, handleLogout }) {
               <div ref={profileRef} className="relative hidden md:block">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-3 px-3 py-1.5 rounded-full border transition-all"
+                  className="flex items-center gap-3 bg-white/90 px-3 py-1.5 rounded-full border transition-all"
                   style={{
                     borderColor: theme.colors.border,
-                    background: theme.colors.background,
                   }}
                 >
                   <span
@@ -163,8 +177,8 @@ function OldHeader({ user, handleLogout }) {
 
             {/* MOBILE TOGGLE ICON */}
             {user && (
-              <button 
-                onClick={() => setOpen(!open)} 
+              <button
+                onClick={() => setOpen(!open)}
                 className="xl:hidden p-2 rounded-lg"
                 style={{ color: theme.colors.textPrimary }}
               >
@@ -177,9 +191,8 @@ function OldHeader({ user, handleLogout }) {
 
       {/* MOBILE MENU PANEL */}
       <div
-        className={`fixed top-0 right-0 h-full w-[80%] max-w-sm shadow-xl transition-transform duration-300 ease-in-out z-50 flex flex-col ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-0 right-0 h-full w-[80%] max-w-sm shadow-xl transition-transform duration-300 ease-in-out z-50 flex flex-col ${open ? "translate-x-0" : "translate-x-full"
+          }`}
         style={{ background: theme.colors.card }}
       >
         <div className="p-4 flex items-center justify-between border-b" style={{ borderColor: theme.colors.border }}>
@@ -196,9 +209,9 @@ function OldHeader({ user, handleLogout }) {
               to={`/${group.path}`}
               onClick={() => setOpen(false)}
               className="text-base font-medium pb-2 border-b"
-              style={{ 
+              style={{
                 color: theme.colors.textPrimary,
-                borderColor: theme.colors.border 
+                borderColor: theme.colors.border
               }}
             >
               {group.label}
@@ -252,6 +265,6 @@ export default function Header({ user, handleLogout }) {
   if (hasToken) {
     return <OldHeader user={user} handleLogout={handleLogout} />;
   }
-  
+
   return null;
 }

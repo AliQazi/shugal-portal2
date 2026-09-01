@@ -1498,7 +1498,8 @@ export const updateOverallStatus = async (req, res) => {
           })),
         };
 
-        const response = await zipAccountsService.createVoucher(voucherData);
+        const response =
+          await zipAccountsService.createUnpostedVoucher(voucherData);
 
         const createdVoucherId = response?.newVoucher?._id;
         if (createdVoucherId) {
@@ -1795,7 +1796,8 @@ export const updateOverallStatus = async (req, res) => {
         })),
       };
 
-      const response = await zipAccountsService.createVoucher(voucherData);
+      const response =
+        await zipAccountsService.createUnpostedVoucher(voucherData);
       // console.log("ZIP Voucher Created:", response);
 
       // Save the ZIP voucher ID to the booking
@@ -1823,7 +1825,10 @@ export const updateOverallStatus = async (req, res) => {
       const zipVoucherId = booking.voucherStatus?.zipVoucherId;
       if (zipVoucherId) {
         try {
-          await zipAccountsService.voidUnvoidVoucher(zipVoucherId, "void");
+          // Void it, and settle it as posted so it lands in ZIP Accounts'
+          // Void list instead of lingering in the Unposted queue (relevant
+          // when the voucher was un-confirmed before anyone posted it).
+          await zipAccountsService.voidAndPostVoucher(zipVoucherId);
           // console.log(`ZIP Voucher ${zipVoucherId} voided successfully`);
         } catch (voidError) {
           console.error(

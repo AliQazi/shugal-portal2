@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import useAccountsList from "../../../context/useAccountsList";
+import { theme } from "../../../theme/theme";
 
 export default function UmrahBooking() {
   const [bookings, setBookings] = useState([]);
@@ -1092,11 +1093,11 @@ export default function UmrahBooking() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-295 border-collapse text-sm">
               {/* HEADER */}
-              <thead className="bg-slate-100">
+              <thead style={{ background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.primaryDark})` }}>
                 <tr className="whitespace-nowrap">
                   <th
                     onClick={() => handleSort("bookingNumber")}
-                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
+                    className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white cursor-pointer hover:text-emerald-600"
                   >
                     Id{" "}
                     {sortConfig.key === "bookingNumber" &&
@@ -1105,7 +1106,7 @@ export default function UmrahBooking() {
 
                   <th
                     onClick={() => handleSort("packageName")}
-                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
+                    className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white cursor-pointer hover:text-emerald-600"
                   >
                     Name{" "}
                     {sortConfig.key === "packageName" &&
@@ -1114,34 +1115,34 @@ export default function UmrahBooking() {
 
                   <th
                     onClick={() => handleSort("totalPrice")}
-                    className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 cursor-pointer hover:text-emerald-600"
+                    className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white cursor-pointer hover:text-emerald-600"
                   >
                     Flight Detail{" "}
                     {sortConfig.key === "totalPrice" &&
                       (sortConfig.direction === "asc" ? "↑" : "↓")}
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white">
                     Departure
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white">
                     Arrival
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white">
                     Dept. Date Time
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white">
                     Arr. Date Time
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-white">
                     Hotel
                   </th>
 
-                  <th className="border border-slate-300 px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <th className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-white">
                     Action
                   </th>
                 </tr>
@@ -2559,12 +2560,13 @@ export default function UmrahBooking() {
                             {hotel.name || "Hotel N/A"}
                           </p>
                           <p className="text-xs font-medium text-gray-500">
-                            {[
+                            {/* {[
                               hotel.location?.city,
                               `${hotel.nightCount || hotel.nights || 0} nights`,
                             ]
                               .filter(Boolean)
-                              .join(" | ")}
+                              .join(" | ")} */}
+                            City: {hotel.location?.city}
                           </p>
                         </div>
                       ))}

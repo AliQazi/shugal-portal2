@@ -1507,8 +1507,9 @@ const ledgerHiting = async (booking) => {
     })),
   };
 
-  // Use the ZIP Accounts service to create the voucher
-  const response = await zipAccountsService.createVoucher(voucherData);
+  // Use the ZIP Accounts service to create the voucher (unposted — it is
+  // reviewed/posted manually in ZIP Accounts before it hits the ledger)
+  const response = await zipAccountsService.createUnpostedVoucher(voucherData);
   return response;
 };
 
@@ -1629,7 +1630,10 @@ export const updateBookingStatus = async (req, res) => {
 
       if (zipVoucherId) {
         try {
-          await zipAccountsService.voidUnvoidVoucher(zipVoucherId, "void");
+          // Void it, and settle it as posted so it lands in ZIP Accounts'
+          // Void list instead of lingering in the Unposted queue (relevant
+          // when the voucher was un-confirmed before anyone posted it).
+          await zipAccountsService.voidAndPostVoucher(zipVoucherId);
         } catch (voidError) {
           console.error(
             `Failed to void ZIP voucher ${zipVoucherId}:`,

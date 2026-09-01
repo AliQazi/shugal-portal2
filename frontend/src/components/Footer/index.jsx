@@ -117,10 +117,10 @@ export default function Footer({ user }) {
                   const props =
                     item === "Contact"
                       ? {
-                          href: WHATSAPP_URL,
-                          target: "_blank",
-                          rel: "noopener noreferrer",
-                        }
+                        href: WHATSAPP_URL,
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                      }
                       : {};
                   const Tag = item === "Contact" ? "a" : "button";
 
@@ -242,13 +242,16 @@ export default function Footer({ user }) {
           >
             &copy; {dayjs().year()} Abid Air Travel & Tours. All rights reserved.
           </a>
-
-          <span
+          <a
+            href="https://nexagensolution.com/"
+            target="_blank"
+            rel="noopener noreferrer"
             style={{ color: theme.colors.sidebarText }}
-            className="opacity-60 font-mono tracking-tight"
+            className="font-mono tracking-tight opacity-500 hover:underline"
           >
             Designed & Developed by Nexagen Solution
-          </span>
+          </a>
+
         </div>
       </footer>
     </>

@@ -164,12 +164,13 @@ const RegisteredAgencies = () => {
 
   useEffect(() => {
     filterUsers();
-    setCurrentPage(1);
   }, [filterUsers]);
 
+  // Only reset to page 1 when the filters/search/page-size actually change,
+  // not when the underlying user data is updated (e.g. activating an agent).
   useEffect(() => {
     setCurrentPage(1);
-  }, [entriesPerPage]);
+  }, [searchTerm, cityFilter, statusFilter, entriesPerPage]);
 
   if (!canViewPage) {
     return (

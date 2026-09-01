@@ -96,7 +96,7 @@ const RegisteredAgencies = () => {
   const frontendUrl =
     import.meta.env.VITE_FRONTEND_URL || "https://flyingzone.nexagensolution.com/auth/login";
 
-  const MAX_ACTIVE_AGENTS = 2000;
+  const MAX_ACTIVE_AGENTS = 3500;
 
   const fetchUsers = useCallback(async () => {
     try {

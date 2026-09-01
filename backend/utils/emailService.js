@@ -207,7 +207,7 @@ export const sendPasswordResetEmail = async (
 
     // Construct reset link
     const frontendURL =
-      process.env.FRONTEND_URL || "https://flyingzone.nexagensolution.com";
+      process.env.FRONTEND_URL || "https://abidairtravels.com";
     const resetLink = `${frontendURL}/auth/forgot-password?token=${resetToken}&userId=${userId}`;
 
     const mailOptions = {
@@ -367,7 +367,7 @@ const getCredentialsEmailHTML = (
           </div>
 
           <div style="text-align: center;">
-            <a href="${process.env.FRONTEND_URL || "https://flyingzone.nexagensolution.com"}" class="button">Login to Your Account</a>
+            <a href="${process.env.FRONTEND_URL || "https://abidairtravels.com"}" class="button">Login to Your Account</a>
           </div>
 
           <div class="warning">
@@ -434,7 +434,7 @@ export const sendCredentialsEmail = async (
         userName,
         companyName,
       ),
-      text: `Hello ${userName},\n\nWelcome to Abid Air Travel & Tours ! Your agency account has been created successfully.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nAgent Code: ${agentCode}\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${process.env.FRONTEND_URL || "https://flyingzone.nexagensolution.com"}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air Travel & Tours `,
+      text: `Hello ${userName},\n\nWelcome to Abid Air Travel & Tours ! Your agency account has been created successfully.\n\nCompany: ${companyName}\n\nYour Login Credentials:\nAgent Code: ${agentCode}\nEmail: ${email}\nPassword: ${password}\n\nLogin URL: ${process.env.FRONTEND_URL || "https://abidairtravels.com"}\n\nSecurity Tips:\n- Keep your credentials safe and secure\n- Do not share your password with anyone\n- We recommend changing your password after first login\n\nBest regards,\nAbid Air Travel & Tours `,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -468,7 +468,7 @@ const getAdminCredentialsLoginUrl = () => {
   }
 
   const frontendUrl = (
-    process.env.FRONTEND_URL || "https://flyingzone.nexagensolution.com"
+    process.env.FRONTEND_URL || "https://abidairtravels.com"
   ).replace(/\/$/, "");
   return `${frontendUrl}/admin-portal/signin`;
 };

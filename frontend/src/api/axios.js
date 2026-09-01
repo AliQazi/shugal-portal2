@@ -73,7 +73,7 @@ export default axiosInstance;
 //         currentHost === "Abid Air Travel & Tourstravel.com" || currentHost === "www.Abid Air Travel & Tourstravel.com";
 
 //       if (isDashboardDomain && !window.location.pathname.startsWith("/")) {
-//         window.location.href = "https://flyingzone.nexagensolution.com/login";
+//         window.location.href = "https://abidairtravels.com/login";
 //       }
 //     }
 //     return Promise.reject(error);

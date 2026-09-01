@@ -236,7 +236,7 @@ export default function Footer({ user }) {
           className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t text-xs"
         >
           <a
-            href="https://flyingzone.nexagensolution.com/"
+            href="https://abidairtravels.com/"
             style={{ color: theme.colors.sidebarText }}
             className="hover:text-white font-mono opacity-80"
           >

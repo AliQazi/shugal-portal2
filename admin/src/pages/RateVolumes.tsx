@@ -40,6 +40,12 @@ interface RateVolumeType {
     sellingPrice: number;
     sellingRoe: number;
     sellingCurrency: string;
+    sharedRoomBuyingPrice: number;
+    sharedRoomBuyingRoe: number;
+    sharedRoomBuyingCurrency: string;
+    sharedRoomSellingPrice: number;
+    sharedRoomSellingRoe: number;
+    sharedRoomSellingCurrency: string;
     isActive?: boolean;
     createdAt?: string;
 }
@@ -56,6 +62,12 @@ const initialState: RateVolumeType = {
     sellingPrice: 0,
     sellingRoe: 1,
     sellingCurrency: "PKR",
+    sharedRoomBuyingPrice: 0,
+    sharedRoomBuyingRoe: 1,
+    sharedRoomBuyingCurrency: "PKR",
+    sharedRoomSellingPrice: 0,
+    sharedRoomSellingRoe: 1,
+    sharedRoomSellingCurrency: "PKR",
     isActive: true,
 };
 
@@ -162,12 +174,19 @@ export default function RateVolumes() {
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => {
         const { name, value } = e.target;
+        const numericFields = [
+            "buyingPrice",
+            "buyingRoe",
+            "sellingPrice",
+            "sellingRoe",
+            "sharedRoomBuyingPrice",
+            "sharedRoomBuyingRoe",
+            "sharedRoomSellingPrice",
+            "sharedRoomSellingRoe",
+        ];
         setFormData((prev) => ({
             ...prev,
-            [name]:
-                name === "buyingPrice" || name === "buyingRoe" || name === "sellingPrice" || name === "sellingRoe"
-                    ? Number(value)
-                    : value,
+            [name]: numericFields.includes(name) ? Number(value) : value,
         }));
     };
 
@@ -262,6 +281,12 @@ export default function RateVolumes() {
             sellingPrice: volume.sellingPrice,
             sellingRoe: volume.sellingRoe,
             sellingCurrency: volume.sellingCurrency,
+            sharedRoomBuyingPrice: volume.sharedRoomBuyingPrice || 0,
+            sharedRoomBuyingRoe: volume.sharedRoomBuyingRoe || 1,
+            sharedRoomBuyingCurrency: volume.sharedRoomBuyingCurrency || "PKR",
+            sharedRoomSellingPrice: volume.sharedRoomSellingPrice || 0,
+            sharedRoomSellingRoe: volume.sharedRoomSellingRoe || 1,
+            sharedRoomSellingCurrency: volume.sharedRoomSellingCurrency || "PKR",
             isActive: volume.isActive !== undefined ? volume.isActive : true,
         });
         setEditId(volume._id || null);
@@ -347,7 +372,7 @@ export default function RateVolumes() {
                             </h2>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             {/* VOLUME NAME & STATUS */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                 <div className="md:col-span-2">
@@ -487,15 +512,16 @@ export default function RateVolumes() {
                             </div>
 
                             {/* ================= PRICING SECTION ================= */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {/* BUYING */}
-                                <div className="border-2 border-red-200 rounded-xl p-5 bg-linear-to-br from-red-50 to-red-50/50 hover:shadow-md transition-shadow">
+                                <div className="border-2 border-red-200 rounded-xl p-5 bg-linear-to-br from-red-50 to-red-50/50">
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="p-1.5 bg-red-100 rounded-lg">
                                             <FiTrendingDown className="w-4 h-4 text-red-600" />
                                         </div>
                                         <h3 className="text-lg font-bold text-red-700">Buying Details</h3>
                                     </div>
+                                    <p className="text-xs text-gray-500 -mt-2 mb-4">Applied to Double, Triple &amp; Quad pricing</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block mb-1.5 text-xs font-semibold text-gray-600">
@@ -543,13 +569,14 @@ export default function RateVolumes() {
                                 </div>
 
                                 {/* SELLING */}
-                                <div className="border-2 border-green-200 rounded-xl p-5 bg-linear-to-br from-green-50 to-green-50/50 hover:shadow-md transition-shadow">
+                                <div className="border-2 border-green-200 rounded-xl p-5 bg-linear-to-br from-green-50 to-green-50/50">
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="p-1.5 bg-green-100 rounded-lg">
                                             <FiTrendingUp className="w-4 h-4 text-green-600" />
                                         </div>
                                         <h3 className="text-lg font-bold text-green-700">Selling Details</h3>
                                     </div>
+                                    <p className="text-xs text-gray-500 -mt-2 mb-4">Applied to Double, Triple &amp; Quad pricing</p>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block mb-1.5 text-xs font-semibold text-gray-600">
@@ -588,6 +615,106 @@ export default function RateVolumes() {
                                                         : null
                                                 }
                                                 onChange={(opt) => setFormData({ ...formData, sellingCurrency: opt?.value || "PKR" })}
+                                                placeholder="Select currency"
+                                                isSearchable
+                                                styles={customSelectStyles}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ================= SHARED ROOM PRICING ================= */}
+                            <div className="border-2 border-yellow-200 rounded-xl p-5 bg-linear-to-br from-yellow-50 to-yellow-50/50">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="p-1.5 bg-yellow-100 rounded-lg">
+                                        <FiPackage className="w-4 h-4 text-yellow-600" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-yellow-700">Shared Room Pricing</h3>
+                                </div>
+                                <p className="text-xs text-gray-500 mb-4 ml-9">
+                                    Saved separately and applied only to Shared Room pricing - Double/Triple/Quad use the Buying/Selling Details above.
+                                </p>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* SHARED - BUYING */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">Buying Price</label>
+                                            <input
+                                                type="number"
+                                                name="sharedRoomBuyingPrice"
+                                                value={formData.sharedRoomBuyingPrice || ""}
+                                                onChange={handleChange}
+                                                placeholder="0"
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">ROE</label>
+                                            <input
+                                                type="number"
+                                                name="sharedRoomBuyingRoe"
+                                                value={formData.sharedRoomBuyingRoe}
+                                                onChange={handleChange}
+                                                placeholder="1"
+                                                step="0.01"
+                                                min={0}
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">Currency</label>
+                                            <Select
+                                                options={currencyOptions}
+                                                value={
+                                                    formData.sharedRoomBuyingCurrency
+                                                        ? { value: formData.sharedRoomBuyingCurrency, label: `${formData.sharedRoomBuyingCurrency} - ${currency_list.find(c => c.code === formData.sharedRoomBuyingCurrency)?.name || ''}` }
+                                                        : null
+                                                }
+                                                onChange={(opt) => setFormData({ ...formData, sharedRoomBuyingCurrency: opt?.value || "PKR" })}
+                                                placeholder="Select currency"
+                                                isSearchable
+                                                styles={customSelectStyles}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* SHARED - SELLING */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">Selling Price</label>
+                                            <input
+                                                type="number"
+                                                name="sharedRoomSellingPrice"
+                                                value={formData.sharedRoomSellingPrice || ""}
+                                                onChange={handleChange}
+                                                placeholder="0"
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">ROE</label>
+                                            <input
+                                                type="number"
+                                                name="sharedRoomSellingRoe"
+                                                value={formData.sharedRoomSellingRoe}
+                                                onChange={handleChange}
+                                                placeholder="1"
+                                                step="0.01"
+                                                min={0}
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block mb-1.5 text-xs font-semibold text-gray-600">Currency</label>
+                                            <Select
+                                                options={currencyOptions}
+                                                value={
+                                                    formData.sharedRoomSellingCurrency
+                                                        ? { value: formData.sharedRoomSellingCurrency, label: `${formData.sharedRoomSellingCurrency} - ${currency_list.find(c => c.code === formData.sharedRoomSellingCurrency)?.name || ''}` }
+                                                        : null
+                                                }
+                                                onChange={(opt) => setFormData({ ...formData, sharedRoomSellingCurrency: opt?.value || "PKR" })}
                                                 placeholder="Select currency"
                                                 isSearchable
                                                 styles={customSelectStyles}
@@ -660,6 +787,7 @@ export default function RateVolumes() {
                                     <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Date Range</th>
                                     <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Buying</th>
                                     <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Selling</th>
+                                    <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Shared Room</th>
                                     <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
                                     <th className="text-left p-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Actions</th>
                                 </tr>
@@ -726,6 +854,24 @@ export default function RateVolumes() {
                                                 <div className="text-xs text-gray-400 mt-0.5">ROE {volume.sellingRoe}</div>
                                             </td>
                                             <td className="p-3">
+                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+                                                    <span className="font-semibold text-red-600">
+                                                        {volume.sharedRoomBuyingPrice?.toLocaleString()}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-red-50 rounded text-[11px] font-medium text-red-700">
+                                                        {volume.sharedRoomBuyingCurrency}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap mt-0.5">
+                                                    <span className="font-semibold text-green-600">
+                                                        {volume.sharedRoomSellingPrice?.toLocaleString()}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-green-50 rounded text-[11px] font-medium text-green-700">
+                                                        {volume.sharedRoomSellingCurrency}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="p-3">
                                                 <span
                                                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${volume.isActive
                                                         ? "bg-green-100 text-green-700"
@@ -759,7 +905,7 @@ export default function RateVolumes() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={8}>
+                                        <td colSpan={9}>
                                             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                                                 <FiAlertCircle className="w-12 h-12 mb-4 text-gray-300" />
                                                 <p className="text-lg font-medium text-gray-500">No volumes found</p>

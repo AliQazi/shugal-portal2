@@ -191,6 +191,14 @@ interface RateVolumeData {
   sellingPrice: number;
   sellingRoe: number;
   sellingCurrency: string;
+  // Shared Room pricing, saved separately on the Rate Volume - applied as-is to
+  // Shared Room instead of splitting the buying/selling rate above across it.
+  sharedRoomBuyingPrice?: number;
+  sharedRoomBuyingRoe?: number;
+  sharedRoomBuyingCurrency?: string;
+  sharedRoomSellingPrice?: number;
+  sharedRoomSellingRoe?: number;
+  sharedRoomSellingCurrency?: string;
 }
 
 interface RateVolumeOption {
@@ -363,6 +371,12 @@ const UmrahPackage = () => {
                 sellingPrice: v.sellingPrice || 0,
                 sellingRoe: v.sellingRoe || 1,
                 sellingCurrency: v.sellingCurrency || "PKR",
+                sharedRoomBuyingPrice: v.sharedRoomBuyingPrice || 0,
+                sharedRoomBuyingRoe: v.sharedRoomBuyingRoe || 1,
+                sharedRoomBuyingCurrency: v.sharedRoomBuyingCurrency || "PKR",
+                sharedRoomSellingPrice: v.sharedRoomSellingPrice || 0,
+                sharedRoomSellingRoe: v.sharedRoomSellingRoe || 1,
+                sharedRoomSellingCurrency: v.sharedRoomSellingCurrency || "PKR",
               },
             };
           })
@@ -1043,6 +1057,12 @@ const UmrahPackage = () => {
     const buyingRoe = volume.buyingRoe || 1;
     const selling = volume.sellingPrice || 0;
     const sellingRoe = volume.sellingRoe || 1;
+    // Shared Room uses its own dedicated rate from the volume (not a split of the
+    // buying/selling rate above, which only feeds Double/Triple/Quad).
+    const sharedBuying = volume.sharedRoomBuyingPrice || 0;
+    const sharedBuyingRoe = volume.sharedRoomBuyingRoe || 1;
+    const sharedSelling = volume.sharedRoomSellingPrice || 0;
+    const sharedSellingRoe = volume.sharedRoomSellingRoe || 1;
 
     const fields: Partial<HotelForm> = {
       rateVolumeName: volume.volumeName,
@@ -1055,7 +1075,7 @@ const UmrahPackage = () => {
       doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((buying / 2).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 2).toFixed(2)), sellingRoe },
       tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((buying / 3).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 3).toFixed(2)), sellingRoe },
       quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((buying / 4).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 4).toFixed(2)), sellingRoe },
-      sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat((buying / 5).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 5).toFixed(2)), sellingRoe },
+      sharedRoom: { ...hotel.sharedRoom, buyingPrice: sharedBuying, buyingRoe: sharedBuyingRoe, sellingPrice: sharedSelling, sellingRoe: sharedSellingRoe },
     };
 
     const matchedHotelOption = volume.hotelId ? hotelOptions.find((h) => h.value === volume.hotelId) : undefined;
@@ -1998,7 +2018,7 @@ const UmrahPackage = () => {
                             { key: "doubleRoom", label: "Double Room (2 Pax)", color: "bg-green-600", paxLabel: "Price/Pax" },
                             { key: "tripleRoom", label: "Triple Room (3 Pax)", color: "bg-teal-500", paxLabel: `Price/Pax${""}` },
                             { key: "quadRoom", label: "Quad Room (4 Pax)", color: "bg-blue-500", paxLabel: "Price/Pax" },
-                            { key: "sharedRoom", label: "Shared Room (5 Pax)", color: "bg-yellow-500", paxLabel: "Total Price" },
+                            { key: "sharedRoom", label: "Shared Room", color: "bg-yellow-500", paxLabel: "Total Price" },
                           ] as const).map(({ key, label, color, paxLabel }) => {
                             const room = hotel[key] as RoomPricing;
                             const updateRoom = (fields: Partial<RoomPricing>) => {
@@ -2537,7 +2557,7 @@ const UmrahPackage = () => {
                       {/* Shared */}
                       <div className="border rounded overflow-hidden">
                         <div className="bg-yellow-500 text-white px-3 py-2">
-                          <span className="text-xs font-bold">Shared Package Total (5 Pax)</span>
+                          <span className="text-xs font-bold">Shared Package Total</span>
                         </div>
                         <div className="p-3">
                           <div className="flex items-center border rounded overflow-hidden h-9">

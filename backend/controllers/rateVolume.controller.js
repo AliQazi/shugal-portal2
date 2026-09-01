@@ -17,6 +17,12 @@ export const createRateVolume = async (req, res) => {
       sellingPrice,
       sellingRoe,
       sellingCurrency,
+      sharedRoomBuyingPrice,
+      sharedRoomBuyingRoe,
+      sharedRoomBuyingCurrency,
+      sharedRoomSellingPrice,
+      sharedRoomSellingRoe,
+      sharedRoomSellingCurrency,
       isActive,
     } = req.body;
 
@@ -53,6 +59,12 @@ export const createRateVolume = async (req, res) => {
       sellingPrice: sellingPrice || 0,
       sellingRoe: sellingRoe || 1,
       sellingCurrency: sellingCurrency || "PKR",
+      sharedRoomBuyingPrice: sharedRoomBuyingPrice || 0,
+      sharedRoomBuyingRoe: sharedRoomBuyingRoe || 1,
+      sharedRoomBuyingCurrency: sharedRoomBuyingCurrency || "PKR",
+      sharedRoomSellingPrice: sharedRoomSellingPrice || 0,
+      sharedRoomSellingRoe: sharedRoomSellingRoe || 1,
+      sharedRoomSellingCurrency: sharedRoomSellingCurrency || "PKR",
       isActive: isActive !== undefined ? isActive : true,
     });
 
@@ -143,6 +155,12 @@ export const updateRateVolume = async (req, res) => {
       sellingPrice,
       sellingRoe,
       sellingCurrency,
+      sharedRoomBuyingPrice,
+      sharedRoomBuyingRoe,
+      sharedRoomBuyingCurrency,
+      sharedRoomSellingPrice,
+      sharedRoomSellingRoe,
+      sharedRoomSellingCurrency,
       isActive,
     } = req.body;
 
@@ -158,6 +176,12 @@ export const updateRateVolume = async (req, res) => {
       ...(sellingPrice !== undefined && { sellingPrice }),
       ...(sellingRoe !== undefined && { sellingRoe }),
       ...(sellingCurrency !== undefined && { sellingCurrency }),
+      ...(sharedRoomBuyingPrice !== undefined && { sharedRoomBuyingPrice }),
+      ...(sharedRoomBuyingRoe !== undefined && { sharedRoomBuyingRoe }),
+      ...(sharedRoomBuyingCurrency !== undefined && { sharedRoomBuyingCurrency }),
+      ...(sharedRoomSellingPrice !== undefined && { sharedRoomSellingPrice }),
+      ...(sharedRoomSellingRoe !== undefined && { sharedRoomSellingRoe }),
+      ...(sharedRoomSellingCurrency !== undefined && { sharedRoomSellingCurrency }),
       ...(isActive !== undefined && { isActive }),
     };
 

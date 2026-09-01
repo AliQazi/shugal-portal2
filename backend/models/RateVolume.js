@@ -62,6 +62,35 @@ const rateVolumeSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Shared Room pricing - kept separate from the buying/selling rate above,
+    // which is used for Double/Triple/Quad. Applied as-is (not split per pax).
+    sharedRoomBuyingPrice: {
+      type: Number,
+      default: 0,
+    },
+    sharedRoomBuyingRoe: {
+      type: Number,
+      default: 1,
+    },
+    sharedRoomBuyingCurrency: {
+      type: String,
+      default: "PKR",
+      trim: true,
+    },
+    sharedRoomSellingPrice: {
+      type: Number,
+      default: 0,
+    },
+    sharedRoomSellingRoe: {
+      type: Number,
+      default: 1,
+    },
+    sharedRoomSellingCurrency: {
+      type: String,
+      default: "PKR",
+      trim: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

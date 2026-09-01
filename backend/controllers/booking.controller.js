@@ -1283,6 +1283,11 @@ const ledgerHiting = async (booking) => {
   }
   const customerAccount = agentUser.zipId;
 
+  const accountsData = await zipAccountsService.getAllAccounts();
+  const accounts = Array.isArray(accountsData)
+    ? accountsData
+    : accountsData.results || [];
+
   // Determine supplier account based on booking source
   let supplierAccount = null;
   let supplierName = "";
@@ -1316,11 +1321,6 @@ const ledgerHiting = async (booking) => {
       externalSupplierNames[bookingData.source] || bookingData.source;
     supplierName = standardSupplierName;
 
-    const accountsData = await zipAccountsService.getAllAccounts();
-    const accounts = Array.isArray(accountsData)
-      ? accountsData
-      : accountsData.results || [];
-
     const supplierAccountObj = accounts.find(
       (acc) => acc.account_name === standardSupplierName,
     );
@@ -1334,11 +1334,6 @@ const ledgerHiting = async (booking) => {
   }
 
   // Fetch "Ticket Income" account ID
-  const accountsData = await zipAccountsService.getAllAccounts();
-  const accounts = Array.isArray(accountsData)
-    ? accountsData
-    : accountsData.results || [];
-
   const ticketIncomeAcc = accounts.find(
     (acc) => acc.account_name === "Ticket Income",
   );

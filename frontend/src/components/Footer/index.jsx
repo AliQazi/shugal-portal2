@@ -1,5 +1,5 @@
 import React from "react";
-import logo from "../../assets/images/logo.png";
+// import logo from "../../assets/images/logo.png";
 import footerbg from "../../assets/images/footerbg1.jpg";
 import { CiLogin } from "react-icons/ci";
 import { FaPhoneAlt } from "react-icons/fa";
@@ -243,12 +243,12 @@ export default function Footer({ user }) {
             &copy; {dayjs().year()} Abid Air Travel & Tours. All rights reserved.
           </a>
 
-          {/* <span
+          <span
             style={{ color: theme.colors.sidebarText }}
             className="opacity-60 font-mono tracking-tight"
           >
             Designed & Developed by Nexagen Solution
-          </span> */}
+          </span>
         </div>
       </footer>
     </>

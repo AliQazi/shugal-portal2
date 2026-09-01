@@ -2,7 +2,7 @@ import axios from "axios";
 
 const axiosInstance = axios.create({
   // baseURL: "http://localhost:8016/api", // backend ka port
-  baseURL: "https://flyingzone.nexagensolution.com/api", // backend ka port
+  baseURL: "https://abidairtravels.com/api", // backend ka port
   withCredentials: true,
 });
 

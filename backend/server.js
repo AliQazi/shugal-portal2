@@ -57,7 +57,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3000",
       "http://localhost:3001",
-      "https://flyingzone.nexagensolution.com",
+      "https://abidairtravels.com",
     ],
     credentials: true,
   }),

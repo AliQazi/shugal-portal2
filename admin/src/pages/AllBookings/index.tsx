@@ -8,6 +8,7 @@ import { printGDSBooking } from '../../utils/bookingPDFService'
 import { useAuth } from '../../context/AuthContext'
 import { hasPermission } from '../../utils/permissions'
 import dayjs from 'dayjs'
+import Select, { type StylesConfig } from 'react-select'
 
 // Match the brand gradient used across the customer-facing app (frontend/src/theme/theme.js)
 const BRAND_GRADIENT = 'linear-gradient(to right, #09B0FF, #0064BC)'
@@ -107,6 +108,106 @@ interface StatusOption {
     value: string
     label: string
     color: string
+}
+
+interface FilterOption {
+    value: string
+    label: string
+}
+
+interface BookingStatusCounts {
+    'on hold': number
+    'partially confirmed': number
+    confirmed: number
+    cancelled: number
+}
+
+const EMPTY_BOOKING_STATUS_COUNTS: BookingStatusCounts = {
+    'on hold': 0,
+    'partially confirmed': 0,
+    confirmed: 0,
+    cancelled: 0,
+}
+
+const filterSelectStyles: StylesConfig<FilterOption, false> = {
+    control: (base, state) => ({
+        ...base,
+        minHeight: '40px',
+        borderRadius: '0px',
+        borderColor: state.isFocused ? '#0ea5e9' : '#cbd5e1',
+        backgroundColor: '#ffffff',
+        boxShadow: state.isFocused ? '0 0 0 3px rgba(14, 165, 233, 0.12)' : 'none',
+        cursor: 'pointer',
+        transition: 'border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease',
+        '&:hover': {
+            borderColor: '#38bdf8',
+            backgroundColor: '#ffffff',
+        },
+    }),
+    valueContainer: (base) => ({
+        ...base,
+        padding: '0 12px',
+    }),
+    singleValue: (base) => ({
+        ...base,
+        color: '#334155',
+        fontSize: '0.875rem',
+        fontWeight: 500,
+    }),
+    input: (base) => ({
+        ...base,
+        color: '#334155',
+        fontSize: '0.875rem',
+    }),
+    indicatorSeparator: () => ({
+        display: 'none',
+    }),
+    dropdownIndicator: (base, state) => ({
+        ...base,
+        color: state.isFocused ? '#0284c7' : '#64748b',
+        padding: '8px 10px',
+        transition: 'transform 150ms ease, color 150ms ease',
+        transform: state.selectProps.menuIsOpen ? 'rotate(180deg)' : undefined,
+        '&:hover': {
+            color: '#0284c7',
+        },
+    }),
+    menu: (base) => ({
+        ...base,
+        zIndex: 30,
+        marginTop: '6px',
+        padding: '4px',
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0',
+        borderRadius: '0px',
+        boxShadow: '0 14px 30px -10px rgba(15, 23, 42, 0.28)',
+    }),
+    menuList: (base) => ({
+        ...base,
+        padding: 0,
+    }),
+    option: (base, state) => ({
+        ...base,
+        borderRadius: '0px',
+        background: state.isSelected
+            ? BRAND_GRADIENT
+            : state.isFocused
+                ? '#e0f2fe'
+                : '#ffffff',
+        color: state.isSelected ? '#ffffff' : '#334155',
+        cursor: 'pointer',
+        fontSize: '0.875rem',
+        fontWeight: state.isSelected ? 600 : 500,
+        padding: '9px 11px',
+        '&:active': {
+            backgroundColor: state.isSelected ? '#0284c7' : '#bae6fd',
+        },
+    }),
+    noOptionsMessage: (base) => ({
+        ...base,
+        color: '#64748b',
+        fontSize: '0.875rem',
+    }),
 }
 
 interface BookingsTableProps {
@@ -679,11 +780,12 @@ export default function AllBookings() {
     const canView = hasPermission(user, "view_bookings")
     const canSeeProfitLoss = hasPermission(user, "can_see_profit_loss")
     const navigate = useNavigate()
-    const [searchParams] = useSearchParams()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [bookings, setBookings] = useState<Booking[]>([])
     const [initialLoading, setInitialLoading] = useState(true)
     const [fetching, setFetching] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [bookingStatusCounts, setBookingStatusCounts] = useState<BookingStatusCounts>(EMPTY_BOOKING_STATUS_COUNTS)
     const [filters, setFilters] = useState<Filters>({
         sector: '',
         airline: '',
@@ -705,6 +807,27 @@ export default function AllBookings() {
         { value: 'confirmed', label: 'Confirmed', color: 'bg-emerald-50 text-emerald-800 border border-emerald-300' },
         { value: 'partially confirmed', label: 'Partially Confirmed', color: 'bg-indigo-50 text-indigo-800 border border-indigo-300' },
         { value: 'cancelled', label: 'Cancelled', color: 'bg-rose-50 text-rose-800 border border-rose-300' }
+    ]
+
+    const sectorFilterOptions: FilterOption[] = [
+        { value: '', label: 'All Sectors' },
+        ...uniqueSectors.map(sector => ({ value: sector, label: sector })),
+    ]
+
+    const airlineFilterOptions: FilterOption[] = [
+        { value: '', label: 'All Airlines' },
+        ...uniqueAirlines.map(airline => ({ value: airline, label: airline })),
+    ]
+
+    const formatStatusCount = (count: number) => count > 0 ? String(count).padStart(2, '0') : '0'
+    const allBookingStatusCount = Object.values(bookingStatusCounts).reduce((total, count) => total + count, 0)
+
+    const bookingStatusFilterOptions: FilterOption[] = [
+        { value: '', label: `All Booking Statuses (${formatStatusCount(allBookingStatusCount)})` },
+        { value: 'on hold', label: `On Hold (${formatStatusCount(bookingStatusCounts['on hold'])})` },
+        { value: 'partially confirmed', label: `Partially Confirmed (${formatStatusCount(bookingStatusCounts['partially confirmed'])})` },
+        { value: 'confirmed', label: `Confirmed (${formatStatusCount(bookingStatusCounts.confirmed)})` },
+        { value: 'cancelled', label: `Cancelled (${formatStatusCount(bookingStatusCounts.cancelled)})` },
     ]
 
     // Calculate remaining time for a booking (2 hours from creation)
@@ -795,6 +918,7 @@ export default function AllBookings() {
 
             if (response.data.success) {
                 setBookings(response.data.data)
+                setBookingStatusCounts(response.data.statusCounts || EMPTY_BOOKING_STATUS_COUNTS)
             }
         } catch (err) {
             console.error('Error fetching bookings:', err)
@@ -809,6 +933,18 @@ export default function AllBookings() {
         value: Filters[K]
     ) => {
         setFilters(prev => ({ ...prev, [filterName]: value }))
+    }
+
+    const handleStatusFilterChange = (status: string) => {
+        const nextSearchParams = new URLSearchParams(searchParams)
+
+        if (status) {
+            nextSearchParams.set('status', status)
+        } else {
+            nextSearchParams.delete('status')
+        }
+
+        setSearchParams(nextSearchParams)
     }
 
 
@@ -880,36 +1016,42 @@ export default function AllBookings() {
                         />
                     </div>
 
+                    {/* Booking Status Filter */}
+                    <div className="w-full sm:w-auto min-w-45">
+                        <Select<FilterOption, false>
+                            aria-label="Filter by booking status"
+                            options={bookingStatusFilterOptions}
+                            value={bookingStatusFilterOptions.find(option => option.value === activeStatus)}
+                            onChange={(option) => handleStatusFilterChange(option?.value || '')}
+                            styles={filterSelectStyles}
+                            isSearchable={false}
+                        />
+                    </div>
+
                     {/* Sector Filter */}
                     <div className="w-full sm:w-auto min-w-37.5">
-                        <select
-                            value={filters.sector}
-                            onChange={(e) => handleFilterChange('sector', e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 text-sm text-slate-700 focus:outline-none focus:border-slate-500"
-                        >
-                            <option value="">All Sectors</option>
-                            {uniqueSectors.map(sector => (
-                                <option key={sector} value={sector}>
-                                    {sector}
-                                </option>
-                            ))}
-                        </select>
+                        <Select<FilterOption, false>
+                            aria-label="Filter by sector"
+                            options={sectorFilterOptions}
+                            value={sectorFilterOptions.find(option => option.value === filters.sector)}
+                            onChange={(option) => handleFilterChange('sector', option?.value || '')}
+                            styles={filterSelectStyles}
+                            isSearchable
+                            noOptionsMessage={() => 'No sectors found'}
+                        />
                     </div>
 
                     {/* Airline Filter */}
                     <div className="w-full sm:w-auto min-w-37.5">
-                        <select
-                            value={filters.airline}
-                            onChange={(e) => handleFilterChange('airline', e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-300 text-sm text-slate-700 focus:outline-none focus:border-slate-500"
-                        >
-                            <option value="">All Airlines</option>
-                            {uniqueAirlines.map(airline => (
-                                <option key={airline} value={airline}>
-                                    {airline}
-                                </option>
-                            ))}
-                        </select>
+                        <Select<FilterOption, false>
+                            aria-label="Filter by airline"
+                            options={airlineFilterOptions}
+                            value={airlineFilterOptions.find(option => option.value === filters.airline)}
+                            onChange={(option) => handleFilterChange('airline', option?.value || '')}
+                            styles={filterSelectStyles}
+                            isSearchable
+                            noOptionsMessage={() => 'No airlines found'}
+                        />
                     </div>
 
                     {/* From Date */}
@@ -919,6 +1061,7 @@ export default function AllBookings() {
                             onChange={(date) => handleFilterChange('fromDate', date)}
                             placeholderText="Dept Date"
                             minDate={new Date()}
+                            className="rounded-none"
                         />
                     </div>
 

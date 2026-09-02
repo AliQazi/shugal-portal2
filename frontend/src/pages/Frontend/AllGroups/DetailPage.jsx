@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { theme } from "../../../theme/theme";
 import { FaCar, FaBus } from "react-icons/fa";
@@ -7,7 +7,6 @@ import {
   FaPlaneArrival,
   FaHotel,
   FaCheckCircle,
-  FaMapMarkerAlt,
   FaStar,
   FaMapMarkedAlt,
 } from "react-icons/fa";
@@ -69,6 +68,10 @@ export default function DetailPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [])
+
   if (!group) {
     return (
       <div
@@ -108,7 +111,6 @@ export default function DetailPage() {
     <div
       style={{
         backgroundColor: "#f4f7fe",
-        minHeight: "100vh",
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
@@ -119,6 +121,7 @@ export default function DetailPage() {
           .room-grid { grid-template-columns: 1fr 1fr !important; }
           .header-inner { flex-direction: column !important; align-items: flex-start !important; }
           .header-ref { text-align: left !important; }
+          .header-schedule { grid-template-columns: 1fr !important; }
           .sticky-col { position: static !important; }
         }
 
@@ -149,7 +152,7 @@ export default function DetailPage() {
               gap: "12px",
             }}
           >
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div
                 style={{
                   display: "flex",
@@ -169,40 +172,6 @@ export default function DetailPage() {
                 >
                   {group.packageName}
                 </h1>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  alignItems: "center",
-                  opacity: 0.9,
-                  fontSize: "0.82rem",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                  }}
-                >
-                  <FaPlaneDeparture /> {group.flights?.[0]?.flightNo || "N/A"}
-                </span>
-
-                <span>•</span>
-
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                  }}
-                >
-                  <FaMapMarkerAlt /> {group.flights?.[0]?.sectorFrom} -{" "}
-                  {group.flights?.[0]?.sectorTo}
-                </span>
               </div>
             </div>
 
@@ -238,15 +207,60 @@ export default function DetailPage() {
             </div>
           </div>
 
+          {/* COMPACT FLIGHT SCHEDULE */}
+          <div
+            style={{
+              marginTop: "10px",
+              paddingTop: "10px",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "7px",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                opacity: 0.9,
+              }}
+            >
+              <FaPlaneDeparture size={12} /> Flight Schedule
+            </div>
+
+            {group.flights?.length > 0 ? (
+              <div
+                className="header-schedule"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${Math.min(group.flights.length, 2)}, minmax(0, 1fr))`,
+                  gap: "7px",
+                }}
+              >
+                {group.flights.map((flight, index) => (
+                  <HeaderFlightItem
+                    key={flight._id || `${flight.flightNo || "flight"}-${index}`}
+                    flight={flight}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: "0.78rem", opacity: 0.8 }}>
+                No flights available
+              </div>
+            )}
+          </div>
+
           {/* PACKAGE INCLUDES */}
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
               gap: "6px",
-              marginTop: "10px",
-              paddingTop: "10px",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
+              marginTop: "8px",
             }}
           >
             {includesList.map((item) => (
@@ -530,39 +544,6 @@ export default function DetailPage() {
               </div>
             </div>
 
-            {/* Flight Schedule */}
-            <div style={cardStyle}>
-              <h3 style={cardTitleStyle}>Flight Schedule</h3>
-
-              {group.flights && group.flights.length > 0 ? (
-                <>
-                  {group.flights.map((flight, index) => (
-                    <React.Fragment key={index}>
-                      {index > 0 && (
-                        <div
-                          style={{
-                            height: "1px",
-                            background: "#edf2f7",
-                            margin: "8px 0",
-                          }}
-                        />
-                      )}
-
-                      <FlightInfo
-                        label={
-                          index === 0 ? "Departure" : `Flight ${index + 1}`
-                        }
-                        data={flight}
-                        icon={<FaPlaneDeparture color={theme.colors.primary} />}
-                      />
-                    </React.Fragment>
-                  ))}
-                </>
-              ) : (
-                <div>No Flights Available</div>
-              )}
-            </div>
-
             {/* TRANSPORTS */}
             {group.transports?.length > 0 && (
               <div style={cardStyle}>
@@ -775,72 +756,79 @@ function HotelCard({ hotel, city }) {
   );
 }
 
-/* ==================== FLIGHT INFO ==================== */
-function FlightInfo({ label, data, icon }) {
+/* ==================== HEADER FLIGHT SCHEDULE ==================== */
+function HeaderFlightItem({ flight }) {
+  const routeFrom = flight?.sectorFrom || "N/A";
+  const routeTo = flight?.sectorTo || "N/A";
+
   return (
-    <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-      <div style={{ marginTop: "3px" }}>{icon}</div>
-
-      <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontSize: "0.65rem",
-            fontWeight: 700,
-            color: "#a0aec0",
-            textTransform: "uppercase",
-          }}
-        >
-          {label}
-        </div>
-
+    <div
+      style={{
+        minWidth: 0,
+        padding: "8px 10px",
+        borderRadius: "9px",
+        background: "rgba(255,255,255,0.14)",
+        border: "1px solid rgba(255,255,255,0.16)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px",
+          marginBottom: "5px",
+        }}
+      >
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            flexWrap: "wrap",
-            gap: "4px",
+            gap: "6px",
+            minWidth: 0,
+            fontSize: "0.8rem",
+            fontWeight: 700,
           }}
         >
-          <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#2d3748" }}>
-            {formatDate(data?.depDate)}
-          </span>
-
-          <span
-            style={{
-              fontSize: "0.72rem",
-              background: "#edf2f7",
-              padding: "1px 6px",
-              borderRadius: "4px",
-            }}
-          >
-            {data?.flightNo}
-          </span>
+          <span>{routeFrom}</span>
+          <span style={{ opacity: 0.65 }}>→</span>
+          <span>{routeTo}</span>
         </div>
 
-        <div style={{ fontSize: "0.78rem", color: "#718096" }}>
-          {formatTime(data?.depTime)} • {data?.sectorFrom} to {data?.sectorTo}
-        </div>
-
-        <div
+        <span
           style={{
-            fontSize: "0.72rem",
-            color: "#a0aec0",
-            marginTop: "2px",
+            flexShrink: 0,
+            padding: "2px 6px",
+            borderRadius: "5px",
+            background: "rgba(255,255,255,0.18)",
+            fontSize: "0.66rem",
+            fontWeight: 700,
           }}
         >
-          Arrival: {formatDate(data?.arrDate)} {formatTime(data?.arrTime)}
-        </div>
+          {flight?.flightNo || "N/A"}
+        </span>
+      </div>
 
-        <div
-          style={{
-            fontSize: "0.72rem",
-            color: "#718096",
-            marginTop: "3px",
-          }}
-        >
-          {data?.flightClass} • {data?.baggage}KG • Meal: {data?.meal}
-        </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px",
+          fontSize: "0.69rem",
+          lineHeight: 1.35,
+          opacity: 0.9,
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <FaPlaneDeparture size={10} />
+          {formatDate(flight?.depDate)}, {formatTime(flight?.depTime)}
+        </span>
+        <span style={{ opacity: 0.55 }}>→</span>
+        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <FaPlaneArrival size={10} />
+          {formatDate(flight?.arrDate)}, {formatTime(flight?.arrTime)}
+        </span>
       </div>
     </div>
   );

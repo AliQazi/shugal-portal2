@@ -10,6 +10,7 @@ interface MaskedDatePickerProps {
   minDate?: Date;
   maxDate?: Date;
   placeholderText?: string;
+  className?: string;
 }
 
 export default function MaskedDatePicker({
@@ -19,6 +20,7 @@ export default function MaskedDatePicker({
   minDate,
   maxDate,
   placeholderText = "DD/MM/YYYY",
+  className = "",
 }: MaskedDatePickerProps) {
   return (
     <DatePicker
@@ -73,7 +75,7 @@ export default function MaskedDatePicker({
       className={`w-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 ${size === "big"
         ? "px-4 py-2 pr-10 rounded-md text-sm"
         : "px-2 py-1 rounded text-xs"
-        }`}
+        } ${className}`}
     />
   );
 }

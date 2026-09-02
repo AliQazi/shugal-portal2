@@ -855,7 +855,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
     if (activeDurationTab === "all") return true;
     const duration = parseInt(g.packageDuration);
     if (isNaN(duration)) return false;
-    if (activeDurationTab === "14") return duration === 14;
+    if (activeDurationTab === "15") return duration === 15;
     if (activeDurationTab === "21") return duration === 21;
     if (activeDurationTab === "28") return duration === 28;
     return true;
@@ -1018,7 +1018,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {[
                 { id: "all", label: "All Packages", count: getCountForDuration("all") },
-                { id: "14", label: "14 Days", count: getCountForDuration(14) },
+                { id: "15", label: "15 Days", count: getCountForDuration(15) },
                 { id: "21", label: "21 Days", count: getCountForDuration(21) },
                 { id: "28", label: "28 Days", count: getCountForDuration(28) },
               ].map((tab) => (

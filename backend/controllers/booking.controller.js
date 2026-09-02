@@ -1106,7 +1106,10 @@ export const getAllBookings = async (req, res) => {
 
     const query = {};
 
-    if (status) query.status = status;
+    if (status) {
+      query.status =
+        status === "on hold" ? { $in: ["on hold", "pending"] } : status;
+    }
     if (sector) query.sector = sector;
     if (airline) query["airline.name"] = airline;
     if (fromDate) query.departureDate = { $gte: new Date(fromDate) };
@@ -1176,9 +1179,34 @@ export const getAllBookings = async (req, res) => {
 
     const total = await Booking.countDocuments(query);
 
+    // Count every user-facing status against the same search/filter scope, but
+    // omit the selected status so the dropdown always shows all available totals.
+    const statusCountQuery = { ...query };
+    delete statusCountQuery.status;
+
+    const statusCountRows = await Booking.aggregate([
+      { $match: statusCountQuery },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    const statusCounts = {
+      "on hold": 0,
+      "partially confirmed": 0,
+      confirmed: 0,
+      cancelled: 0,
+    };
+
+    statusCountRows.forEach(({ _id, count }) => {
+      const normalizedStatus = _id === "pending" ? "on hold" : _id;
+      if (Object.prototype.hasOwnProperty.call(statusCounts, normalizedStatus)) {
+        statusCounts[normalizedStatus] += count;
+      }
+    });
+
     res.json({
       success: true,
       data: bookings,
+      statusCounts,
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(total / limit),

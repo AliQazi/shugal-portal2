@@ -1152,7 +1152,10 @@ export const getAllBookings = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
-      .populate("userId", "name email phone agencyCode companyName logo");
+      .populate(
+        "userId",
+        "name email phone agencyCode companyName logo address city country",
+      );
 
     bookings = await attachGroupData(bookings);
 
@@ -1169,6 +1172,10 @@ export const getAllBookings = async (req, res) => {
           phone: bookingObj.userId.phone,
           agencyCode: bookingObj.userId.agencyCode,
           companyName: bookingObj.userId.companyName,
+          logo: bookingObj.userId.logo,
+          address: bookingObj.userId.address,
+          city: bookingObj.userId.city,
+          country: bookingObj.userId.country,
         };
 
         bookingObj.contactPersonName = agencyName;
@@ -1228,7 +1235,7 @@ export const getBookingById = async (req, res) => {
   try {
     let booking = await Booking.findById(req.params.id).populate(
       "userId",
-      "name email agencyCode companyName logo",
+      "name email phone agencyCode companyName logo address city country",
     );
 
     if (!booking)
@@ -1263,7 +1270,10 @@ export const getBookingByReference = async (req, res) => {
   try {
     let booking = await Booking.findOne({
       bookingReference: req.params.reference,
-    }).populate("userId", "name email agencyCode companyName");
+    }).populate(
+      "userId",
+      "name email phone agencyCode companyName logo address city country",
+    );
 
     if (!booking)
       return res

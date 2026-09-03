@@ -1,4 +1,6 @@
 import axiosInstance from "../api/axios";
+import { getUserProfile } from "../api/profileApi";
+import { getStoredFrontendUser } from "./authUser";
 
 // Colors used across the printed Travel Itinerary template.
 const NAVY = "#163a63";
@@ -74,6 +76,28 @@ const fetchAirlineLogoByName = async (airlineName) => {
   }
 };
 
+const DEFAULT_AGENCY = {
+  companyName: "ABID AIR INTERNATIONAL (PVT) LTD",
+  address: "G2, Ch Arcade, Regency Road, Faisalabad",
+  address2: "Opp. TMA Office, Faisalabad Road, Samundri",
+  phone: "0300-7277854  •  0300-7298467  •  0349-4900118",
+  email: "abid_intl@msn.com",
+};
+
+// The ticket is issued by whichever agent is printing it, so their own
+// profile (Profile.jsx) supplies the branding shown on the ticket. Falls
+// back to the cached login user, then to the original agency defaults, so
+// printing still works if the profile endpoint is unreachable.
+const fetchAgentProfile = async () => {
+  try {
+    const response = await getUserProfile();
+    if (response?.success && response.data) return response.data;
+  } catch {
+    // fall through to cached/default values below
+  }
+  return getStoredFrontendUser();
+};
+
 const STATUS_LABELS = {
   "on hold": "On Hold",
   pending: "On Hold",
@@ -116,6 +140,18 @@ export const printGDSBooking = async (booking) => {
       minute: "2-digit",
       hour12: false,
     });
+  };
+
+  const agentProfile = await fetchAgentProfile();
+  const agency = {
+    companyName: agentProfile?.companyName || DEFAULT_AGENCY.companyName,
+    address: agentProfile?.address || DEFAULT_AGENCY.address,
+    address2: agentProfile?.address ? "" : DEFAULT_AGENCY.address2,
+    cityCountry: [agentProfile?.city, agentProfile?.country]
+      .filter(Boolean)
+      .join(", "),
+    phone: agentProfile?.phone || DEFAULT_AGENCY.phone,
+    email: agentProfile?.email || DEFAULT_AGENCY.email,
   };
 
   const flight = booking.flights?.[0] || {};
@@ -465,18 +501,20 @@ export const printGDSBooking = async (booking) => {
     bookingStatus === "ISSUED" ||
     bookingStatus === "TICKETED";
 
+  const isOnHold = bookingStatus === "ON HOLD" || bookingStatus === "PENDING";
+
   const reservationBoxHTML =
     expiresAt && !isTicketed
       ? `
         <div class="reservation-box">
             <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
             <div>
-                <div class="res-title">RESERVATION TIME LIMIT</div>
+                <div class="res-title">${isOnHold ? "ON HOLD UNTIL" : "RESERVATION TIME LIMIT"}</div>
                 <div class="res-row">Date&nbsp;&nbsp;:&nbsp;&nbsp;${formatDateOnly(expiresAt)}</div>
-                <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)} (Local Time)</div>
+                <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)}</div>
             </div>
         </div>
-        <div class="note-text">Seats reserved until the above date &amp; time.</div>`
+        <div class="note-text">${isOnHold ? "This booking is on hold until the above date &amp; time." : "Seats reserved until the above date &amp; time."}</div>`
       : `
         <div class="reservation-box">
             <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
@@ -580,7 +618,7 @@ export const printGDSBooking = async (booking) => {
                 <!-- <div class="airline-name">${airlineName}</div> -->
             </div>
             <div class="brand-right">
-                <div class="agency-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
+                <div class="agency-name">${escapeHTML(agency.companyName)}</div>
                 <div class="agency-tag">IATA Accredited Travel Agency</div>
             </div>
         </div>
@@ -654,15 +692,16 @@ export const printGDSBooking = async (booking) => {
 
         <div class="section-title">Issued By</div>
         <div class="issued-by">
-            <div class="company-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
-            <div class="addr-line">G2, Ch Arcade, Regency Road, Faisalabad</div>
-            <div class="addr-line">Opp. TMA Office, Faisalabad Road, Samundri</div>
-            <div class="contact-row">${ICON_PHONE(NAVY_SOFT)}<span>0300-7277854&nbsp;&nbsp;•&nbsp;&nbsp;0300-7298467&nbsp;&nbsp;•&nbsp;&nbsp;0349-4900118</span></div>
-            <div class="contact-row">${ICON_MAIL(NAVY_SOFT)}<span>abid_intl@msn.com&nbsp;&nbsp;•&nbsp;&nbsp;abidairtravels.com</span></div>
+            <div class="company-name">${escapeHTML(agency.companyName)}</div>
+            <div class="addr-line">${escapeHTML(agency.address)}</div>
+            ${agency.address2 ? `<div class="addr-line">${escapeHTML(agency.address2)}</div>` : ""}
+            ${agency.cityCountry ? `<div class="addr-line">${escapeHTML(agency.cityCountry)}</div>` : ""}
+            <div class="contact-row">${ICON_PHONE(NAVY_SOFT)}<span>${escapeHTML(agency.phone)}</span></div>
+            <div class="contact-row">${ICON_MAIL(NAVY_SOFT)}<span>${escapeHTML(agency.email)}</span></div>
         </div>
 
         <div class="footer">
-            <div class="thanks">${ICON_PLANE(NAVY)}<span>Thank you for choosing Abid Air International.</span></div>
+            <div class="thanks">${ICON_PLANE(NAVY)}<span>Thank you for choosing ${escapeHTML(agency.companyName)}.</span></div>
         </div>
     </div>
 </body>

@@ -90,6 +90,14 @@ const formatStatusLabel = (status?: string): string => {
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
+const DEFAULT_AGENCY = {
+  companyName: "ABID AIR INTERNATIONAL (PVT) LTD",
+  address: "G2, Ch Arcade, Regency Road, Faisalabad",
+  address2: "Opp. TMA Office, Faisalabad Road, Samundri",
+  phone: "0300-7277854  •  0300-7298467  •  0349-4900118",
+  email: "abid_intl@msn.com",
+};
+
 export const printGDSBooking = async (booking: any): Promise<void> => {
   // "17-Aug-2026" style, timezone-safe for plain YYYY-MM-DD strings.
   const formatDateOnly = (dateStr: Date | string | undefined | null) => {
@@ -116,6 +124,21 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
       minute: "2-digit",
       hour12: false,
     });
+  };
+
+  // Admin prints tickets on behalf of whichever agent owns the booking, so
+  // the agency branding must reflect that agent (booking.contactAgency /
+  // booking.userId), not the admin's own account.
+  const bookingAgent = booking.contactAgency || booking.userId || {};
+  const agency = {
+    companyName: bookingAgent.companyName || bookingAgent.name || DEFAULT_AGENCY.companyName,
+    address: bookingAgent.address || DEFAULT_AGENCY.address,
+    address2: bookingAgent.address ? "" : DEFAULT_AGENCY.address2,
+    cityCountry: [bookingAgent.city, bookingAgent.country]
+      .filter(Boolean)
+      .join(", "),
+    phone: bookingAgent.phone || DEFAULT_AGENCY.phone,
+    email: bookingAgent.email || DEFAULT_AGENCY.email,
   };
 
   const flight = booking.flights?.[0] || {};
@@ -459,18 +482,20 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
     bookingStatus === "ISSUED" ||
     bookingStatus === "TICKETED";
 
+  const isOnHold = bookingStatus === "ON HOLD" || bookingStatus === "PENDING";
+
   const reservationBoxHTML =
     expiresAt && !isTicketed
       ? `
         <div class="reservation-box">
             <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
             <div>
-                <div class="res-title">RESERVATION TIME LIMIT</div>
+                <div class="res-title">${isOnHold ? "ON HOLD UNTIL" : "RESERVATION TIME LIMIT"}</div>
                 <div class="res-row">Date&nbsp;&nbsp;:&nbsp;&nbsp;${formatDateOnly(expiresAt)}</div>
-                <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)} (Local Time)</div>
+                <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)}</div>
             </div>
         </div>
-        <div class="note-text">Seats reserved until the above date &amp; time.</div>`
+        <div class="note-text">${isOnHold ? "This booking is on hold until the above date &amp; time." : "Seats reserved until the above date &amp; time."}</div>`
       : `
         <div class="reservation-box">
             <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
@@ -567,7 +592,7 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
                 <!-- <div class="airline-name">${airlineName}</div> -->
             </div>
             <div class="brand-right">
-                <div class="agency-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
+                <div class="agency-name">${escapeHTML(agency.companyName)}</div>
                 <div class="agency-tag">IATA Accredited Travel Agency</div>
             </div>
         </div>
@@ -641,15 +666,16 @@ export const printGDSBooking = async (booking: any): Promise<void> => {
 
         <div class="section-title">Issued By</div>
         <div class="issued-by">
-            <div class="company-name">ABID AIR INTERNATIONAL (PVT) LTD</div>
-            <div class="addr-line">G2, Ch Arcade, Regency Road, Faisalabad</div>
-            <div class="addr-line">Opp. TMA Office, Faisalabad Road, Samundri</div>
-            <div class="contact-row">${ICON_PHONE(NAVY_SOFT)}<span>0300-7277854&nbsp;&nbsp;•&nbsp;&nbsp;0300-7298467&nbsp;&nbsp;•&nbsp;&nbsp;0349-4900118</span></div>
-            <div class="contact-row">${ICON_MAIL(NAVY_SOFT)}<span>abid_intl@msn.com&nbsp;&nbsp;•&nbsp;&nbsp;abidairtravels.com</span></div>
+            <div class="company-name">${escapeHTML(agency.companyName)}</div>
+            <div class="addr-line">${escapeHTML(agency.address)}</div>
+            ${agency.address2 ? `<div class="addr-line">${escapeHTML(agency.address2)}</div>` : ""}
+            ${agency.cityCountry ? `<div class="addr-line">${escapeHTML(agency.cityCountry)}</div>` : ""}
+            <div class="contact-row">${ICON_PHONE(NAVY_SOFT)}<span>${escapeHTML(agency.phone)}</span></div>
+            <div class="contact-row">${ICON_MAIL(NAVY_SOFT)}<span>${escapeHTML(agency.email)}</span></div>
         </div>
 
         <div class="footer">
-            <div class="thanks">${ICON_PLANE(NAVY)}<span>Thank you for choosing Abid Air International.</span></div>
+            <div class="thanks">${ICON_PLANE(NAVY)}<span>Thank you for choosing ${escapeHTML(agency.companyName)}.</span></div>
         </div>
     </div>
 </body>

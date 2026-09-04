@@ -42,6 +42,15 @@ export default function DetailPage() {
     infant: "infant",
   };
   const roomOrder = ["sharing", "quint", "quad", "triple", "double"];
+  // How many seats booking this room type consumes per room booked —
+  // must match the capacity used in UmrahBookingPage's getRoomCapacity.
+  const roomCapacityMap = {
+    sharing: 1,
+    double: 2,
+    triple: 3,
+    quad: 4,
+    quint: 5,
+  };
   const getRoomPrice = (key, rooms, packageTotals) => {
     const totalsKey = totalsKeyMap[key] || key;
     const fromTotals = packageTotals?.[totalsKey];
@@ -49,13 +58,19 @@ export default function DetailPage() {
     const fromRooms = rooms?.[key];
     return typeof fromRooms === "number" && fromRooms > 0 ? fromRooms : null;
   };
+  const isRoomSelectable = (key, availableRooms) =>
+    availableRooms >= (roomCapacityMap[key] || 1);
 
   const [selectedRoom, setSelectedRoom] = useState(() => {
     const rooms = state?.group?.rooms || {};
     const packageTotals = state?.group?.packageTotals || {};
+    const availableRooms = state?.group?.availableRooms || 0;
     return (
-      roomOrder.find((k) => getRoomPrice(k, rooms, packageTotals) !== null) ||
-      "sharing"
+      roomOrder.find(
+        (k) =>
+          getRoomPrice(k, rooms, packageTotals) !== null &&
+          isRoomSelectable(k, availableRooms),
+      ) || "sharing"
     );
   });
 
@@ -130,7 +145,7 @@ export default function DetailPage() {
         }
       `}</style>
 
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* HEADER */}
         <div
           style={{
@@ -430,11 +445,23 @@ export default function DetailPage() {
                       const isLastOddItem =
                         filteredRooms.length % 2 !== 0 &&
                         index === filteredRooms.length - 1;
+                      const requiredSeats = roomCapacityMap[room] || 1;
+                      const selectable = isRoomSelectable(
+                        room,
+                        group.availableRooms || 0,
+                      );
 
                       return (
                         <button
                           key={room}
-                          onClick={() => setSelectedRoom(room)}
+                          type="button"
+                          onClick={() => selectable && setSelectedRoom(room)}
+                          disabled={!selectable}
+                          title={
+                            selectable
+                              ? undefined
+                              : `Needs ${requiredSeats} available seat${requiredSeats > 1 ? "s" : ""}, only ${group.availableRooms || 0} left`
+                          }
                           style={{
                             padding: "8px 10px",
                             borderRadius: "10px",
@@ -442,12 +469,16 @@ export default function DetailPage() {
                               ? theme.colors.primary
                               : "#edf2f7"
                               }`,
-                            background:
-                              selectedRoom === room ? "#f0f7ff" : "white",
-                            cursor: "pointer",
+                            background: !selectable
+                              ? "#f4f4f5"
+                              : selectedRoom === room
+                                ? "#f0f7ff"
+                                : "white",
+                            cursor: selectable ? "pointer" : "not-allowed",
                             textAlign: "left",
                             transition: "0.2s",
                             gridColumn: isLastOddItem ? "1 / -1" : "auto",
+                            opacity: selectable ? 1 : 0.5,
                           }}
                         >
                           <div
@@ -470,6 +501,21 @@ export default function DetailPage() {
                           >
                             Rs.{price?.toLocaleString()}
                           </div>
+
+                          {!selectable && (
+                            <div
+                              style={{
+                                fontSize: "0.62rem",
+                                color: "#e53e3e",
+                                fontWeight: 600,
+                                marginTop: "2px",
+                              }}
+                            >
+                              {group.availableRooms || 0} seat
+                              {(group.availableRooms || 0) === 1 ? "" : "s"}{" "}
+                              available
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -524,15 +570,23 @@ export default function DetailPage() {
                       },
                     })
                   }
-                  disabled={!group.availableRooms || group.availableRooms <= 0}
+                  disabled={
+                    !group.availableRooms ||
+                    group.availableRooms <= 0 ||
+                    !isRoomSelectable(selectedRoom, group.availableRooms || 0)
+                  }
                   style={{
                     ...priBtn,
                     opacity:
-                      !group.availableRooms || group.availableRooms <= 0
+                      !group.availableRooms ||
+                        group.availableRooms <= 0 ||
+                        !isRoomSelectable(selectedRoom, group.availableRooms || 0)
                         ? 0.5
                         : 1,
                     cursor:
-                      !group.availableRooms || group.availableRooms <= 0
+                      !group.availableRooms ||
+                        group.availableRooms <= 0 ||
+                        !isRoomSelectable(selectedRoom, group.availableRooms || 0)
                         ? "not-allowed"
                         : "pointer",
                   }}
@@ -639,19 +693,9 @@ function HotelCard({ hotel, city }) {
     border: "1px solid #f1f1f1",
   };
 
-  const hoverStyle = {
-    boxShadow: "0 8px 14px rgba(0,0,0,0.1)",
-  };
-
   return (
     <div
       style={cardStyle}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.boxShadow = hoverStyle.boxShadow)
-      }
-      onMouseLeave={(e) =>
-        (e.currentTarget.style.boxShadow = cardStyle.boxShadow)
-      }
     >
       {/* Top Right Google Map Link */}
       {hotel.mapUrl && (
@@ -861,7 +905,7 @@ function TransportPill({ transport }) {
         display: "flex",
         alignItems: "center",
         gap: "8px",
-        minWidth: "160px",
+        flex: 1,
         transition: "all 0.2s ease",
       }}
       onMouseEnter={(e) => {

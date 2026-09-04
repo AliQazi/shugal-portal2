@@ -141,7 +141,7 @@ const StatTile = ({
 
 export default function XOReport() {
     const { user } = useAuth()
-    const canView = hasPermission(user, 'view_bookings')
+    const canView = hasPermission(user, 'view_xo_report')
 
     const [rows, setRows] = useState<XORow[]>([])
     const [loading, setLoading] = useState(true)

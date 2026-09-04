@@ -808,17 +808,23 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
           return aTime - bTime;
         });
 
+      // Fully booked packages (0 seats left) are hidden from the listing
+      // entirely rather than shown disabled.
+      const availableGroups = formattedGroups.filter(
+        (g) => g.availableRooms !== 0,
+      );
+
       setAirlines(
         [
-          ...new Set(formattedGroups.map((g) => g.airlineName).filter(Boolean)),
+          ...new Set(availableGroups.map((g) => g.airlineName).filter(Boolean)),
         ].sort(),
       );
       setSectors(
         [
-          ...new Set(formattedGroups.map((g) => g.sector).filter(Boolean)),
+          ...new Set(availableGroups.map((g) => g.sector).filter(Boolean)),
         ].sort(),
       );
-      setGroups(formattedGroups);
+      setGroups(availableGroups);
     } catch (err) {
       console.error("Error fetching groups:", err);
       toast.error("Failed to load Umrah packages. Please try again.");

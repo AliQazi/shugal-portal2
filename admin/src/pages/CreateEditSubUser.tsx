@@ -93,6 +93,7 @@ const AVAILABLE_PERMISSIONS: PermissionItem[] = [
   { key: "create_group", label: "Create Group" },
   { key: "view_groups", label: "View Groups" },
   { key: "group_ticketing_action_buttons", label: "Group Ticketing Action Buttons" },
+  { key: "view_xo_report", label: "View XO Report" },
 
   { key: "view_ledger", label: "View Ledger" },
   { key: "ledger_action_buttons", label: "Ledger Action Buttons" },
@@ -224,6 +225,7 @@ const PERMISSION_GROUPS = [
       "create_group",
       "view_groups",
       "group_ticketing_action_buttons",
+      "view_xo_report",
     ]),
   },
   {

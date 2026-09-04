@@ -81,7 +81,7 @@ const navItems: NavItem[] = [
     icon: <TableIcon />,
     name: "XO Report",
     path: "/xo-report",
-    permission: "view_bookings",
+    permission: "view_xo_report",
   },
   {
     icon: <TableIcon />,

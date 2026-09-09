@@ -89,6 +89,7 @@ const AVAILABLE_PERMISSIONS: PermissionItem[] = [
   { key: "create_umrah_package", label: "Create Umrah Package" },
   { key: "view_umrah_packages", label: "View Umrah Packages" },
   { key: "umrah_packages_action_buttons", label: "Umrah Packages Action Buttons" },
+  { key: "view_xo_report_packages", label: "View XO Report For Packages" },
 
   { key: "create_group", label: "Create Group" },
   { key: "view_groups", label: "View Groups" },
@@ -217,6 +218,7 @@ const PERMISSION_GROUPS = [
       "create_umrah_package",
       "view_umrah_packages",
       "umrah_packages_action_buttons",
+      "view_xo_report_packages",
     ]),
   },
   {

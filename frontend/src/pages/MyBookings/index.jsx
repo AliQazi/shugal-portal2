@@ -22,6 +22,46 @@ const EMPTY_BOOKING_STATUS_COUNTS = {
   cancelled: 0,
 };
 
+const formatCalendarDate = (value) => {
+  if (!value) return "N/A";
+
+  const match = String(value)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (!match) {
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) return "N/A";
+
+    return parsedDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return "N/A";
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
 const FILTER_SELECT_STYLES = {
   control: (base, state) => ({
     ...base,
@@ -568,7 +608,7 @@ export default function MyBookings() {
                                 {booking.sector || "ISB-DXB"}
                               </div>
                               <div className="text-xs text-slate-600">
-                                {formatDate(booking.departureDate)}
+                                {formatCalendarDate(booking.departureDate)}
                               </div>
                               <div className="text-xs text-slate-500 font-medium pt-0.5">
                                 {firstPassenger

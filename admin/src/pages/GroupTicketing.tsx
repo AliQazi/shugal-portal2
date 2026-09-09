@@ -794,7 +794,7 @@ const GroupTicketing = () => {
   return (
     <>
       <PageMeta title="Group Ticketing" description="Manage group ticketing groups" />
-      <PageBreadCrumb pageTitle="Group Ticketing" />
+      {/* <PageBreadCrumb pageTitle="Group Ticketing" /> */}
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/3">
         <div className="px-4 py-6 md:px-6 xl:px-7.5">

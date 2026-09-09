@@ -450,7 +450,12 @@ export default function UmrahBookingPage({ user }) {
     0,
   );
   const infantTotal = formData.infants.length * infantPrice;
-  const totalPrice = () => adultTotal + childrenTotal + infantTotal;
+  const subtotalPrice = () => adultTotal + childrenTotal + infantTotal;
+  const incentiveEligiblePassengerCount =
+    formData.adults.length +
+    formData.children.filter((child) => child.childType === "withBed").length;
+  const totalIncentive = incentive * incentiveEligiblePassengerCount;
+  const totalPrice = () => Math.max(0, subtotalPrice() - totalIncentive);
 
   const getAllPassengers = () => [
     ...formData.adults,
@@ -589,7 +594,9 @@ export default function UmrahBookingPage({ user }) {
       fd.append("pricing[adultTotal]", adultTotal);
       fd.append("pricing[childTotal]", childrenTotal);
       fd.append("pricing[infantTotal]", infantTotal);
-      fd.append("pricing[totalAmount]", totalPrice());
+      // The API deducts the incentive using the authoritative passenger list.
+      // Send the gross subtotal here so it is deducted exactly once.
+      fd.append("pricing[totalAmount]", subtotalPrice());
       // For travel-network packages, attach TNT booking fields inside packageData
       let enrichedPackageData = { ...packageData };
       if (packageData.packageSource === "travel-network") {
@@ -1996,7 +2003,37 @@ export default function UmrahBookingPage({ user }) {
               </div>
             </div>
 
-            {/* Total */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "8px 0 0",
+                marginTop: "8px",
+                borderTop: "1px solid #e2e8f0",
+                color: "#4a5568",
+                fontSize: "0.78rem",
+                fontWeight: 700,
+              }}
+            >
+              <span>Subtotal:</span>
+              <strong>PKR {subtotalPrice().toLocaleString()}</strong>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "8px 0 0",
+                color: theme.colors.success,
+                fontSize: "0.78rem",
+                fontWeight: 700,
+              }}
+            >
+              <span>Incentive Deduction:</span>
+              <strong>-PKR {totalIncentive.toLocaleString()}</strong>
+            </div>
+
+            {/* Grand Total */}
             <div
               style={{
                 display: "flex",
@@ -2008,7 +2045,7 @@ export default function UmrahBookingPage({ user }) {
               }}
             >
               <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-                Total Amount:
+                Grand Total:
               </span>
               <strong
                 style={{
@@ -2234,6 +2271,29 @@ export default function UmrahBookingPage({ user }) {
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <span style={{ color: "#718096" }}>Subtotal:</span>
+                  <strong style={{ color: "#2d3748" }}>
+                    PKR {subtotalPrice().toLocaleString()}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "12px",
+                    color: theme.colors.success,
+                  }}
+                >
+                  <span>Incentive Deduction:</span>
+                  <strong>-PKR {totalIncentive.toLocaleString()}</strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
                     paddingTop: "15px",
                     marginTop: "15px",
                     borderTop: "2px solid #e2e8f0",
@@ -2246,7 +2306,7 @@ export default function UmrahBookingPage({ user }) {
                       color: "#2d3748",
                     }}
                   >
-                    Total Amount:
+                    Grand Total:
                   </span>
                   <strong
                     style={{

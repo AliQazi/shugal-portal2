@@ -151,6 +151,83 @@ const isUmrahSeatsGroup = (group = {}) => {
   return isUmrahGroupType(group.type);
 };
 
+// Flight dates are calendar dates, not moments in time. Reading an ISO value
+// with `new Date()` and formatting it in the browser's local timezone can move
+// a UTC-midnight date back one day for users in negative UTC offsets.
+const getCalendarDateParts = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+
+    return {
+      year: value.getFullYear(),
+      month: value.getMonth() + 1,
+      day: value.getDate(),
+    };
+  }
+
+  const match = String(value)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const testDate = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      testDate.getUTCFullYear() === year &&
+      testDate.getUTCMonth() + 1 === month &&
+      testDate.getUTCDate() === day
+    ) {
+      return { year, month, day };
+    }
+
+    return null;
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  return {
+    year: parsedDate.getFullYear(),
+    month: parsedDate.getMonth() + 1,
+    day: parsedDate.getDate(),
+  };
+};
+
+const getCalendarDateKey = (value) => {
+  const parts = getCalendarDateParts(value);
+
+  if (!parts) return "";
+
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+};
+
+const getCalendarDateTimestamp = (value) => {
+  const parts = getCalendarDateParts(value);
+
+  return parts ? Date.UTC(parts.year, parts.month - 1, parts.day) : NaN;
+};
+
+const formatDate = (value) => {
+  const parts = getCalendarDateParts(value);
+
+  if (!parts) return "—";
+
+  return new Date(
+    Date.UTC(parts.year, parts.month - 1, parts.day),
+  ).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
 export default function AllGroupsPackages({
   headerType,
   // header,
@@ -190,20 +267,6 @@ export default function AllGroupsPackages({
   //     setShowAdvancedSearch(true);
   //   }
   // }, [dashboardUI]);
-
-  const formatDate = (value) => {
-    if (!value) return "—";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) return "—";
-
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const formatTime = (value) => {
     return value?.substring(0, 5) || "—";
@@ -277,11 +340,10 @@ export default function AllGroupsPackages({
 
     if (!flightNo || !rawDate) return 0;
 
-    const date = new Date(rawDate);
+    const dateKey = getCalendarDateKey(rawDate);
 
-    if (Number.isNaN(date.getTime())) return 0;
+    if (!dateKey) return 0;
 
-    const dateKey = date.toISOString().split("T")[0];
     const key = `${flightNo}_${dateKey}`;
 
     return bookedSeatsMap[key] || 0;
@@ -317,12 +379,12 @@ export default function AllGroupsPackages({
         group.details[group.details.length - 1].flight_date;
 
       if (firstRaw && lastRaw) {
-        const firstDate = new Date(firstRaw);
-        const lastDate = new Date(lastRaw);
+        const firstDate = getCalendarDateTimestamp(firstRaw);
+        const lastDate = getCalendarDateTimestamp(lastRaw);
 
         if (
-          !Number.isNaN(firstDate.getTime()) &&
-          !Number.isNaN(lastDate.getTime())
+          !Number.isNaN(firstDate) &&
+          !Number.isNaN(lastDate)
         ) {
           const diff = Math.round(
             (lastDate - firstDate) / (1000 * 60 * 60 * 24),
@@ -468,11 +530,11 @@ export default function AllGroupsPackages({
         booking.flights?.forEach((flight) => {
           if (!flight.flightNo || !flight.depDate) return;
 
-          const date = new Date(flight.depDate);
+          const dateKey = getCalendarDateKey(flight.depDate);
 
-          if (Number.isNaN(date.getTime())) return;
+          if (!dateKey) return;
 
-          const key = `${flight.flightNo}_${date.toISOString().split("T")[0]}`;
+          const key = `${flight.flightNo}_${dateKey}`;
 
           if (booking.status !== "cancelled") {
             map[key] = (map[key] || 0) + passengersLength;
@@ -780,7 +842,7 @@ export default function AllGroupsPackages({
 
   const getMinDate = (card) => {
     const dates = card.groups
-      .map((g) => g.dept_date)
+      .map((g) => getCalendarDateKey(g.dept_date))
       .filter(Boolean)
       .sort();
 
@@ -1435,7 +1497,8 @@ export default function AllGroupsPackages({
 
                 const sortedGroups = [...data.groups].sort((a, b) => {
                   const dateDiff =
-                    new Date(a.dept_date) - new Date(b.dept_date);
+                    getCalendarDateTimestamp(a.dept_date) -
+                    getCalendarDateTimestamp(b.dept_date);
 
                   if (dateDiff !== 0) return dateDiff;
 

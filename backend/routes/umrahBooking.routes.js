@@ -4,6 +4,7 @@ import {
   getAllUmrahBookings,
   getMyBookings,
   getAllBookingsAdmin,
+  getUmrahPackageXOReportData,
   getUmrahBookingById,
   updateUmrahBooking,
   deleteUmrahBooking,
@@ -33,6 +34,7 @@ router.post("/", protect, uploadUmrahDoc.any(), createUmrahBooking);
 router.get("/", protect, getAllUmrahBookings);
 router.get("/my-bookings", protect, getMyBookings);
 router.get("/admin/all", protect, getAllBookingsAdmin);
+router.get("/reports/xo", protect, getUmrahPackageXOReportData);
 router.get("/:id", protect, getUmrahBookingById);
 router.put("/:id", protect, updateUmrahBooking);
 router.delete("/:id", protect, deleteUmrahBooking);

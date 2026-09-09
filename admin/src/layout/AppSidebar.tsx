@@ -65,6 +65,12 @@ const navItems: NavItem[] = [
   },
   {
     icon: <TableIcon />,
+    name: "XO Report For Packages",
+    path: "/xo-report-packages",
+    permission: "view_xo_report_packages",
+  },
+  {
+    icon: <TableIcon />,
     name: "Group Ticketing",
     subItems: [
       { name: "View Groups", path: "/group-ticketing", permission: "view_groups", pro: false },

@@ -11,6 +11,7 @@ const PackageTotalsSchema = new mongoose.Schema(
     infant: { type: Number, default: 0 },
     incentive: { type: Number, default: 0 },
     margin: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
   },
   { _id: false },
 );

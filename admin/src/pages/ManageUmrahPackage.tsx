@@ -7,7 +7,6 @@ import {
   TableRow,
   TableBody,
 } from "../components/ui/table";
-import ComponentCard from "../components/common/ComponentCard";
 import axiosInstance from "../Api/axios";
 import { PencilIcon, TrashBinIcon } from "../icons";
 import { Copy } from "lucide-react";
@@ -88,6 +87,7 @@ interface PackageData {
     infant?: number;
     incentive?: number;
     margin?: number;
+    discount?: number;
   };
 
   flights: FlightData[];
@@ -169,6 +169,10 @@ interface PackageTotalsForm {
   infant: number;
   incentive: number;
 }
+
+type PackageFilter = "All" | "Public" | "Private" | "Sold";
+
+const PACKAGE_FILTERS: PackageFilter[] = ["All", "Public", "Private", "Sold"];
 
 const emptyPackageTotals: PackageTotalsForm = {
   double: 0,
@@ -285,6 +289,20 @@ const getDepartureRange = (flights: FlightData[]) => {
   };
 };
 
+const getDepartureSortTime = (flights: FlightData[]) => {
+  const departureTime = new Date(flights?.[0]?.depDate || "").getTime();
+
+  return Number.isNaN(departureTime)
+    ? Number.MAX_SAFE_INTEGER
+    : departureTime;
+};
+
+const getCreatedAtSortTime = (createdAt?: string) => {
+  const createdAtTime = new Date(createdAt || "").getTime();
+
+  return Number.isNaN(createdAtTime) ? 0 : createdAtTime;
+};
+
 // const getSectorText = (flights: FlightData[]) => {
 //   if (!flights || flights.length === 0) return "No Sector";
 
@@ -350,44 +368,56 @@ const PackagePricingMiniTable = ({
   canEdit,
   onEditFull,
   onApplyMargin,
+  onApplyDiscount,
 }: {
   pkg: PackageData;
   canEdit: boolean;
   onEditFull: () => void;
   onApplyMargin: (packageId: string, margin: number) => Promise<boolean>;
+  onApplyDiscount: (packageId: string, discount: number) => Promise<boolean>;
 }) => {
   const totals = pkg.packageTotals || {};
   const savedMargin = totals.margin || 0;
+  const savedDiscount = totals.discount || 0;
 
   const [marginInput, setMarginInput] = useState(savedMargin);
-  const [applying, setApplying] = useState(false);
+  const [discountInput, setDiscountInput] = useState(savedDiscount);
+  const [applyingMargin, setApplyingMargin] = useState(false);
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
 
   useEffect(() => {
     setMarginInput(savedMargin);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pkg._id, savedMargin]);
+    setDiscountInput(savedDiscount);
+  }, [pkg._id, savedMargin, savedDiscount]);
 
-  // The base price (before the currently saved margin) is what the "Apply
-  // Margin" button adds the new margin on top of, so re-applying replaces
-  // the previous margin instead of stacking on top of it.
+  // Remove both saved adjustments to recover the base price. The live
+  // preview then applies the entered margin and discount to that base.
   const baseTotals = {
-    double: (totals.double || 0) - savedMargin,
-    triple: (totals.triple || 0) - savedMargin,
-    quad: (totals.quad || 0) - savedMargin,
-    shared: (totals.shared || 0) - savedMargin,
+    double: (totals.double || 0) - savedMargin + savedDiscount,
+    triple: (totals.triple || 0) - savedMargin + savedDiscount,
+    quad: (totals.quad || 0) - savedMargin + savedDiscount,
+    shared: (totals.shared || 0) - savedMargin + savedDiscount,
   };
 
   const previewTotals: Record<string, number> = {
-    double: baseTotals.double + marginInput,
-    triple: baseTotals.triple + marginInput,
-    quad: baseTotals.quad + marginInput,
-    shared: baseTotals.shared + marginInput,
+    double: baseTotals.double + marginInput - discountInput,
+    triple: baseTotals.triple + marginInput - discountInput,
+    quad: baseTotals.quad + marginInput - discountInput,
+    shared: baseTotals.shared + marginInput - discountInput,
   };
 
-  const handleApply = async () => {
-    setApplying(true);
-    await onApplyMargin(pkg._id, marginInput);
-    setApplying(false);
+  const handleApplyMargin = async () => {
+    setApplyingMargin(true);
+    const applied = await onApplyMargin(pkg._id, marginInput);
+    if (applied) setDiscountInput(savedDiscount);
+    setApplyingMargin(false);
+  };
+
+  const handleApplyDiscount = async () => {
+    setApplyingDiscount(true);
+    const applied = await onApplyDiscount(pkg._id, discountInput);
+    if (applied) setMarginInput(savedMargin);
+    setApplyingDiscount(false);
   };
 
   const inputClass =
@@ -451,16 +481,47 @@ const PackagePricingMiniTable = ({
             />
             <button
               type="button"
-              onClick={handleApply}
-              disabled={applying}
+              onClick={handleApplyMargin}
+              disabled={applyingMargin || applyingDiscount}
               className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-orange-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-50"
             >
-              {applying ? "Applying..." : "Apply"}
+              {applyingMargin ? "Applying..." : "Apply"}
             </button>
           </div>
           {savedMargin !== 0 && (
             <p className="text-[10px] text-gray-500 dark:text-gray-400">
               Last applied margin: PKR {savedMargin.toLocaleString("en-PK")}
+            </p>
+          )}
+
+          <label className="block pt-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Discount (PKR)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={
+                discountInput ? discountInput.toLocaleString("en-PK") : ""
+              }
+              onChange={(event) =>
+                setDiscountInput(parseFormattedNumber(event.target.value))
+              }
+              placeholder="0"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={handleApplyDiscount}
+              disabled={applyingMargin || applyingDiscount}
+              className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:opacity-50"
+            >
+              {applyingDiscount ? "Applying..." : "Apply"}
+            </button>
+          </div>
+          {savedDiscount !== 0 && (
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+              Last applied discount: PKR {savedDiscount.toLocaleString("en-PK")}
             </p>
           )}
         </div>
@@ -500,6 +561,7 @@ const ManageUmrahPackage = () => {
   );
   const [bookingsModalOpen, setBookingsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [packageFilter, setPackageFilter] = useState<PackageFilter>("All");
   const [loading, setLoading] = useState(true);
 
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
@@ -524,9 +586,69 @@ const ManageUmrahPackage = () => {
 
   const hasFetched = useRef(false);
 
+  const getPackageSeatStats = (pkg: PackageData) => {
+    const selectedGroupTicketId = getId(
+      pkg.selectedGroupTicketId || pkg.groupTicket?._id || pkg.groupTicket?.id
+    );
+    const linkedTotalSeats =
+      groupTicketTotalSeats.get(selectedGroupTicketId) ??
+      Number(pkg.groupTicket?.totalSeats || 0);
+    const bookedSeats =
+      bookedSeatsByGroup.get(selectedGroupTicketId)?.totalSeats || 0;
+    const bookingStatusCounts = umrahBookingStatusCounts.get(pkg._id) || {
+      pending: 0,
+      cancelled: 0,
+    };
+    const remainingSeats =
+      selectedGroupTicketId && linkedTotalSeats >= 0
+        ? Math.max(0, linkedTotalSeats - bookedSeats)
+        : 0;
+
+    return {
+      hasLinkedGroupTicket: Boolean(selectedGroupTicketId),
+      totalSeats: linkedTotalSeats,
+      bookedSeats,
+      pendingBookings: bookingStatusCounts.pending,
+      cancelledBookings: bookingStatusCounts.cancelled,
+      remainingSeats,
+    };
+  };
+
+  const isPackageSold = (pkg: PackageData) => {
+    const seatStats = getPackageSeatStats(pkg);
+
+    return (
+      seatStats.hasLinkedGroupTicket &&
+      seatStats.totalSeats > 0 &&
+      seatStats.bookedSeats >= seatStats.totalSeats
+    );
+  };
+
+  const packageFilterCounts: Record<PackageFilter, number> = {
+    All: packages.length,
+    Public: 0,
+    Private: 0,
+    Sold: 0,
+  };
+
+  packages.forEach((pkg) => {
+    const status = pkg.internalStatus || "Public";
+    packageFilterCounts[status] += 1;
+
+    if (isPackageSold(pkg)) {
+      packageFilterCounts.Sold += 1;
+    }
+  });
+
   const filteredPackages = packages.filter((pkg) => {
     const searchValue = searchTerm.toLowerCase().trim();
-    if (!searchValue) return true;
+    const matchesPackageFilter =
+      packageFilter === "All" ||
+      (packageFilter === "Sold"
+        ? isPackageSold(pkg)
+        : (pkg.internalStatus || "Public") === packageFilter);
+
+    if (!searchValue) return matchesPackageFilter;
 
     const packageName = pkg.packageName?.toLowerCase() || "";
 
@@ -563,11 +685,25 @@ const ManageUmrahPackage = () => {
     const statusMatch = pkg.internalStatus?.toLowerCase().includes(searchValue);
 
     return (
-      packageName.includes(searchValue) ||
-      hotelMatch ||
-      flightMatch ||
-      transportMatch ||
-      statusMatch
+      matchesPackageFilter &&
+      (packageName.includes(searchValue) ||
+        hotelMatch ||
+        flightMatch ||
+        transportMatch ||
+        statusMatch)
+    );
+  });
+
+  filteredPackages.sort((firstPackage, secondPackage) => {
+    const departureDifference =
+      getDepartureSortTime(firstPackage.flights) -
+      getDepartureSortTime(secondPackage.flights);
+
+    if (departureDifference !== 0) return departureDifference;
+
+    return (
+      getCreatedAtSortTime(secondPackage.createdAt) -
+      getCreatedAtSortTime(firstPackage.createdAt)
     );
   });
 
@@ -790,9 +926,9 @@ const ManageUmrahPackage = () => {
       triple: (totals.triple || 0) - incentive,
       quad: (totals.quad || 0) - incentive,
       shared: (totals.shared || 0) - incentive,
-      childWithoutBed: (totals.childWithoutBed || 0) - incentive,
+      childWithoutBed: totals.childWithoutBed || 0,
       childWithBed: (totals.childWithBed || 0) - incentive,
-      infant: (totals.infant || 0) - incentive,
+      infant: totals.infant || 0,
     };
 
     setPricingTotals({
@@ -820,9 +956,11 @@ const ManageUmrahPackage = () => {
     field: keyof Omit<PackageTotalsForm, "incentive">,
     value: number
   ) => {
+    const excludesIncentive =
+      field === "childWithoutBed" || field === "infant";
     pricingBaseTotalsRef.current = {
       ...pricingBaseTotalsRef.current,
-      [field]: value + pricingTotals.incentive,
+      [field]: excludesIncentive ? value : value + pricingTotals.incentive,
     };
     setPricingTotals((prev) => ({ ...prev, [field]: value }));
   };
@@ -834,9 +972,9 @@ const ManageUmrahPackage = () => {
       triple: base.triple + value,
       quad: base.quad + value,
       shared: base.shared + value,
-      childWithoutBed: base.childWithoutBed + value,
+      childWithoutBed: base.childWithoutBed,
       childWithBed: base.childWithBed + value,
-      infant: base.infant + value,
+      infant: base.infant,
       incentive: value,
     });
   };
@@ -846,14 +984,15 @@ const ManageUmrahPackage = () => {
 
     setPricingSaving(true);
 
-    // This form doesn't touch margin, so carry the previously saved margin
-    // through unchanged instead of letting it be wiped back to 0.
+    // This form doesn't touch table-level adjustments, so carry them through
+    // unchanged instead of letting them be wiped back to 0.
     const margin = pricingPackage.packageTotals?.margin || 0;
+    const discount = pricingPackage.packageTotals?.discount || 0;
 
     try {
       const { data } = await axiosInstance.patch(
         `/umrahpackages/${pricingPackage._id}/package-totals`,
-        { packageTotals: { ...pricingTotals, margin } }
+        { packageTotals: { ...pricingTotals, margin, discount } }
       );
 
       if (!data?.success) {
@@ -863,7 +1002,7 @@ const ManageUmrahPackage = () => {
       setPackages((prev) =>
         prev.map((pkg) =>
           pkg._id === pricingPackage._id
-            ? { ...pkg, packageTotals: { ...pricingTotals, margin } }
+            ? { ...pkg, packageTotals: { ...pricingTotals, margin, discount } }
             : pkg
         )
       );
@@ -926,6 +1065,57 @@ const ManageUmrahPackage = () => {
     } catch (error) {
       console.error("Error applying margin:", error);
       toast.error("Failed to apply margin");
+      return false;
+    }
+  };
+
+  const handleApplyDiscount = async (
+    packageId: string,
+    discount: number
+  ): Promise<boolean> => {
+    if (!canUseActions) {
+      toast.error("You don't have permission to manage Umrah packages");
+      return false;
+    }
+
+    const target = packages.find((pkg) => pkg._id === packageId);
+    if (!target) return false;
+
+    const totals = target.packageTotals || {};
+    const savedDiscount = totals.discount || 0;
+
+    // Restore the previous discount before subtracting the new one, so
+    // re-applying replaces the saved discount rather than stacking it.
+    const updatedTotals = {
+      ...totals,
+      double: (totals.double || 0) + savedDiscount - discount,
+      triple: (totals.triple || 0) + savedDiscount - discount,
+      quad: (totals.quad || 0) + savedDiscount - discount,
+      shared: (totals.shared || 0) + savedDiscount - discount,
+      discount,
+    };
+
+    try {
+      const { data } = await axiosInstance.patch(
+        `/umrahpackages/${packageId}/package-totals`,
+        { packageTotals: updatedTotals }
+      );
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to apply discount");
+      }
+
+      setPackages((prev) =>
+        prev.map((pkg) =>
+          pkg._id === packageId ? { ...pkg, packageTotals: updatedTotals } : pkg
+        )
+      );
+
+      toast.success("Discount applied and pricing updated");
+      return true;
+    } catch (error) {
+      console.error("Error applying discount:", error);
+      toast.error("Failed to apply discount");
       return false;
     }
   };
@@ -1039,34 +1229,7 @@ const ManageUmrahPackage = () => {
 
   const isAllSelected =
     filteredPackages.length > 0 &&
-    selectedPackageIds.length === filteredPackages.length;
-
-  const getPackageSeatStats = (pkg: PackageData) => {
-    const selectedGroupTicketId = getId(
-      pkg.selectedGroupTicketId || pkg.groupTicket?._id || pkg.groupTicket?.id
-    );
-    const linkedTotalSeats =
-      groupTicketTotalSeats.get(selectedGroupTicketId) ??
-      Number(pkg.groupTicket?.totalSeats || 0);
-    const bookedSeats =
-      bookedSeatsByGroup.get(selectedGroupTicketId)?.totalSeats || 0;
-    const bookingStatusCounts = umrahBookingStatusCounts.get(pkg._id) || {
-      pending: 0,
-      cancelled: 0,
-    };
-    const remainingSeats =
-      selectedGroupTicketId && linkedTotalSeats >= 0
-        ? Math.max(0, linkedTotalSeats - bookedSeats)
-        : 0;
-
-    return {
-      totalSeats: linkedTotalSeats,
-      bookedSeats,
-      pendingBookings: bookingStatusCounts.pending,
-      cancelledBookings: bookingStatusCounts.cancelled,
-      remainingSeats,
-    };
-  };
+    filteredPackages.every((pkg) => selectedPackageIds.includes(pkg._id));
 
   const getPackageGroupTicketInfo = (pkg: PackageData) => {
     const selectedGroupTicketId = getId(
@@ -1095,7 +1258,7 @@ const ManageUmrahPackage = () => {
   };
 
   return (
-    <ComponentCard title="Manage Umrah Packages">
+    <div>
       <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -1134,6 +1297,30 @@ const ManageUmrahPackage = () => {
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-500/20 sm:max-w-sm"
           />
         </div>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        {PACKAGE_FILTERS.map((filter) => (
+          <button
+            key={filter}
+            type="button"
+            onClick={() => setPackageFilter(filter)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition ${packageFilter === filter
+              ? "border-blue-500 bg-blue-500 text-white shadow-sm"
+              : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+              }`}
+          >
+            {filter}
+            <span
+              className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${packageFilter === filter
+                ? "bg-white/20 text-white"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                }`}
+            >
+              {packageFilterCounts[filter]}
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/3">
@@ -1336,6 +1523,7 @@ const ManageUmrahPackage = () => {
                           canEdit={canUseActions}
                           onEditFull={() => handleOpenPricingModal(pkg)}
                           onApplyMargin={handleApplyMargin}
+                          onApplyDiscount={handleApplyDiscount}
                         />
                       </TableCell>
 
@@ -1764,7 +1952,8 @@ const ManageUmrahPackage = () => {
               <div className="border-t-2 border-dashed border-orange-300 pt-3">
                 <p className="text-xs text-orange-600 font-semibold mb-2">
                   * Incentive (PKR {pricingTotals.incentive.toLocaleString()})
-                  is included in all room totals above
+                  is included in Double, Triple, Quad, Shared, and Child W/ Bed
+                  totals. It is not included in Child W/O Bed or Infant totals.
                 </p>
               </div>
             </div>
@@ -1797,7 +1986,7 @@ const ManageUmrahPackage = () => {
       </Modal>
 
       <ToastContainer style={{ zIndex: 9999999 }} />
-    </ComponentCard>
+    </div>
   );
 };
 

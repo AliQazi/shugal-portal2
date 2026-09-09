@@ -142,8 +142,7 @@ export const createUmrahBooking = async (req, res) => {
     const infantTotal =
       Number(pricing.infantTotal) || Number(pricing.infantTotal) || 0;
 
-    const incentive =
-      JSON.parse(parsedData?.packageData)?.packageTotals?.incentive || 0;
+    const incentive = Number(packageData?.packageTotals?.incentive) || 0;
 
     const calculatedTotal =
       Number(pricing.totalAmount) ||
@@ -151,8 +150,15 @@ export const createUmrahBooking = async (req, res) => {
       pricePerPerson * totalPassengers ||
       0;
 
-    // incentive is per-pax — multiply by total passengers before deducting
-    const totalPrice = calculatedTotal - incentive * totalPassengers;
+    // Incentive applies only to adults and children with a bed. Child without
+    // bed and infant package totals are stored without incentive.
+    const incentiveEligiblePassengerCount = passengers.filter(
+      (passenger) =>
+        passenger.type === "Adult" ||
+        (passenger.type === "Child" && passenger.childType === "withBed"),
+    ).length;
+    const totalPrice =
+      calculatedTotal - incentive * incentiveEligiblePassengerCount;
 
     // Handle passport files — matched by index via field name passportFile_0, passportFile_1, etc.
     const uploadedFiles = req.files || [];
@@ -577,6 +583,299 @@ export const getAllBookingsAdmin = async (req, res) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+/* ===========================
+   XO REPORT — CONFIRMED UMRAH PACKAGE BOOKINGS
+   Reports buying (supplier cost) vs selling (customer price) for confirmed
+   Umrah Package bookings, mirroring the cost breakdown used to generate the
+   ledger voucher when a booking is marked "Confirmed" (see updateOverallStatus).
+=========================== */
+export const getUmrahPackageXOReportData = async (req, res) => {
+  try {
+    const { fromDate, toDate, search } = req.query;
+
+    const query = { overallStatus: "Confirmed" };
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(fromDate);
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { bookingNumber: searchRegex },
+        { packageName: searchRegex },
+        { "passengers.givenName": searchRegex },
+        { "passengers.surName": searchRegex },
+        { "passengers.passport": searchRegex },
+      ];
+    }
+
+    // Agents/sub-users only ever see their own bookings; admins see everything.
+    if (req.user.role !== "Super Admin" && req.user.role !== "Admin") {
+      query.user = req.user._id.toString();
+    }
+
+    const bookings = await UmrahPackageBooking.find(query)
+      .populate("user", "name email agencyCode companyName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Batch-fetch linked local-db packages (visa/hotels/transports/packageTotals)
+    const localPackageIds = bookings
+      .filter((b) => b.packageSource === "local-db")
+      .map((b) => b.packageId)
+      .filter(Boolean);
+
+    const localPackages = localPackageIds.length
+      ? await GroupTicketing.find({ _id: { $in: localPackageIds } })
+          .select(
+            "packageName packageTotals flights hotels transports visa selectedGroupTicketId",
+          )
+          .lean()
+      : [];
+
+    const packageMap = {};
+    localPackages.forEach((pkg) => {
+      packageMap[pkg._id.toString()] = pkg;
+    });
+
+    // Batch-fetch group tickets referenced by those packages (ticket buying prices + supplier)
+    const groupTicketIds = localPackages
+      .map((pkg) => pkg.selectedGroupTicketId)
+      .filter(Boolean);
+
+    const groupTickets = groupTicketIds.length
+      ? await GroupTicket.find({ _id: { $in: groupTicketIds } })
+          .select("price user pnr")
+          .populate("user", "name")
+          .lean()
+      : [];
+
+    const ticketMap = {};
+    groupTickets.forEach((t) => {
+      ticketMap[t._id.toString()] = t;
+    });
+
+    const roomTypeKeyMap = { double: "double", triple: "triple", quad: "quad", sharing: "shared" };
+
+    let rows = bookings.map((booking) => {
+      const passengers = booking.passengers || [];
+      const isExternal = booking.packageSource !== "local-db";
+      const pkg = !isExternal ? packageMap[booking.packageId?.toString()] : null;
+
+      let flights = [];
+      let sector = "N/A";
+      let airlineName = "N/A";
+      let supplierName = "N/A";
+      let pnr = "N/A";
+      let totalBuying = 0;
+      let totalSelling = 0;
+      let totalDiscount = 0;
+
+      if (isExternal) {
+        supplierName = booking.packageSource === "upsky" ? "Up Sky" : "Travel Network";
+        pnr = booking.travelNetworkBookingRefNo || booking.upskyBookingRefNo || "N/A";
+
+        if (Array.isArray(booking.packageData?.flights)) {
+          flights = booking.packageData.flights.map((f) => ({
+            flightNo: f.flightNo,
+            depDate: f.depDate,
+            depTime: f.depTime,
+            arrDate: f.arrDate,
+            arrTime: f.arrTime,
+            origin: f.sectorFrom || f.origin,
+            destination: f.sectorTo || f.destination,
+          }));
+          airlineName = booking.packageData?.airlineName || booking.packageData?.airline || "N/A";
+        } else if (booking.flightDetails?.departure) {
+          flights = [
+            {
+              flightNo: booking.flightDetails.departure.flightNumber,
+              depDate: booking.flightDetails.departure.date,
+              origin: booking.flightDetails.departure.from,
+              destination: booking.flightDetails.departure.to,
+            },
+          ];
+        }
+
+        if (flights.length) {
+          sector = `${flights[0].origin || "?"}-${flights[flights.length - 1].destination || "?"}`;
+        }
+
+        const pricePerPerson = Math.round(booking.pricing?.pricePerPerson || 0);
+        passengers.forEach((pax) => {
+          totalSelling += pricePerPerson;
+          totalDiscount += Number(pax.discount) || 0;
+        });
+        const netSellingExternal = totalSelling - totalDiscount;
+        totalBuying = Math.max(
+          0,
+          netSellingExternal - (Number(booking.supplierDiscount) || 0),
+        );
+      } else if (pkg) {
+        const packageTotals = pkg.packageTotals || {};
+        const incentive = packageTotals.incentive || 0;
+        const roomKey = roomTypeKeyMap[booking.roomType] || booking.roomType;
+
+        const adultSellingPerPax = Math.round((packageTotals[roomKey] || 0) - incentive);
+        const childWithoutBedSellingPerPax = Math.round(packageTotals.childWithoutBed || 0);
+        const childWithBedSellingPerPax = Math.round((packageTotals.childWithBed || 0) - incentive);
+        const infantSellingPerPax = Math.round(packageTotals.infant || 0);
+
+        const getSellingPrice = (pax) => {
+          if (pax.type === "Child") {
+            return pax.childType === "withBed"
+              ? childWithBedSellingPerPax
+              : childWithoutBedSellingPerPax;
+          }
+          if (pax.type === "Infant") return infantSellingPerPax;
+          return adultSellingPerPax;
+        };
+
+        passengers.forEach((pax) => {
+          totalSelling += getSellingPrice(pax);
+          totalDiscount += Number(pax.discount) || 0;
+        });
+
+        // BUYING — visa + hotels (by room type & night count) + transports + group ticket (per pax)
+        const supplierNames = new Set();
+
+        if (pkg.visa?.buyingPrice) {
+          totalBuying += Math.round((pkg.visa.buyingPrice || 0) * (pkg.visa.buyingRoe || 1));
+          if (pkg.visa.supplier?.name) supplierNames.add(pkg.visa.supplier.name);
+        }
+
+        (pkg.hotels || []).forEach((hotel) => {
+          const nightCount = hotel.nightCount || hotel.nights || 0;
+          const roomPricing =
+            {
+              double: hotel.doubleRoom,
+              triple: hotel.tripleRoom,
+              quad: hotel.quadRoom,
+              sharing: hotel.sharedRoom,
+            }[booking.roomType] || null;
+          if (roomPricing) {
+            totalBuying += Math.round(
+              (roomPricing.buyingPrice || 0) * (roomPricing.buyingRoe || 1) * nightCount,
+            );
+          }
+          if (hotel.supplier?.name) supplierNames.add(hotel.supplier.name);
+        });
+
+        (pkg.transports || []).forEach((transport) => {
+          totalBuying += Math.round((transport.buyingPrice || 0) * (transport.buyingRoe || 1));
+          if (transport.supplier?.name) supplierNames.add(transport.supplier.name);
+        });
+
+        const ticket = pkg.selectedGroupTicketId
+          ? ticketMap[pkg.selectedGroupTicketId.toString()]
+          : null;
+        if (ticket) {
+          const buyingAdult = ticket.price?.buyingAdultPrice || 0;
+          const buyingChild = ticket.price?.buyingChildPrice || 0;
+          const buyingInfant = ticket.price?.buyingInfantPrice || 0;
+          const getTicketBuyingPrice = (type) =>
+            type === "Child" ? buyingChild : type === "Infant" ? buyingInfant : buyingAdult;
+          passengers.forEach((pax) => {
+            totalBuying += getTicketBuyingPrice(pax.type);
+          });
+          if (ticket.user?.name) supplierNames.add(ticket.user.name);
+          if (ticket.pnr) pnr = ticket.pnr;
+        }
+
+        supplierName = supplierNames.size
+          ? supplierNames.size <= 2
+            ? [...supplierNames].join(", ")
+            : "Multiple Suppliers"
+          : "N/A";
+
+        flights = (pkg.flights || []).map((f) => ({
+          flightNo: f.flightNo,
+          depDate: f.depDate,
+          depTime: f.depTime,
+          arrDate: f.arrDate,
+          arrTime: f.arrTime,
+          origin: f.sectorFrom,
+          destination: f.sectorTo,
+        }));
+        if (flights.length) {
+          sector = `${flights[0].origin || "?"}-${flights[flights.length - 1].destination || "?"}`;
+          airlineName = pkg.flights?.[0]?.airline || "N/A";
+        }
+      }
+
+      const netSelling = totalSelling - totalDiscount;
+      const profit = netSelling - totalBuying;
+
+      const agencyName = booking.user
+        ? booking.user.companyName || booking.user.name
+        : "N/A";
+
+      return {
+        _id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        pnr,
+        packageName: booking.packageName,
+        packageSource: booking.packageSource,
+        roomType: booking.roomType,
+        supplierName,
+        agencyName,
+        sector,
+        airline: airlineName,
+        flights,
+        passengers,
+        adultsCount: booking.passengerCount?.adults || 0,
+        childrenCount: booking.passengerCount?.children || 0,
+        infantsCount: booking.passengerCount?.infants || 0,
+        totalPassengers: booking.passengerCount?.total || passengers.length,
+        currency: booking.pricing?.currency || "PKR",
+        totalBuying,
+        totalSelling,
+        totalDiscount,
+        netSelling,
+        profit,
+        createdAt: booking.createdAt,
+      };
+    });
+
+    const { sector, airline, supplier } = req.query;
+    if (sector && sector.trim()) rows = rows.filter((r) => r.sector === sector.trim());
+    if (airline && airline.trim()) rows = rows.filter((r) => r.airline === airline.trim());
+    if (supplier && supplier.trim()) rows = rows.filter((r) => r.supplierName === supplier.trim());
+
+    const summary = rows.reduce(
+      (acc, r) => {
+        acc.totalBookings += 1;
+        acc.totalPassengers += r.totalPassengers || 0;
+        acc.totalBuying += r.totalBuying || 0;
+        acc.totalSelling += r.netSelling || 0;
+        acc.totalProfit += r.profit || 0;
+        return acc;
+      },
+      {
+        totalBookings: 0,
+        totalPassengers: 0,
+        totalBuying: 0,
+        totalSelling: 0,
+        totalProfit: 0,
+      },
+    );
+
+    res.json({ success: true, data: rows, summary });
+  } catch (err) {
+    console.error("Error generating Umrah Package XO report:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to generate Umrah Package XO report" });
   }
 };
 
@@ -1530,13 +1829,13 @@ export const updateOverallStatus = async (req, res) => {
         (packageTotals[roomKey] || 0) - incentive,
       );
       const childWithoutBedSellingPerPax = Math.round(
-        (packageTotals.childWithoutBed || 0) - incentive,
+        packageTotals.childWithoutBed || 0,
       );
       const childWithBedSellingPerPax = Math.round(
         (packageTotals.childWithBed || 0) - incentive,
       );
       const infantSellingPerPax = Math.round(
-        (packageTotals.infant || 0) - incentive,
+        packageTotals.infant || 0,
       );
 
       const getSellingPrice = (pax) => {

@@ -2,6 +2,34 @@
 
 import mongoose from "mongoose";
 
+const hotelRateSchema = new mongoose.Schema(
+  {
+    hotel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Hotel",
+      required: true,
+    },
+    city: { type: String, trim: true, default: "" },
+    // Retained only so records created by the transitional multi-date version
+    // remain readable. New writes keep one date range at the volume root.
+    fromDate: { type: Date },
+    toDate: { type: Date },
+    buyingPrice: { type: Number, required: true, default: 0 },
+    buyingRoe: { type: Number, default: 1 },
+    buyingCurrency: { type: String, default: "PKR", trim: true },
+    sellingPrice: { type: Number, required: true, default: 0 },
+    sellingRoe: { type: Number, default: 1 },
+    sellingCurrency: { type: String, default: "PKR", trim: true },
+    sharedRoomBuyingPrice: { type: Number, default: 0 },
+    sharedRoomBuyingRoe: { type: Number, default: 1 },
+    sharedRoomBuyingCurrency: { type: String, default: "PKR", trim: true },
+    sharedRoomSellingPrice: { type: Number, default: 0 },
+    sharedRoomSellingRoe: { type: Number, default: 1 },
+    sharedRoomSellingCurrency: { type: String, default: "PKR", trim: true },
+  },
+  { _id: true },
+);
+
 const rateVolumeSchema = new mongoose.Schema(
   {
     volumeName: {
@@ -10,7 +38,16 @@ const rateVolumeSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Hotel this rate volume applies to
+    // New structure: one named volume can contain rates for many hotels (and can
+    // also contain more than one dated rate for the same hotel).
+    hotelRates: {
+      type: [hotelRateSchema],
+      default: undefined,
+    },
+
+    // Legacy single-hotel fields are intentionally retained. Existing documents
+    // continue to work, while new writes mirror the first hotelRates item here so
+    // older consumers are not broken during deployment.
     hotel: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Hotel",
@@ -22,12 +59,14 @@ const rateVolumeSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Date range this buying/selling rate is valid for
+    // One shared date range for every hotel rate in this volume.
     fromDate: {
       type: Date,
+      required: true,
     },
     toDate: {
       type: Date,
+      required: true,
     },
 
     // Buying side

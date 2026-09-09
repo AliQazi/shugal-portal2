@@ -54,6 +54,68 @@ const formatTime = (time) => {
   return time.slice(0, 5);
 };
 
+// Flight dates represent calendar days. Extract the saved YYYY-MM-DD value
+// before formatting so the browser cannot shift UTC-midnight values to the
+// previous day in negative UTC offsets.
+const getCalendarDateParts = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+
+    return {
+      year: value.getFullYear(),
+      month: value.getMonth() + 1,
+      day: value.getDate(),
+    };
+  }
+
+  const match = String(value)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const testDate = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      testDate.getUTCFullYear() === year &&
+      testDate.getUTCMonth() + 1 === month &&
+      testDate.getUTCDate() === day
+    ) {
+      return { year, month, day };
+    }
+
+    return null;
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  return {
+    year: parsedDate.getFullYear(),
+    month: parsedDate.getMonth() + 1,
+    day: parsedDate.getDate(),
+  };
+};
+
+const getCalendarDateKey = (value) => {
+  const parts = getCalendarDateParts(value);
+
+  if (!parts) return "";
+
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+};
+
+const getCalendarDateTimestamp = (value) => {
+  const parts = getCalendarDateParts(value);
+
+  return parts ? Date.UTC(parts.year, parts.month - 1, parts.day) : NaN;
+};
+
 // Room price resolution mirrors the previous card logic: packageTotals wins
 // when set, falling back to the raw rooms map saved on the package.
 const getRoomPrice = (pkg, key) => {
@@ -136,10 +198,11 @@ const getDefaultRoomSelection = (pkg) => {
 // Short date used inside the combined Schedule column, e.g. "15 AUG" — no
 // year, month abbreviation uppercased to match the requested format.
 const formatScheduleDate = (dateStr) => {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  if (isNaN(d)) return "-";
-  return `${String(d.getDate()).padStart(2, "0")} ${MONTHS_TITLE[d.getMonth()].toUpperCase()}`;
+  const parts = getCalendarDateParts(dateStr);
+
+  if (!parts) return "-";
+
+  return `${String(parts.day).padStart(2, "0")} ${MONTHS_TITLE[parts.month - 1].toUpperCase()}`;
 };
 
 // Collapses Departure/Arrival/Dep Date Time/Arr Date Time into one line,
@@ -683,10 +746,14 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
           const sector = sectorPoints.join("-");
 
           const toDate = (dateStr) => {
-            if (!dateStr) return null;
-            const d = new Date(dateStr);
-            return isNaN(d) ? null : d;
+            return getCalendarDateKey(dateStr) || null;
           };
+
+          const normalizedFlights = flights.map((flight) => ({
+            ...flight,
+            depDate: toDate(flight.depDate) || flight.depDate,
+            arrDate: toDate(flight.arrDate) || flight.arrDate,
+          }));
 
           // const hotels = (pkg.hotels || []).reduce((acc, h) => {
           //   const city = h.location?.city || "";
@@ -778,7 +845,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             depTime: formatTime(firstFlight.depTime || ""),
             arrTime: formatTime(lastFlight.arrTime || ""),
             flightNo: firstFlight.flightNo || "",
-            flights,
+            flights: normalizedFlights,
             hotels,
             rooms,
             packageSource: pkg.packageSource,
@@ -796,23 +863,27 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
               arrivalDate: toDate(lastFlight.arrDate),
               packageDuration: pkg.days,
               hotels,
-              flights,
+              flights: normalizedFlights,
             },
           };
         })
         .sort((a, b) => {
-          const aTime =
-            a.dept_date instanceof Date ? a.dept_date.getTime() : Infinity;
-          const bTime =
-            b.dept_date instanceof Date ? b.dept_date.getTime() : Infinity;
+          const parsedATime = getCalendarDateTimestamp(a.dept_date);
+          const parsedBTime = getCalendarDateTimestamp(b.dept_date);
+          const aTime = Number.isNaN(parsedATime) ? Infinity : parsedATime;
+          const bTime = Number.isNaN(parsedBTime) ? Infinity : parsedBTime;
           return aTime - bTime;
         });
 
-      // Fully booked packages (0 seats left) are hidden from the listing
-      // entirely rather than shown disabled.
-      const availableGroups = formattedGroups.filter(
-        (g) => g.availableRooms !== 0,
-      );
+      // Packages whose departure date has already passed are hidden from
+      // the listing, along with fully booked packages (0 seats left).
+      const todayTimestamp = getCalendarDateTimestamp(new Date());
+      const availableGroups = formattedGroups.filter((g) => {
+        if (g.availableRooms === 0) return false;
+        const departureTimestamp = getCalendarDateTimestamp(g.dept_date);
+        if (Number.isNaN(departureTimestamp)) return true;
+        return departureTimestamp >= todayTimestamp;
+      });
 
       setAirlines(
         [
@@ -884,14 +955,10 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
     )
       return false;
     if (filters.departDate && g.dept_date) {
-      const depDate = new Date(g.dept_date);
-      const filterDate = new Date(filters.departDate);
-      if (
-        depDate.getFullYear() !== filterDate.getFullYear() ||
-        depDate.getMonth() !== filterDate.getMonth() ||
-        depDate.getDate() !== filterDate.getDate()
-      )
-        return false;
+      const departureDateKey = getCalendarDateKey(g.dept_date);
+      const filterDateKey = getCalendarDateKey(filters.departDate);
+
+      if (!departureDateKey || departureDateKey !== filterDateKey) return false;
     }
     return true;
   });

@@ -115,20 +115,52 @@ const formatStatusLabel = (status) => {
 };
 
 export const printGDSBooking = async (booking) => {
-  // "17-Aug-2026" style, timezone-safe for plain YYYY-MM-DD strings.
-  const formatDateOnly = (dateStr) => {
-    if (!dateStr) return "";
-    let d;
-    if (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      const [year, month, day] = dateStr.slice(0, 10).split("-").map(Number);
-      d = new Date(year, month - 1, day);
-    } else {
-      d = new Date(dateStr);
+  // Flight dates are calendar values, so format their saved YYYY-MM-DD
+  // components without allowing the browser timezone to change the day.
+  const formatCalendarDate = (dateValue) => {
+    if (!dateValue) return "";
+
+    const match = String(dateValue)
+      .trim()
+      .match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const parsedDate = match ? null : new Date(dateValue);
+
+    if (!match && Number.isNaN(parsedDate.getTime())) return "";
+
+    const year = match ? Number(match[1]) : parsedDate.getUTCFullYear();
+    const month = match ? Number(match[2]) : parsedDate.getUTCMonth() + 1;
+    const day = match ? Number(match[3]) : parsedDate.getUTCDate();
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() + 1 !== month ||
+      date.getUTCDate() !== day
+    ) {
+      return "";
     }
-    if (isNaN(d.getTime())) return "";
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = d.toLocaleDateString("en-GB", { month: "short" });
-    return `${day}-${month}-${d.getFullYear()}`;
+
+    const monthName = date.toLocaleDateString("en-GB", {
+      month: "short",
+      timeZone: "UTC",
+    });
+
+    return `${String(day).padStart(2, "0")}-${monthName}-${year}`;
+  };
+
+  // Expiry is a real timestamp; its printed date must use the same local
+  // timezone as formatTimeOnly so the two values cannot disagree.
+  const formatTimestampDate = (dateValue) => {
+    if (!dateValue) return "";
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = date.toLocaleDateString("en-GB", { month: "short" });
+
+    return `${day}-${month}-${date.getFullYear()}`;
   };
 
   const formatTimeOnly = (dateStr) => {
@@ -433,7 +465,7 @@ export const printGDSBooking = async (booking) => {
       const fDepTime = f.depTime || booking.depTime || "--:--";
       const fArrTime = f.arrTime || booking.arrTime || "--:--";
 
-      const fDepDate = formatDateOnly(
+      const fDepDate = formatCalendarDate(
         f.departureDate ||
         f.depDate ||
         f.date ||
@@ -510,7 +542,7 @@ export const printGDSBooking = async (booking) => {
             <div class="clock-icon">${ICON_CLOCK(NAVY)}</div>
             <div>
                 <div class="res-title">${isOnHold ? "ON HOLD UNTIL" : "RESERVATION TIME LIMIT"}</div>
-                <div class="res-row">Date&nbsp;&nbsp;:&nbsp;&nbsp;${formatDateOnly(expiresAt)}</div>
+                <div class="res-row">Date&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimestampDate(expiresAt)}</div>
                 <div class="res-row">Time&nbsp;&nbsp;:&nbsp;&nbsp;${formatTimeOnly(expiresAt)}</div>
             </div>
         </div>

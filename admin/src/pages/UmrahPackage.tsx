@@ -178,13 +178,9 @@ interface VisaOption {
   };
 }
 
-interface RateVolumeData {
-  volumeName: string;
-  // The hotel this rate volume applies to, and the stay-date window it's valid for.
+interface RateVolumeHotelRate {
   hotelId?: string;
   city?: string;
-  fromDate?: string;
-  toDate?: string;
   buyingPrice: number;
   buyingRoe: number;
   buyingCurrency: string;
@@ -199,6 +195,19 @@ interface RateVolumeData {
   sharedRoomSellingPrice?: number;
   sharedRoomSellingRoe?: number;
   sharedRoomSellingCurrency?: string;
+}
+
+interface RateVolumeData {
+  volumeName: string;
+  fromDate?: string;
+  toDate?: string;
+  hotelRates: RateVolumeHotelRate[];
+}
+
+interface RateVolumeApiHotelRate extends Partial<RateVolumeHotelRate> {
+  hotel?: string | { _id?: string };
+  fromDate?: string;
+  toDate?: string;
 }
 
 interface RateVolumeOption {
@@ -352,31 +361,35 @@ const UmrahPackage = () => {
       if (res.data.success) {
         setRateVolumeOptions(
           (res.data.data || []).map((v: any) => {
-            const hotelId = typeof v.hotel === "string" ? v.hotel : v.hotel?._id;
-            const hotelName = typeof v.hotel === "object" ? v.hotel?.hotelName : undefined;
-            const fromLabel = v.fromDate ? new Date(v.fromDate).toLocaleDateString("en-GB") : "";
-            const toLabel = v.toDate ? new Date(v.toDate).toLocaleDateString("en-GB") : "";
+            // Old volumes have their rate at the document root. New volumes keep
+            // all hotel-specific rates in hotelRates; normalize both shapes here.
+            const rawRates: RateVolumeApiHotelRate[] = Array.isArray(v.hotelRates) && v.hotelRates.length ? v.hotelRates : [v];
+            const fromDate = v.fromDate || rawRates[0]?.fromDate;
+            const toDate = v.toDate || rawRates[0]?.toDate;
+            const hotelRates: RateVolumeHotelRate[] = rawRates.map((rate) => ({
+              hotelId: typeof rate.hotel === "string" ? rate.hotel : rate.hotel?._id,
+              city: rate.city,
+              buyingPrice: rate.buyingPrice ?? 0,
+              buyingRoe: rate.buyingRoe ?? 1,
+              buyingCurrency: rate.buyingCurrency || "PKR",
+              sellingPrice: rate.sellingPrice ?? 0,
+              sellingRoe: rate.sellingRoe ?? 1,
+              sellingCurrency: rate.sellingCurrency || "PKR",
+              sharedRoomBuyingPrice: rate.sharedRoomBuyingPrice ?? 0,
+              sharedRoomBuyingRoe: rate.sharedRoomBuyingRoe ?? 1,
+              sharedRoomBuyingCurrency: rate.sharedRoomBuyingCurrency || "PKR",
+              sharedRoomSellingPrice: rate.sharedRoomSellingPrice ?? 0,
+              sharedRoomSellingRoe: rate.sharedRoomSellingRoe ?? 1,
+              sharedRoomSellingCurrency: rate.sharedRoomSellingCurrency || "PKR",
+            }));
             return {
               value: v._id,
-              label: `${v.volumeName}${hotelName ? ` - ${hotelName}` : ""}${fromLabel && toLabel ? ` (${fromLabel} - ${toLabel})` : ""}`,
+              label: `${v.volumeName} (${hotelRates.length} hotel ${hotelRates.length === 1 ? "rate" : "rates"})`,
               data: {
                 volumeName: v.volumeName,
-                hotelId,
-                city: v.city,
-                fromDate: v.fromDate,
-                toDate: v.toDate,
-                buyingPrice: v.buyingPrice || 0,
-                buyingRoe: v.buyingRoe || 1,
-                buyingCurrency: v.buyingCurrency || "PKR",
-                sellingPrice: v.sellingPrice || 0,
-                sellingRoe: v.sellingRoe || 1,
-                sellingCurrency: v.sellingCurrency || "PKR",
-                sharedRoomBuyingPrice: v.sharedRoomBuyingPrice || 0,
-                sharedRoomBuyingRoe: v.sharedRoomBuyingRoe || 1,
-                sharedRoomBuyingCurrency: v.sharedRoomBuyingCurrency || "PKR",
-                sharedRoomSellingPrice: v.sharedRoomSellingPrice || 0,
-                sharedRoomSellingRoe: v.sharedRoomSellingRoe || 1,
-                sharedRoomSellingCurrency: v.sharedRoomSellingCurrency || "PKR",
+                fromDate,
+                toDate,
+                hotelRates,
               },
             };
           })
@@ -540,9 +553,9 @@ const UmrahPackage = () => {
             triple: (data.packageTotals.triple || 0) - inc,
             quad: (data.packageTotals.quad || 0) - inc,
             shared: (data.packageTotals.shared || 0) - inc,
-            childWithoutBed: (data.packageTotals.childWithoutBed || 0) - inc,
+            childWithoutBed: data.packageTotals.childWithoutBed || 0,
             childWithBed: (data.packageTotals.childWithBed || 0) - inc,
-            infant: (data.packageTotals.infant || 0) - inc,
+            infant: data.packageTotals.infant || 0,
           };
           baseTotalsRef.current = base;
           setPackageTotals({
@@ -1036,62 +1049,76 @@ const UmrahPackage = () => {
     return from.getTime() <= checkInDate.getTime() && to.getTime() >= checkOutDate.getTime();
   };
 
-  // Finds the Rate Volume (if any) for `hotelId` whose from/to date range fully covers
-  // the given check-in/check-out stay. Used to auto-apply pricing as dates change.
+  const findHotelRateInVolume = (
+    volume: RateVolumeData,
+    hotelId: string | undefined,
+    checkIn?: string,
+    checkOut?: string
+  ): RateVolumeHotelRate | undefined => {
+    if (!hotelId) return undefined;
+    if (checkIn && checkOut && !isStayWithinVolumeRange(checkIn, checkOut, volume.fromDate, volume.toDate)) {
+      return undefined;
+    }
+    return volume.hotelRates.find((rate) => rate.hotelId === hotelId);
+  };
+
+  // Finds any active root volume containing this hotel and covering the stay.
   const findMatchingRateVolume = (
     hotelId: string | undefined,
     checkIn: string,
     checkOut: string
-  ): RateVolumeOption | undefined => {
+  ): { option: RateVolumeOption; rate: RateVolumeHotelRate } | undefined => {
     if (!hotelId || !checkIn || !checkOut) return undefined;
-    return rateVolumeOptions.find(
-      (opt) => opt.data.hotelId === hotelId && isStayWithinVolumeRange(checkIn, checkOut, opt.data.fromDate, opt.data.toDate)
-    );
+    for (const option of rateVolumeOptions) {
+      const rate = findHotelRateInVolume(option.data, hotelId, checkIn, checkOut);
+      if (rate) return { option, rate };
+    }
+    return undefined;
   };
 
   // Builds the hotel-row fields (name/city/rating + buying/selling incl. the
   // per-room-type breakdown) implied by a Rate Volume - pulling the hotel's own details
   // (rating, map URL) from the already-loaded Hotel list via its hotelId.
-  const computeVolumeFields = (hotel: HotelForm, volume: RateVolumeData): Partial<HotelForm> => {
-    const buying = volume.buyingPrice || 0;
-    const buyingRoe = volume.buyingRoe || 1;
-    const selling = volume.sellingPrice || 0;
-    const sellingRoe = volume.sellingRoe || 1;
+  const computeVolumeFields = (hotel: HotelForm, volumeName: string, rate: RateVolumeHotelRate): Partial<HotelForm> => {
+    const buying = rate.buyingPrice || 0;
+    const buyingRoe = rate.buyingRoe ?? 1;
+    const selling = rate.sellingPrice || 0;
+    const sellingRoe = rate.sellingRoe ?? 1;
     // Shared Room uses its own dedicated rate from the volume (not a split of the
     // buying/selling rate above, which only feeds Double/Triple/Quad).
-    const sharedBuying = volume.sharedRoomBuyingPrice || 0;
-    const sharedBuyingRoe = volume.sharedRoomBuyingRoe || 1;
-    const sharedSelling = volume.sharedRoomSellingPrice || 0;
-    const sharedSellingRoe = volume.sharedRoomSellingRoe || 1;
+    const sharedBuying = rate.sharedRoomBuyingPrice || 0;
+    const sharedBuyingRoe = rate.sharedRoomBuyingRoe ?? 1;
+    const sharedSelling = rate.sharedRoomSellingPrice || 0;
+    const sharedSellingRoe = rate.sharedRoomSellingRoe ?? 1;
 
     const fields: Partial<HotelForm> = {
-      rateVolumeName: volume.volumeName,
+      rateVolumeName: volumeName,
       buyingPrice: buying,
       buyingRoe,
-      buyingCurrency: volume.buyingCurrency,
+      buyingCurrency: rate.buyingCurrency,
       sellingPrice: selling,
       sellingRoe,
-      sellingCurrency: volume.sellingCurrency,
+      sellingCurrency: rate.sellingCurrency,
       doubleRoom: { ...hotel.doubleRoom, buyingPrice: parseFloat((buying / 2).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 2).toFixed(2)), sellingRoe },
       tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat((buying / 3).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 3).toFixed(2)), sellingRoe },
       quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat((buying / 4).toFixed(2)), buyingRoe, sellingPrice: parseFloat((selling / 4).toFixed(2)), sellingRoe },
       sharedRoom: { ...hotel.sharedRoom, buyingPrice: sharedBuying, buyingRoe: sharedBuyingRoe, sellingPrice: sharedSelling, sellingRoe: sharedSellingRoe },
     };
 
-    const matchedHotelOption = volume.hotelId ? hotelOptions.find((h) => h.value === volume.hotelId) : undefined;
+    const matchedHotelOption = rate.hotelId ? hotelOptions.find((h) => h.value === rate.hotelId) : undefined;
     if (matchedHotelOption) {
       fields.hotelId = matchedHotelOption.value;
       fields.name = matchedHotelOption.data?.hotelName || matchedHotelOption.label;
       fields.location = {
-        city: matchedHotelOption.data?.city || volume.city || hotel.location.city,
+        city: matchedHotelOption.data?.city || rate.city || hotel.location.city,
         mapUrl: matchedHotelOption.data?.mapUrl || hotel.location.mapUrl,
       };
       fields.rating = Number(matchedHotelOption.data?.rating || 0);
-    } else if (volume.hotelId) {
+    } else if (rate.hotelId) {
       // Hotel list hasn't loaded yet - at least keep the id/city so matching still works.
-      fields.hotelId = volume.hotelId;
-      if (volume.city) {
-        fields.location = { ...hotel.location, city: volume.city };
+      fields.hotelId = rate.hotelId;
+      if (rate.city) {
+        fields.location = { ...hotel.location, city: rate.city };
       }
     }
 
@@ -1151,27 +1178,24 @@ const UmrahPackage = () => {
       Object.prototype.hasOwnProperty.call(fields, "checkOut") ||
       Object.prototype.hasOwnProperty.call(fields, "nights");
     if (datesChanged && row.hotelId && row.checkIn && row.checkOut) {
-      const match = findMatchingRateVolume(row.hotelId, row.checkIn, row.checkOut);
+      const selectedVolumeId = selectedRateVolumeByHotel[index];
+      const selectedOption = selectedVolumeId
+        ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
+        : undefined;
+      const selectedRate = selectedOption
+        ? findHotelRateInVolume(selectedOption.data, row.hotelId, row.checkIn, row.checkOut)
+        : undefined;
+      const match = selectedOption
+        ? selectedRate ? { option: selectedOption, rate: selectedRate } : undefined
+        : findMatchingRateVolume(row.hotelId, row.checkIn, row.checkOut);
       if (match) {
-        Object.assign(row, computeVolumeFields(row, match.data));
-        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.value }));
-      } else {
-        // A Rate Volume was active for this hotel but its date range no longer covers
-        // the new stay - the rates it filled in are stale, so clear them instead of
-        // silently leaving prices on screen that don't correspond to any picked volume.
-        if (index in selectedRateVolumeByHotel) {
-          const previousVolumeName = row.rateVolumeName;
-          Object.assign(row, emptyRateFields());
-          toast.error(
-            `The selected Rate Volume "${previousVolumeName}" doesn't cover ${formatFlightDate(row.checkIn)} - ${formatFlightDate(row.checkOut)}. Buying/Selling rates were cleared - pick a Rate Volume that covers these dates or enter rates manually.`
-          );
-        }
-        setSelectedRateVolumeByHotel((prev) => {
-          if (!(index in prev)) return prev;
-          const next = { ...prev };
-          delete next[index];
-          return next;
-        });
+        Object.assign(row, computeVolumeFields(row, match.option.data.volumeName, match.rate));
+        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
+      } else if (selectedOption) {
+        Object.assign(row, emptyRateFields());
+        toast.error(
+          `"${selectedOption.data.volumeName}" has no rate for this hotel covering ${formatFlightDate(row.checkIn)} - ${formatFlightDate(row.checkOut)}. Rates were cleared; the volume remains selected so you can choose another hotel or date range.`
+        );
       }
     }
 
@@ -1192,11 +1216,26 @@ const UmrahPackage = () => {
       rating: Number(selected.data?.rating || 0),
     };
 
-    if (hotel.checkIn && hotel.checkOut) {
+    const selectedVolumeId = selectedRateVolumeByHotel[index];
+    const selectedOption = selectedVolumeId
+      ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
+      : undefined;
+
+    if (selectedOption) {
+      const rate = findHotelRateInVolume(selectedOption.data, selected.value, hotel.checkIn, hotel.checkOut);
+      if (rate) {
+        Object.assign(baseFields, computeVolumeFields({ ...hotel, ...baseFields } as HotelForm, selectedOption.data.volumeName, rate));
+      } else {
+        Object.assign(baseFields, emptyRateFields());
+        toast.error(
+          `"${selectedOption.data.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "date-matching " : ""}rate for ${selected.label}. The volume remains selected.`
+        );
+      }
+    } else if (hotel.checkIn && hotel.checkOut) {
       const match = findMatchingRateVolume(selected.value, hotel.checkIn, hotel.checkOut);
       if (match) {
-        Object.assign(baseFields, computeVolumeFields({ ...hotel, ...baseFields } as HotelForm, match.data));
-        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.value }));
+        Object.assign(baseFields, computeVolumeFields({ ...hotel, ...baseFields } as HotelForm, match.option.data.volumeName, match.rate));
+        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
       }
     }
 
@@ -1215,11 +1254,17 @@ const UmrahPackage = () => {
     });
   };
 
-  // Fill Hotel Name/City + Buying/Selling price/ROE/currency (and the
-  // per-room-type breakdown) from a saved Rate Volume, triggered by the "Rate Volume"
-  // dropdown. Check-in/check-out are left untouched.
   const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
-    updateHotel(index, computeVolumeFields(hotel, volume));
+    if (!hotel.hotelId) return;
+    const rate = findHotelRateInVolume(volume, hotel.hotelId, hotel.checkIn, hotel.checkOut);
+    if (!rate) {
+      updateHotel(index, emptyRateFields());
+      toast.error(
+        `"${volume.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "date-matching " : ""}rate for this hotel. The volume remains selected.`
+      );
+      return;
+    }
+    updateHotel(index, computeVolumeFields(hotel, volume.volumeName, rate));
   };
 
   // Manual entry for Buying Price/Room (used when no Rate Volume is picked) - mirrors
@@ -1310,9 +1355,9 @@ const UmrahPackage = () => {
       triple: base.triple + prev.incentive,
       quad: base.quad + prev.incentive,
       shared: base.shared + prev.incentive,
-      childWithoutBed: base.childWithoutBed + prev.incentive,
+      childWithoutBed: base.childWithoutBed,
       childWithBed: base.childWithBed + prev.incentive,
-      infant: base.infant + prev.incentive,
+      infant: base.infant,
       incentive: prev.incentive,
     }));
   }, [
@@ -1780,20 +1825,10 @@ const UmrahPackage = () => {
                                   });
                                   return;
                                 }
-                                // If a stay is already selected, only apply the volume when its
-                                // date range actually covers that stay - otherwise the rate would
-                                // silently apply to dates it was never priced for.
-                                if (hotel.checkIn && hotel.checkOut) {
-                                  const rangeOk = isStayWithinVolumeRange(hotel.checkIn, hotel.checkOut, option.data.fromDate, option.data.toDate);
-                                  if (!rangeOk) {
-                                    toast.error(
-                                      `"${option.data.volumeName}" is only valid ${formatFlightDate(option.data.fromDate)} - ${formatFlightDate(option.data.toDate)}, which doesn't cover the selected stay (${formatFlightDate(hotel.checkIn)} - ${formatFlightDate(hotel.checkOut)}). Pick a volume that covers these dates, or change Check-in/Check-out first.`
-                                    );
-                                    return;
-                                  }
-                                }
                                 setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
-                                applyRateVolumeToHotel(index, hotel, option.data);
+                                // Keep the root volume selected even when the hotel has not been
+                                // chosen yet; selecting the hotel later resolves its nested rate.
+                                if (hotel.hotelId) applyRateVolumeToHotel(index, hotel, option.data);
                               }}
                               placeholder="Select Volume"
                               isClearable
@@ -2593,7 +2628,7 @@ const UmrahPackage = () => {
                                 const val = Number(e.target.value);
                                 baseTotalsRef.current = {
                                   ...baseTotalsRef.current,
-                                  childWithoutBed: val + packageTotals.incentive,
+                                  childWithoutBed: val,
                                 };
                                 setPackageTotals((prev) => ({ ...prev, childWithoutBed: val }));
                               }}
@@ -2641,7 +2676,7 @@ const UmrahPackage = () => {
                                 const val = Number(e.target.value);
                                 baseTotalsRef.current = {
                                   ...baseTotalsRef.current,
-                                  infant: val + packageTotals.incentive,
+                                  infant: val,
                                 };
                                 setPackageTotals((prev) => ({ ...prev, infant: val }));
                               }}
@@ -2669,9 +2704,9 @@ const UmrahPackage = () => {
                                   triple: base.triple + inc,
                                   quad: base.quad + inc,
                                   shared: base.shared + inc,
-                                  childWithoutBed: base.childWithoutBed + inc,
+                                  childWithoutBed: base.childWithoutBed,
                                   childWithBed: base.childWithBed + inc,
-                                  infant: base.infant + inc,
+                                  infant: base.infant,
                                   incentive: inc,
                                 });
                               }}
@@ -2683,7 +2718,7 @@ const UmrahPackage = () => {
                     </div>
                     {/* Incentive Separator */}
                     <div className="border-t-2 border-dashed border-orange-300 pt-3">
-                      <p className="text-xs text-orange-600 font-semibold mb-2">* Incentive (PKR {packageTotals.incentive.toLocaleString()}) is included in all room totals above</p>
+                      <p className="text-xs text-orange-600 font-semibold mb-2">* Incentive (PKR {packageTotals.incentive.toLocaleString()}) is included in Double, Triple, Quad, Shared, and Child W/ Bed totals. It is not included in Child W/O Bed or Infant totals.</p>
                     </div>
                   </div>
                 </div>

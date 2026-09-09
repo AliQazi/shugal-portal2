@@ -475,6 +475,7 @@ export const updatePackageTotals = async (req, res) => {
       "infant",
       "incentive",
       "margin",
+      "discount",
     ];
 
     const sanitizedTotals = {};

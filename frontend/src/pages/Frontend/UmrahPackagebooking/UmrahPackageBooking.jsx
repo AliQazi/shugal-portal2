@@ -31,6 +31,37 @@ import { toast } from "react-toastify";
 import useAccountsList from "../../../context/useAccountsList";
 import { theme } from "../../../theme/theme";
 
+const formatCalendarDate = (value) => {
+  if (!value) return "N/A";
+
+  const match = String(value)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const parsedDate = match ? null : new Date(value);
+
+  if (!match && Number.isNaN(parsedDate.getTime())) return "N/A";
+
+  const year = match ? Number(match[1]) : parsedDate.getUTCFullYear();
+  const month = match ? Number(match[2]) : parsedDate.getUTCMonth() + 1;
+  const day = match ? Number(match[3]) : parsedDate.getUTCDate();
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return "N/A";
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
 export default function UmrahBooking() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -339,7 +370,7 @@ export default function UmrahBooking() {
       flightNo: d.flight_no || "",
       depDate: d.flight_date,
       depTime: d.dept_time || "",
-      arrDate: d.flight_date,
+      arrDate: d.arv_date || d.arr_date || d.flight_date,
       arrTime: d.arv_time || "",
       sectorFrom: d.origin || "",
       sectorTo: d.destination || "",
@@ -1379,7 +1410,7 @@ export default function UmrahBooking() {
                                 key={`deptdt-${idx}`}
                                 className="text-gray-700"
                               >
-                                {formatDate(
+                                {formatCalendarDate(
                                   f.depDate ||
                                   f.departureDate ||
                                   f.flightDate,
@@ -1400,7 +1431,9 @@ export default function UmrahBooking() {
                                 key={`arrdt-${idx}`}
                                 className="text-gray-700"
                               >
-                                {formatDate(f.arrDate || f.arrivalDate)}{" "}
+                                {formatCalendarDate(
+                                  f.arrDate || f.arrivalDate,
+                                )}{" "}
                                 {f.arrTime || f.arrivalTime || ""}
                               </div>
                             ))
@@ -1787,9 +1820,9 @@ export default function UmrahBooking() {
                             Approval Date:
                           </span>
                           <span className="text-xs text-gray-800 font-semibold">
-                            {new Date(
+                            {formatCalendarDate(
                               selectedBooking.visaStatus.approvalDate,
-                            ).toLocaleDateString()}
+                            )}
                           </span>
                         </div>
                       )}
@@ -1872,9 +1905,9 @@ export default function UmrahBooking() {
                             Booking Date:
                           </span>
                           <span className="text-xs text-gray-800 font-semibold">
-                            {new Date(
+                            {formatCalendarDate(
                               selectedBooking.hotelStatus.bookingDate,
-                            ).toLocaleDateString()}
+                            )}
                           </span>
                         </div>
                       )}
@@ -2057,757 +2090,679 @@ export default function UmrahBooking() {
             onClick={handleCloseDetailsModal}
           ></div>
 
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="relative flex h-[96vh] w-full max-w-[1360px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             {/* Header */}
-            <div className="px-8 py-6 flex items-start justify-between bg-linear-to-r from-slate-900 via-slate-800 to-emerald-800">
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {selectedBooking.bookingNumber}
-                </h2>
-                <p className="text-slate-200 text-sm mt-1">
-                  {selectedBooking.packageName} | Booked on{" "}
-                  {formatDate(selectedBooking.createdAt)}
-                </p>
+            <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 bg-linear-to-r from-slate-900 via-slate-800 to-emerald-800 px-6 py-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <h2 className="text-xl font-bold text-white">
+                    {selectedBooking.bookingNumber}
+                  </h2>
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${getStatusBadgeClass(
+                      selectedBooking.overallStatus,
+                    )}`}
+                  >
+                    {selectedBooking.overallStatus}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-200">
+                  <span>{selectedBooking.packageName}</span>
+                  <span className="text-slate-500">•</span>
+                  <span>Booked {formatDate(selectedBooking.createdAt)}</span>
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${selectedPackageSource.className}`}
+                  >
+                    {selectedPackageSource.label}
+                  </span>
+                  <span>Room: {selectedBooking.roomType || "N/A"}</span>
+                  <span>
+                    {selectedPackageDetails?.days
+                      ? `${selectedPackageDetails.days} days`
+                      : ""}
+                  </span>
+                  {selectedBooking.packageSource === "travel-network" && (
+                    <span>
+                      TNT: {selectedTravelNetworkBookingId || "Pending"}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleCloseDetailsModal}
-                className="p-2 bg-white/10 text-white hover:bg-white/20 rounded-full transition-all"
+                className="shrink-0 rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-              {/* Package Info */}
-              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-emerald-600" />
-                  Package Information
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Package
-                    </p>
-                    <p className="font-semibold text-gray-900">
-                      {selectedBooking.packageName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Booked On
-                    </p>
-                    <p className="font-semibold text-gray-900">
-                      {formatDateTime(selectedBooking.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Passengers
-                    </p>
-                    <p className="font-semibold text-gray-900">
-                      {selectedBooking.passengerCount?.total ||
-                        selectedBooking.passengers?.length}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Booking Status
-                    </p>
-                    <span
-                      className={`inline-block px-2 py-1 rounded-full border text-xs font-medium ${getStatusBadgeClass(
-                        selectedBooking.overallStatus,
-                      )}`}
-                    >
-                      {selectedBooking.overallStatus}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Original Total
-                    </p>
-                    <p className="font-bold text-gray-900">
-                      {formatMoney(
-                        selectedBooking.pricing?.totalPrice,
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Discount
-                    </p>
-                    <p className="font-bold text-amber-700">
-                      {formatMoney(
-                        selectedBookingDiscountTotal,
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Payable
-                    </p>
-                    <p className="font-bold text-emerald-700">
-                      {formatMoney(
-                        selectedBookingAfterDiscountTotal,
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs font-semibold uppercase">
-                      Remaining
-                    </p>
-                    <p className="font-bold text-red-700">
-                      {formatMoney(
-                        getPayableRemainingAmount(selectedBooking),
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {isOnHoldBooking(selectedBooking) && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-amber-900 flex items-center gap-2">
-                        <Clock className="w-5 h-5" />
-                        Booking Expiry Time
-                      </h3>
-                      {timers[selectedBooking._id]?.expired ? (
-                        <p className="mt-2 text-sm font-bold text-red-600">
-                          EXPIRED
-                        </p>
-                      ) : (
-                        <div className="mt-3 flex items-center gap-2">
-                          {[
-                            {
-                              label: "HOURS",
-                              value: timers[selectedBooking._id]?.hours || 0,
-                            },
-                            {
-                              label: "MINS",
-                              value: timers[selectedBooking._id]?.minutes || 0,
-                            },
-                            {
-                              label: "SECS",
-                              value: timers[selectedBooking._id]?.seconds || 0,
-                            },
-                          ].map((item) => (
-                            <div
-                              key={item.label}
-                              className="min-w-14 rounded-lg bg-white px-3 py-2 text-center shadow-sm"
-                            >
-                              <div className="text-xl font-black leading-none text-gray-900">
-                                {String(item.value).padStart(2, "0")}
-                              </div>
-                              <div className="mt-1 text-[10px] font-bold text-amber-700">
-                                {item.label}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <p className="mt-2 text-xs font-medium text-amber-800">
-                        Expires at: {formatDateTime(selectedBooking.expiresAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  Passengers ({selectedBooking.passengers?.length || 0})
-                  <span className="text-xs font-semibold text-gray-500">
-                    A:{selectedBooking.passengerCount?.adults || 0} C:
-                    {selectedBooking.passengerCount?.children || 0} I:
-                    {selectedBooking.passengerCount?.infants || 0}
-                  </span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(selectedBooking.passengers || []).map((passenger, idx) => (
+            {/* Flights strip */}
+            <div className="shrink-0 border-b border-blue-100 bg-blue-50/70 px-6 py-3">
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                <Plane className="h-3.5 w-3.5" /> Flights
+              </p>
+              {loadingDetailsData ? (
+                <p className="text-xs font-semibold text-blue-700">
+                  Loading flights...
+                </p>
+              ) : selectedPackageFlights.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedPackageFlights.map((flight, idx) => (
                     <div
-                      key={`${passenger.passport || passenger.givenName}-${idx}`}
-                      className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                      key={`${flight.flightNo || "flight"}-${idx}`}
+                      className="min-w-55 flex-1 rounded-lg border border-blue-100 bg-white px-3 py-2"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-bold text-gray-900">
-                            {[
-                              passenger.title,
-                              passenger.givenName,
-                              passenger.surName,
-                            ]
-                              .filter(Boolean)
-                              .join(" ") || "Passenger"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {[
-                              passenger.type === "Child"
-                                ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
-                                : passenger.type,
-                              passenger.nationality,
-                            ]
-                              .filter(Boolean)
-                              .join(" | ")}
-                          </p>
-                        </div>
-                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">
-                          {passenger.type === "Child"
-                            ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
-                            : passenger.type || "N/A"}
+                      <p className="text-xs font-bold text-gray-900">
+                        {flight.flightNo || flight.flightNumber || "Flight N/A"}
+                        {flight.airline || flight.airlineName
+                          ? ` - ${flight.airline || flight.airlineName}`
+                          : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-600">
+                        <span>
+                          {flight.sectorFrom ||
+                            flight.originCode ||
+                            flight.origin ||
+                            "N/A"}{" "}
+                          to{" "}
+                          {flight.sectorTo ||
+                            flight.destinationCode ||
+                            flight.destination ||
+                            "N/A"}
                         </span>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="font-semibold uppercase text-gray-400">
-                            Passport
-                          </p>
-                          <p className="font-semibold text-gray-800">
-                            {passenger.passport || "N/A"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="font-semibold uppercase text-gray-400">
-                            DOB
-                          </p>
-                          <p className="font-semibold text-gray-800">
-                            {formatDate(passenger.dateOfBirth)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="font-semibold uppercase text-gray-400">
-                            Discount
-                          </p>
-                          <p className="font-semibold text-emerald-700">
-                            {formatMoney(
-                              passenger.discount,
-                              selectedBooking.pricing?.currency,
-                            )}
-                          </p>
-                        </div>
-                        {passenger.documentUrl && (
-                          <a
-                            href={passenger.documentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold text-blue-600 hover:text-blue-800"
-                          >
-                            View Document
-                          </a>
-                        )}
+                        <span>
+                          Dep:{" "}
+                          {formatCalendarDate(
+                            flight.depDate ||
+                            flight.departureDate ||
+                            flight.flightDate,
+                          )}{" "}
+                          {flight.depTime || flight.departureTime || ""}
+                        </span>
+                        <span>
+                          Arr:{" "}
+                          {formatCalendarDate(
+                            flight.arrDate || flight.arrivalDate,
+                          )}{" "}
+                          {flight.arrTime || flight.arrivalTime || ""}
+                        </span>
+                        {flight.baggage && <span>Bag: {flight.baggage}</span>}
+                        {flight.meal && <span>Meal: {flight.meal}</span>}
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  {selectedBooking.packageSource === "travel-network"
+                    ? "Flight details are not available in the stored Travel Network package."
+                    : "Flight details are not available for this package."}
+                </p>
+              )}
+            </div>
 
-              {/* Payment Status & History */}
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-emerald-600" />
-                  Payment Status
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-                  <div className="rounded-xl bg-white p-3 border border-emerald-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Status
-                    </p>
-                    <span
-                      className={`mt-1 inline-block rounded-full border px-2 py-1 text-xs font-bold ${getStatusBadgeClass(
-                        selectedBooking.paymentStatus?.status,
-                      )}`}
-                    >
-                      {selectedBooking.paymentStatus?.status || "N/A"}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white p-3 border border-emerald-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Paid
-                    </p>
-                    <p className="mt-1 font-bold text-emerald-700">
-                      {formatMoney(
-                        selectedBooking.paymentStatus?.paidAmount,
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white p-3 border border-emerald-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Total
-                    </p>
-                    <p className="mt-1 font-bold text-gray-900">
-                      {formatMoney(
-                        selectedBookingAfterDiscountTotal,
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white p-3 border border-emerald-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Remaining
-                    </p>
-                    <p className="mt-1 font-bold text-red-700">
-                      {formatMoney(
-                        getPayableRemainingAmount(selectedBooking),
-                        selectedBooking.pricing?.currency,
-                      )}
-                    </p>
-                  </div>
-                </div>
-                {selectedPaymentHistory.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                      Payment History
-                    </p>
-                    {selectedPaymentHistory.map((payment, idx) => (
-                      <div
-                        key={`${payment.receiptNumber || "payment"}-${idx}`}
-                        className="rounded-xl border border-gray-100 bg-white p-3"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                          <div>
-                            <p className="font-bold text-gray-900">
-                              {formatMoney(
-                                payment.amount,
-                                selectedBooking.pricing?.currency,
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {[payment.method, payment.receiptNumber]
-                                .filter(Boolean)
-                                .join(" | ") || "Payment details N/A"}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {formatDateTime(
-                                payment.paymentDate || payment.createdAt,
-                              )}
-                            </p>
-                          </div>
-                          <span
-                            className={`w-fit rounded-full border px-2 py-1 text-xs font-bold ${getStatusBadgeClass(
-                              payment.paymentStatus,
-                            )}`}
-                          >
-                            {payment.paymentStatus === "Received"
-                              ? "Approved"
-                              : payment.paymentStatus || "Pending"}
+            {/* Main content */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:overflow-hidden">
+              <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-[1fr_320px] lg:overflow-hidden">
+                {/* Left column */}
+                <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+                  {isOnHoldBooking(selectedBooking) && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="flex items-center gap-1.5 text-sm font-bold text-amber-900">
+                          <Clock className="w-4 h-4" />
+                          Booking Expiry
+                        </h3>
+                        {timers[selectedBooking._id]?.expired ? (
+                          <span className="text-sm font-bold text-red-600">
+                            EXPIRED
                           </span>
-                        </div>
-                        {payment.rejectionReason && (
-                          <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">
-                            Rejection: {payment.rejectionReason}
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {[
+                              {
+                                label: "H",
+                                value: timers[selectedBooking._id]?.hours || 0,
+                              },
+                              {
+                                label: "M",
+                                value:
+                                  timers[selectedBooking._id]?.minutes || 0,
+                              },
+                              {
+                                label: "S",
+                                value:
+                                  timers[selectedBooking._id]?.seconds || 0,
+                              },
+                            ].map((item) => (
+                              <div
+                                key={item.label}
+                                className="min-w-11 rounded-md bg-white px-2 py-1 text-center shadow-sm"
+                              >
+                                <div className="text-sm font-black leading-none text-gray-900">
+                                  {String(item.value).padStart(2, "0")}
+                                </div>
+                                <div className="mt-0.5 text-[9px] font-bold text-amber-700">
+                                  {item.label}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-medium text-amber-800">
+                        Expires at: {formatDateTime(selectedBooking.expiresAt)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Hotels & Transport */}
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                    <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                      <Building className="h-4 w-4 text-blue-600" />
+                      Hotels &amp; Transport
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {/* Hotels */}
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                          Hotels
+                        </p>
+                        {selectedPackageHotels.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {selectedPackageHotels.map((hotel, idx) => (
+                              <div
+                                key={`${hotel.name || "hotel"}-${idx}`}
+                                className="rounded-lg border border-blue-100 bg-white px-2.5 py-1.5"
+                              >
+                                <p className="text-xs font-bold text-gray-900">
+                                  {hotel.name || "Hotel N/A"}
+                                </p>
+                                <p className="text-[11px] font-medium text-gray-500">
+                                  City: {hotel.location?.city || "N/A"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] font-medium text-slate-500">
+                            {loadingDetailsData
+                              ? "Loading..."
+                              : "No hotels available."}
                           </p>
                         )}
-                        <div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold">
-                          {payment.receiptFile && (
-                            <a
-                              href={payment.receiptFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              View Receipt
-                            </a>
-                          )}
-                          {payment.approvalProofFile && (
-                            <a
-                              href={payment.approvalProofFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-600 hover:text-emerald-800"
-                            >
-                              View Approval Proof
-                            </a>
-                          )}
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="rounded-xl bg-white p-3 text-sm font-medium text-gray-500 border border-emerald-100">
-                    No payment history submitted yet.
-                  </p>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <Plane className="w-5 h-5 text-blue-600" />
-                  Package Travel Details
-                </h3>
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold ${selectedPackageSource.className}`}
-                  >
-                    {selectedPackageSource.label}
-                  </span>
-                  {selectedBooking.packageSource === "travel-network" && (
-                    <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600">
-                      TNT Booking: {selectedTravelNetworkBookingId || "Pending / N/A"}
-                    </span>
-                  )}
-                </div>
-                {loadingDetailsData && (
-                  <div className="mb-4 rounded-xl border border-blue-100 bg-white p-3 text-sm font-semibold text-blue-700">
-                    Loading package flights and hotels...
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                  <div className="rounded-xl bg-white p-3 border border-blue-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Room Type
-                    </p>
-                    <p className="mt-1 font-bold text-gray-900 capitalize">
-                      {selectedBooking.roomType || "N/A"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white p-3 border border-blue-100">
-                    <p className="text-xs font-bold uppercase text-gray-400">
-                      Duration
-                    </p>
-                    <p className="mt-1 font-bold text-gray-900">
-                      {selectedPackageDetails?.days
-                        ? `${selectedPackageDetails.days} days`
-                        : "N/A"}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedPackageFlights.length > 0 && (
-                  <div className="mb-4">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-700">
-                      Flights
-                    </p>
-                    <div className="space-y-2">
-                      {selectedPackageFlights.map((flight, idx) => (
-                        <div
-                          key={`${flight.flightNo || "flight"}-${idx}`}
-                          className="rounded-xl border border-blue-100 bg-white p-3"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <p className="font-bold text-gray-900">
-                              {flight.flightNo ||
-                                flight.flightNumber ||
-                                "Flight N/A"}
-                              {flight.airline || flight.airlineName
-                                ? ` | ${flight.airline || flight.airlineName}`
-                                : ""}
-                            </p>
-                            <span className="w-fit rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
-                              {flight.sectorFrom ||
-                                flight.originCode ||
-                                flight.origin ||
-                                "N/A"}{" "}
-                              to{" "}
-                              {flight.sectorTo ||
-                                flight.destinationCode ||
-                                flight.destination ||
-                                "N/A"}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-gray-600">
-                            <span>
-                              Dep:{" "}
-                              {formatDate(
-                                flight.depDate ||
-                                flight.departureDate ||
-                                flight.flightDate,
-                              )}{" "}
-                              {flight.depTime || flight.departureTime || ""}
-                            </span>
-                            <span>
-                              Arr:{" "}
-                              {formatDate(flight.arrDate || flight.arrivalDate)}{" "}
-                              {flight.arrTime || flight.arrivalTime || ""}
-                            </span>
-                            {flight.baggage && (
-                              <span>Bag: {flight.baggage}</span>
-                            )}
-                            {flight.meal && <span>Meal: {flight.meal}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!loadingDetailsData && selectedPackageFlights.length === 0 && (
-                  <div className="mb-4 rounded-xl border border-blue-100 bg-white p-3 text-sm font-medium text-slate-500">
-                    {selectedBooking.packageSource === "travel-network"
-                      ? "Flight details are not available in the stored Travel Network package."
-                      : "Flight details are not available for this package."}
-                  </div>
-                )}
-
-                {selectedPackageHotels.length > 0 && (
-                  <div className="mb-4">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-700">
-                      Hotels
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {selectedPackageHotels.map((hotel, idx) => (
-                        <div
-                          key={`${hotel.name || "hotel"}-${idx}`}
-                          className="rounded-xl border border-blue-100 bg-white p-3"
-                        >
-                          <p className="font-bold text-gray-900">
-                            {hotel.name || "Hotel N/A"}
-                          </p>
-                          <p className="text-xs font-medium text-gray-500">
-                            {/* {[
-                              hotel.location?.city,
-                              `${hotel.nightCount || hotel.nights || 0} nights`,
-                            ]
-                              .filter(Boolean)
-                              .join(" | ")} */}
-                            City: {hotel.location?.city}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!loadingDetailsData && selectedPackageHotels.length === 0 && (
-                  <div className="mb-4 rounded-xl border border-blue-100 bg-white p-3 text-sm font-medium text-slate-500">
-                    {selectedBooking.packageSource === "travel-network"
-                      ? "Hotel details are not available in the stored Travel Network package."
-                      : "Hotel details are not available for this package."}
-                  </div>
-                )}
-
-                {selectedPackageTransports.length > 0 && (
-                  <div className="mb-4">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-700">
-                      Transport
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {selectedPackageTransports.map((transport, idx) => (
-                        <div
-                          key={`${transport.route || "transport"}-${idx}`}
-                          className="rounded-xl border border-blue-100 bg-white p-3"
-                        >
-                          <p className="font-bold text-gray-900">
-                            {transport.route || "Route N/A"}
-                          </p>
-                          <p className="text-xs font-medium text-gray-500">
-                            {transport.transportType ||
-                              transport.type ||
-                              "Transport details N/A"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedPackageVisa && (
-                  <div className="rounded-xl border border-blue-100 bg-white p-3">
-                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
-                      Package Visa
-                    </p>
-                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      {/* Transport */}
                       <div>
-                        <p className="text-xs font-bold uppercase text-gray-400">
-                          Type
+                        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                          Transport
                         </p>
-                        <p className="font-bold text-gray-900">
+                        {selectedPackageTransports.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {selectedPackageTransports.map((transport, idx) => (
+                              <div
+                                key={`${transport.route || "transport"}-${idx}`}
+                                className="rounded-lg border border-blue-100 bg-white px-2.5 py-1.5"
+                              >
+                                <p className="text-xs font-bold text-gray-900">
+                                  {transport.route || "Route N/A"}
+                                </p>
+                                <p className="text-[11px] font-medium text-gray-500">
+                                  {transport.transportType ||
+                                    transport.type ||
+                                    "N/A"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] font-medium text-slate-500">
+                            {loadingDetailsData
+                              ? "Loading..."
+                              : "No transport available."}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {selectedPackageVisa && (
+                      <div className="mt-3 rounded-lg border border-blue-100 bg-white px-2.5 py-1.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                          Package Visa
+                        </p>
+                        <p className="text-xs font-bold text-gray-900">
                           {selectedPackageVisa.visaType || "N/A"}
                         </p>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Passengers */}
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      Passengers ({selectedBooking.passengers?.length || 0})
+                      <span className="text-[11px] font-semibold text-gray-500">
+                        A:{selectedBooking.passengerCount?.adults || 0} C:
+                        {selectedBooking.passengerCount?.children || 0} I:
+                        {selectedBooking.passengerCount?.infants || 0}
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {(selectedBooking.passengers || []).map(
+                        (passenger, idx) => (
+                          <div
+                            key={`${passenger.passport || passenger.givenName}-${idx}`}
+                            className="rounded-lg border border-gray-100 bg-gray-50 p-2.5"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">
+                                  {[
+                                    passenger.title,
+                                    passenger.givenName,
+                                    passenger.surName,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ") || "Passenger"}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-gray-500">
+                                  {[
+                                    passenger.type === "Child"
+                                      ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                                      : passenger.type,
+                                    passenger.nationality,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" | ")}
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                                {passenger.type === "Child"
+                                  ? passenger.childType === "withBed"
+                                    ? "Child+Bed"
+                                    : "Child"
+                                  : passenger.type || "N/A"}
+                              </span>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+                              <div>
+                                <p className="font-semibold uppercase text-gray-400">
+                                  Passport
+                                </p>
+                                <p className="font-semibold text-gray-800">
+                                  {passenger.passport || "N/A"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="font-semibold uppercase text-gray-400">
+                                  DOB
+                                </p>
+                                <p className="font-semibold text-gray-800">
+                                  {formatCalendarDate(passenger.dateOfBirth)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="font-semibold uppercase text-gray-400">
+                                  Discount
+                                </p>
+                                <p className="font-semibold text-emerald-700">
+                                  {formatMoney(
+                                    passenger.discount,
+                                    selectedBooking.pricing?.currency,
+                                  )}
+                                </p>
+                              </div>
+                              {passenger.documentUrl && (
+                                <a
+                                  href={passenger.documentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="self-end font-semibold text-blue-600 hover:text-blue-800"
+                                >
+                                  View Document
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ),
+                      )}
                     </div>
                   </div>
-                )}
+
+                  {/* Visa & Hotel status */}
+                  {(selectedBooking.visaStatus?.status &&
+                    selectedBooking.visaStatus.status !== "Not Applied") ||
+                    (selectedBooking.hotelStatus?.status &&
+                      selectedBooking.hotelStatus.status !== "Not Booked") ? (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {selectedBooking.visaStatus?.status &&
+                        selectedBooking.visaStatus.status !== "Not Applied" && (
+                          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                            <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                              <FileCheck className="w-4 h-4 text-blue-600" />
+                              Visa Status
+                            </h3>
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-gray-700">
+                                  Status:
+                                </span>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${selectedBooking.visaStatus.status === "Approved"
+                                    ? "bg-blue-600 text-white"
+                                    : selectedBooking.visaStatus.status ===
+                                      "Rejected"
+                                      ? "bg-red-600 text-white"
+                                      : "bg-amber-600 text-white"
+                                    }`}
+                                >
+                                  {selectedBooking.visaStatus.status}
+                                </span>
+                              </div>
+                              {selectedBooking.visaStatus.applicationNumber && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-gray-700">
+                                    Application No:
+                                  </span>
+                                  <span className="font-bold text-gray-900">
+                                    {
+                                      selectedBooking.visaStatus
+                                        .applicationNumber
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                              {selectedBooking.visaStatus.approvalDate && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-gray-700">
+                                    Approval Date:
+                                  </span>
+                                  <span className="font-bold text-gray-900">
+                                    {formatCalendarDate(
+                                      selectedBooking.visaStatus.approvalDate,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedBooking.visaStatus.notes && (
+                                <p className="border-t border-blue-300 pt-1.5 text-gray-800">
+                                  {selectedBooking.visaStatus.notes}
+                                </p>
+                              )}
+                              {selectedBooking.visaStatus.approvalDocument && (
+                                <a
+                                  href={
+                                    selectedBooking.visaStatus.approvalDocument
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 pt-1 font-medium text-blue-700 hover:text-blue-900"
+                                >
+                                  <FileCheck className="w-3.5 h-3.5" />
+                                  View Visa Document
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      {selectedBooking.hotelStatus?.status &&
+                        selectedBooking.hotelStatus.status !== "Not Booked" && (
+                          <div className="rounded-xl border border-purple-200 bg-purple-50 p-3">
+                            <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                              <Building className="w-4 h-4 text-purple-600" />
+                              Hotel Status
+                            </h3>
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-gray-700">
+                                  Status:
+                                </span>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${selectedBooking.hotelStatus.status ===
+                                    "Confirmed"
+                                    ? "bg-purple-600 text-white"
+                                    : selectedBooking.hotelStatus.status ===
+                                      "Cancelled"
+                                      ? "bg-red-600 text-white"
+                                      : "bg-amber-600 text-white"
+                                    }`}
+                                >
+                                  {selectedBooking.hotelStatus.status}
+                                </span>
+                              </div>
+                              {selectedBooking.hotelStatus
+                                .confirmationNumber && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-gray-700">
+                                      Confirmation No:
+                                    </span>
+                                    <span className="font-bold text-gray-900">
+                                      {
+                                        selectedBooking.hotelStatus
+                                          .confirmationNumber
+                                      }
+                                    </span>
+                                  </div>
+                                )}
+                              {selectedBooking.hotelStatus.bookingDate && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-gray-700">
+                                    Booking Date:
+                                  </span>
+                                  <span className="font-bold text-gray-900">
+                                    {formatCalendarDate(
+                                      selectedBooking.hotelStatus.bookingDate,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {selectedBooking.hotelStatus.notes && (
+                                <p className="border-t border-purple-300 pt-1.5 text-gray-800">
+                                  {selectedBooking.hotelStatus.notes}
+                                </p>
+                              )}
+                              {selectedBooking.hotelStatus
+                                .confirmationDocument && (
+                                  <a
+                                    href={
+                                      selectedBooking.hotelStatus
+                                        .confirmationDocument
+                                    }
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 pt-1 font-medium text-purple-700 hover:text-purple-900"
+                                  >
+                                    <Building className="w-3.5 h-3.5" />
+                                    View Hotel Confirmation
+                                  </a>
+                                )}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Right column - pricing & payment */}
+                <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto">
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                    <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                      <CalendarDays className="h-4 w-4 text-emerald-600" />
+                      Pricing Summary
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Original
+                        </p>
+                        <p className="font-bold text-gray-900">
+                          {formatMoney(
+                            selectedBooking.pricing?.totalPrice,
+                            selectedBooking.pricing?.currency,
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Discount
+                        </p>
+                        <p className="font-bold text-amber-700">
+                          {formatMoney(
+                            selectedBookingDiscountTotal,
+                            selectedBooking.pricing?.currency,
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Payable
+                        </p>
+                        <p className="font-bold text-emerald-700">
+                          {formatMoney(
+                            selectedBookingAfterDiscountTotal,
+                            selectedBooking.pricing?.currency,
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Remaining
+                        </p>
+                        <p className="font-bold text-red-700">
+                          {formatMoney(
+                            getPayableRemainingAmount(selectedBooking),
+                            selectedBooking.pricing?.currency,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Status & History */}
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                      <CreditCard className="w-4 h-4 text-emerald-600" />
+                      Payment Status
+                    </h3>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${getStatusBadgeClass(
+                          selectedBooking.paymentStatus?.status,
+                        )}`}
+                      >
+                        {selectedBooking.paymentStatus?.status || "N/A"}
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-700">
+                        Paid{" "}
+                        {formatMoney(
+                          selectedBooking.paymentStatus?.paidAmount,
+                          selectedBooking.pricing?.currency,
+                        )}
+                      </span>
+                    </div>
+                    {selectedPaymentHistory.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {selectedPaymentHistory.map((payment, idx) => (
+                          <div
+                            key={`${payment.receiptNumber || "payment"}-${idx}`}
+                            className="rounded-lg border border-gray-100 bg-white p-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-gray-900">
+                                  {formatMoney(
+                                    payment.amount,
+                                    selectedBooking.pricing?.currency,
+                                  )}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  {[payment.method, payment.receiptNumber]
+                                    .filter(Boolean)
+                                    .join(" | ") || "Payment details N/A"}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  {formatDateTime(
+                                    payment.paymentDate || payment.createdAt,
+                                  )}
+                                </p>
+                              </div>
+                              <span
+                                className={`w-fit shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${getStatusBadgeClass(
+                                  payment.paymentStatus,
+                                )}`}
+                              >
+                                {payment.paymentStatus === "Received"
+                                  ? "Approved"
+                                  : payment.paymentStatus || "Pending"}
+                              </span>
+                            </div>
+                            {payment.rejectionReason && (
+                              <p className="mt-1.5 rounded-md bg-red-50 p-1.5 text-[10px] font-medium text-red-700">
+                                Rejection: {payment.rejectionReason}
+                              </p>
+                            )}
+                            <div className="mt-1.5 flex flex-wrap gap-2 text-[10px] font-semibold">
+                              {payment.receiptFile && (
+                                <a
+                                  href={payment.receiptFile}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  View Receipt
+                                </a>
+                              )}
+                              {payment.approvalProofFile && (
+                                <a
+                                  href={payment.approvalProofFile}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-600 hover:text-emerald-800"
+                                >
+                                  View Approval Proof
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-emerald-100 bg-white p-2 text-xs font-medium text-gray-500">
+                        No payment history submitted yet.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-2">
+                    {selectedBooking.paymentStatus?.status !== "Approved" &&
+                      !(
+                        selectedBooking.paymentStatus?.status === "Pending" &&
+                        selectedBooking.paymentStatus?.amount > 0
+                      ) && (
+                        <button
+                          onClick={() => {
+                            handleCloseDetailsModal();
+                            handleOpenPaymentModal(selectedBooking);
+                          }}
+                          className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {selectedBooking.paymentStatus?.status === "Rejected"
+                            ? "Retry Payment"
+                            : "Submit Payment"}
+                        </button>
+                      )}
+                    <button
+                      onClick={handleCloseDetailsModal}
+                      className="rounded-xl bg-gray-200 px-6 py-2.5 font-semibold text-gray-700 transition-all hover:bg-gray-300"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              {/* Visa Status */}
-              {selectedBooking.visaStatus?.status &&
-                selectedBooking.visaStatus.status !== "Not Applied" && (
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <FileCheck className="w-5 h-5 text-blue-600" />
-                      Visa Status
-                    </h3>
-                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">
-                          Status:
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-bold ${selectedBooking.visaStatus.status === "Approved"
-                            ? "bg-blue-600 text-white"
-                            : selectedBooking.visaStatus.status === "Rejected"
-                              ? "bg-red-600 text-white"
-                              : "bg-amber-600 text-white"
-                            }`}
-                        >
-                          {selectedBooking.visaStatus.status}
-                        </span>
-                      </div>
-                      {selectedBooking.visaStatus.applicationNumber && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">
-                            Application Number:
-                          </span>
-                          <span className="text-sm font-bold text-gray-900">
-                            {selectedBooking.visaStatus.applicationNumber}
-                          </span>
-                        </div>
-                      )}
-                      {selectedBooking.visaStatus.approvalDate && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">
-                            Approval Date:
-                          </span>
-                          <span className="text-sm font-bold text-gray-900">
-                            {new Date(
-                              selectedBooking.visaStatus.approvalDate,
-                            ).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                      {selectedBooking.visaStatus.notes && (
-                        <div className="pt-3 border-t border-blue-300">
-                          <p className="text-xs font-semibold text-blue-900 uppercase mb-1">
-                            Notes:
-                          </p>
-                          <p className="text-sm text-gray-800">
-                            {selectedBooking.visaStatus.notes}
-                          </p>
-                        </div>
-                      )}
-                      {selectedBooking.visaStatus.approvalDocument && (
-                        <a
-                          href={selectedBooking.visaStatus.approvalDocument}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900 font-medium pt-2"
-                        >
-                          <FileCheck className="w-4 h-4" />
-                          View Visa Document
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-              {/* Hotel Status */}
-              {selectedBooking.hotelStatus?.status &&
-                selectedBooking.hotelStatus.status !== "Not Booked" && (
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <Building className="w-5 h-5 text-purple-600" />
-                      Hotel Status
-                    </h3>
-                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">
-                          Status:
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-bold ${selectedBooking.hotelStatus.status === "Confirmed"
-                            ? "bg-purple-600 text-white"
-                            : selectedBooking.hotelStatus.status ===
-                              "Cancelled"
-                              ? "bg-red-600 text-white"
-                              : "bg-amber-600 text-white"
-                            }`}
-                        >
-                          {selectedBooking.hotelStatus.status}
-                        </span>
-                      </div>
-                      {selectedBooking.hotelStatus.confirmationNumber && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">
-                            Confirmation Number:
-                          </span>
-                          <span className="text-sm font-bold text-gray-900">
-                            {selectedBooking.hotelStatus.confirmationNumber}
-                          </span>
-                        </div>
-                      )}
-                      {selectedBooking.hotelStatus.bookingDate && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">
-                            Booking Date:
-                          </span>
-                          <span className="text-sm font-bold text-gray-900">
-                            {new Date(
-                              selectedBooking.hotelStatus.bookingDate,
-                            ).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                      {selectedBooking.hotelStatus.notes && (
-                        <div className="pt-3 border-t border-purple-300">
-                          <p className="text-xs font-semibold text-purple-900 uppercase mb-1">
-                            Notes:
-                          </p>
-                          <p className="text-sm text-gray-800">
-                            {selectedBooking.hotelStatus.notes}
-                          </p>
-                        </div>
-                      )}
-                      {selectedBooking.hotelStatus.confirmationDocument && (
-                        <a
-                          href={
-                            selectedBooking.hotelStatus.confirmationDocument
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-sm text-purple-700 hover:text-purple-900 font-medium pt-2"
-                        >
-                          <Building className="w-4 h-4" />
-                          View Hotel Confirmation
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-8 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              {/* <button
-                onClick={() => handlePrintTicket(selectedBooking)}
-                disabled={printingTicketId === selectedBooking._id}
-                className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-60"
-              >
-                <Printer className="w-4 h-4" />
-                {printingTicketId === selectedBooking._id
-                  ? "Printing..."
-                  : "Print Ticket"}
-              </button> */}
-              <button
-                onClick={handleCloseDetailsModal}
-                className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all"
-              >
-                Close
-              </button>
-              {selectedBooking.paymentStatus?.status !== "Approved" &&
-                !(
-                  selectedBooking.paymentStatus?.status === "Pending" &&
-                  selectedBooking.paymentStatus?.amount > 0
-                ) && (
-                  <button
-                    onClick={() => {
-                      handleCloseDetailsModal();
-                      handleOpenPaymentModal(selectedBooking);
-                    }}
-                    className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {selectedBooking.paymentStatus?.status === "Rejected"
-                      ? "Retry Payment"
-                      : "Submit Payment"}
-                  </button>
-                )}
             </div>
           </div>
         </div>

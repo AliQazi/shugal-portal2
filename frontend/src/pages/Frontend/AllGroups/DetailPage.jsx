@@ -14,11 +14,44 @@ import { Ticket, Info } from "lucide-react";
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "N/A";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-GB", {
+
+  const match = String(dateStr)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  let year;
+  let month;
+  let day;
+
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else {
+    const parsedDate = new Date(dateStr);
+
+    if (Number.isNaN(parsedDate.getTime())) return "N/A";
+
+    year = parsedDate.getFullYear();
+    month = parsedDate.getMonth() + 1;
+    day = parsedDate.getDate();
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return "N/A";
+  }
+
+  return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "UTC",
   });
 };
 

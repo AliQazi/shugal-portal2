@@ -1147,7 +1147,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
     const incentiveEligiblePassengerCount =
         adultCount +
         booking.passengers.filter(
-            (passenger) => passenger.type === "Child" && passenger.childType === "withBed",
+            (passenger: Passenger) => passenger.type === "Child" && passenger.childType === "withBed",
         ).length;
     const totalIncentive = incentivePerPassenger * incentiveEligiblePassengerCount;
     const totalDiscount = discounts.reduce((a, b) => a + b, 0);

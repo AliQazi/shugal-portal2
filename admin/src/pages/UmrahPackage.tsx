@@ -304,11 +304,31 @@ const UmrahPackage = () => {
   console.log(profitBreakdown)
   const [packageTotals, setPackageTotals] = useState({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0, incentive: 0 });
   const baseTotalsRef = useRef({ double: 0, triple: 0, quad: 0, shared: 0, childWithoutBed: 0, childWithBed: 0, infant: 0 });
-  // Skips the packageTotals auto-sync effect for the renders triggered while a copied
-  // package's data (and the umrahGroups list) are still arriving, so the copied totals
-  // (including any manual incentive) aren't clobbered before the user sees them.
-  const skipSyncCountRef = useRef(0);
+  // Skips the packageTotals auto-sync effect while the values it depends on (hotels,
+  // visa, selectedGroupTicketId) still match exactly what a copied package's data set
+  // them to, so the copied totals (including any manual incentive) aren't clobbered by
+  // spurious re-renders while umrahGroups/hotels/etc. are still arriving. Storing a
+  // content signature instead of a fixed render count avoids a race where fetchUmrahGroups
+  // happens to resolve before fetchPackageDetails: a fixed counter would get consumed by
+  // that unrelated render and then skip the user's very first real edit instead.
+  const copiedTotalsBaselineRef = useRef<string | null>(null);
   const [internalStatus, setInternalStatus] = useState<"Public" | "Private">("Public");
+  // In Copy mode, the Hotels/Transport/Visa sections start read-only (see the summary
+  // block below) and only become the full editable sections - identical to Create
+  // Umrah Package - once the admin clicks "Edit" there.
+  const [editingCopiedSections, setEditingCopiedSections] = useState(false);
+  // Snapshot of hotels/transports/visa taken the moment "Edit" is clicked, so
+  // "Cancel" can restore exactly what was copied from the source package.
+  const copiedSectionsSnapshotRef = useRef<{
+    hotels: HotelForm[];
+    transports: Transport[];
+    visa: Visa | null;
+  } | null>(null);
+  // Tracks which hotel-row indexes have already been checked to restore their "Rate
+  // Volume" dropdown selection (see the effect below), so a row is only ever attempted
+  // once - otherwise re-checking on every hotels change would keep re-selecting a
+  // volume the admin had deliberately cleared by hand.
+  const restoredRateVolumeIndexesRef = useRef<Set<number>>(new Set());
   const { data3 = [] } = useAccountsList();
 
   const supplierOptions = data3.map((account: { _id: string; account_name: string }) => ({
@@ -529,13 +549,16 @@ const UmrahPackage = () => {
           currency: data.visa.currency || "PKR",
         } : null;
 
+        const copiedSelectedGroupTicketId = data.selectedGroupTicketId || "";
+        const copiedHotels = formattedHotels.length ? formattedHotels : formik.initialValues.hotels;
+
         formik.setValues({
           packageName: data.packageName || "",
-          selectedGroupTicketId: data.selectedGroupTicketId || "",
+          selectedGroupTicketId: copiedSelectedGroupTicketId,
           logo: "",
           flightLogo: "",
           flights: formattedFlights,
-          hotels: formattedHotels.length ? formattedHotels : formik.initialValues.hotels,
+          hotels: copiedHotels,
           transports: formattedTransports.length ? formattedTransports : formik.initialValues.transports,
           visa: formattedVisa,
           rooms: data.rooms || {
@@ -568,10 +591,15 @@ const UmrahPackage = () => {
             infant: data.packageTotals.infant || 0,
             incentive: inc,
           });
-          // The sync effect below fires again for the formik values set above, then once
-          // more when umrahGroups arrives (order between the two isn't guaranteed) -
-          // skip both so it doesn't overwrite the copied totals before the user sees them.
-          skipSyncCountRef.current = 2;
+          // Record what hotels/visa/selectedGroupTicketId looked like right after this
+          // copy landed, so the totals-sync effect below can tell a spurious re-render
+          // (umrahGroups arriving, etc., in whichever order) apart from the user's first
+          // real edit and only recompute once something has actually changed.
+          copiedTotalsBaselineRef.current = JSON.stringify({
+            selectedGroupTicketId: copiedSelectedGroupTicketId,
+            hotels: copiedHotels,
+            visa: formattedVisa,
+          });
         }
 
         if (data.internalStatus) setInternalStatus(data.internalStatus);
@@ -968,6 +996,36 @@ const UmrahPackage = () => {
     }
   };
 
+  // Copy mode's "Edit" button on the "Copied From Source Package" panel - snapshots
+  // the current hotels/transports/visa so "Cancel" can restore exactly what was
+  // copied, then reveals the full editable sections.
+  const startEditingCopiedSections = () => {
+    copiedSectionsSnapshotRef.current = {
+      hotels: JSON.parse(JSON.stringify(formik.values.hotels)),
+      transports: JSON.parse(JSON.stringify(formik.values.transports)),
+      visa: formik.values.visa ? JSON.parse(JSON.stringify(formik.values.visa)) : null,
+    };
+    setEditingCopiedSections(true);
+  };
+
+  // Reverts hotels/transports/visa back to the snapshot taken when "Edit" was
+  // clicked, discarding any changes made in the editable sections.
+  const cancelEditingCopiedSections = () => {
+    const snapshot = copiedSectionsSnapshotRef.current;
+    if (snapshot) {
+      formik.setFieldValue("hotels", snapshot.hotels);
+      formik.setFieldValue("transports", snapshot.transports);
+      formik.setFieldValue("visa", snapshot.visa);
+    }
+    setSelectedRateVolumeByHotel({});
+    setEditingCopiedSections(false);
+  };
+
+  // Keeps whatever edits were made and collapses back to the read-only summary.
+  const finishEditingCopiedSections = () => {
+    setEditingCopiedSections(false);
+  };
+
   // ✅ NEW: Transport helpers
   const addTransport = () => {
     formik.setFieldValue("transports", [
@@ -1177,17 +1235,18 @@ const UmrahPackage = () => {
       Object.prototype.hasOwnProperty.call(fields, "checkIn") ||
       Object.prototype.hasOwnProperty.call(fields, "checkOut") ||
       Object.prototype.hasOwnProperty.call(fields, "nights");
-    if (datesChanged && row.hotelId && row.checkIn && row.checkOut) {
+    const resolvedHotelIdForDates = datesChanged ? resolveHotelId(row) : undefined;
+    if (datesChanged && resolvedHotelIdForDates && row.checkIn && row.checkOut) {
       const selectedVolumeId = selectedRateVolumeByHotel[index];
       const selectedOption = selectedVolumeId
         ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
         : undefined;
       const selectedRate = selectedOption
-        ? findHotelRateInVolume(selectedOption.data, row.hotelId, row.checkIn, row.checkOut)
+        ? findHotelRateInVolume(selectedOption.data, resolvedHotelIdForDates, row.checkIn, row.checkOut)
         : undefined;
       const match = selectedOption
         ? selectedRate ? { option: selectedOption, rate: selectedRate } : undefined
-        : findMatchingRateVolume(row.hotelId, row.checkIn, row.checkOut);
+        : findMatchingRateVolume(resolvedHotelIdForDates, row.checkIn, row.checkOut);
       if (match) {
         Object.assign(row, computeVolumeFields(row, match.option.data.volumeName, match.rate));
         setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
@@ -1254,9 +1313,26 @@ const UmrahPackage = () => {
     });
   };
 
+  // Rate Volume matching keys off hotelId, but rows carried over from an older/copied
+  // package (or typed freehand before this tracking existed) can have it blank even
+  // though the name matches a real Hotel - fall back to a name match so those rows
+  // still resolve instead of silently failing to apply/validate a Rate Volume.
+  const resolveHotelId = (hotel: HotelForm): string | undefined => {
+    if (hotel.hotelId) return hotel.hotelId;
+    const name = hotel.name?.trim().toLowerCase();
+    if (!name) return undefined;
+    return hotelOptions.find(
+      (option) => (option.data?.hotelName || option.label).trim().toLowerCase() === name
+    )?.value;
+  };
+
   const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
-    if (!hotel.hotelId) return;
-    const rate = findHotelRateInVolume(volume, hotel.hotelId, hotel.checkIn, hotel.checkOut);
+    const hotelId = resolveHotelId(hotel);
+    if (!hotelId) {
+      toast.error(`Select a Hotel Name for this row first so "${volume.volumeName}" can be matched to it.`);
+      return;
+    }
+    const rate = findHotelRateInVolume(volume, hotelId, hotel.checkIn, hotel.checkOut);
     if (!rate) {
       updateHotel(index, emptyRateFields());
       toast.error(
@@ -1264,7 +1340,7 @@ const UmrahPackage = () => {
       );
       return;
     }
-    updateHotel(index, computeVolumeFields(hotel, volume.volumeName, rate));
+    updateHotel(index, computeVolumeFields(hotel.hotelId ? hotel : { ...hotel, hotelId }, volume.volumeName, rate));
   };
 
   // Manual entry for Buying Price/Room (used when no Rate Volume is picked) - mirrors
@@ -1315,12 +1391,21 @@ const UmrahPackage = () => {
 
   // ✅ Effect to sync package totals from computed values
   useEffect(() => {
-    // Skip recalculation right after a copied package's data (and the umrahGroups list)
-    // arrives, so the copied packageTotals (including any manual incentive) aren't
-    // overwritten before the user gets to see/edit them.
-    if (skipSyncCountRef.current > 0) {
-      skipSyncCountRef.current -= 1;
-      return;
+    // Skip recalculation while hotels/visa/selectedGroupTicketId still match exactly
+    // what a copied package's data just set them to, so the copied packageTotals
+    // (including any manual incentive) aren't overwritten by a spurious re-render (e.g.
+    // umrahGroups arriving) before the user makes a real edit. The moment any of them
+    // actually differ, drop the baseline for good and recompute normally from then on.
+    if (copiedTotalsBaselineRef.current !== null) {
+      const currentSignature = JSON.stringify({
+        selectedGroupTicketId: formik.values.selectedGroupTicketId,
+        hotels: formik.values.hotels,
+        visa: formik.values.visa,
+      });
+      if (currentSignature === copiedTotalsBaselineRef.current) {
+        return;
+      }
+      copiedTotalsBaselineRef.current = null;
     }
     const selectedGroup = getSelectedGroupTicket(formik.values.selectedGroupTicketId);
     const flightSellingPrice = selectedGroup?.price?.sellingAdultPriceB2B || 0;
@@ -1366,6 +1451,36 @@ const UmrahPackage = () => {
     formik.values.visa,
     umrahGroups,
   ]);
+
+  // Copy mode: a copied hotel only carries the Rate Volume's name (rateVolumeName) -
+  // the dropdown selection itself is UI-only state that starts empty. Once the volume
+  // list has loaded, resolve each untried hotel row's volume name (and hotel identity,
+  // falling back by name via resolveHotelId) back to an actual option so "Rate Volume"
+  // shows what was really used instead of appearing blank in Edit mode.
+  useEffect(() => {
+    if (!isCopyMode || !rateVolumeOptions.length) return;
+    setSelectedRateVolumeByHotel((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      formik.values.hotels.forEach((hotel, index) => {
+        if (restoredRateVolumeIndexesRef.current.has(index)) return;
+        restoredRateVolumeIndexesRef.current.add(index);
+        if (!hotel.rateVolumeName) return;
+        const hotelId = resolveHotelId(hotel);
+        if (!hotelId) return;
+        const match = rateVolumeOptions.find(
+          (option) =>
+            option.data.volumeName === hotel.rateVolumeName &&
+            option.data.hotelRates.some((rate) => rate.hotelId === hotelId)
+        );
+        if (match) {
+          next[index] = match.value;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [isCopyMode, rateVolumeOptions, formik.values.hotels]);
 
   if (!canCreate) {
     return (
@@ -1660,70 +1775,100 @@ const UmrahPackage = () => {
                     in this copy without being able to accidentally alter it here. */}
                 {isCopyMode && (
                   <div className="border rounded-lg overflow-hidden shadow-sm">
-                    <div className="bg-gray-800 text-white px-4 py-2">
+                    <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
                       <h4 className="text-sm font-semibold">Copied From Source Package</h4>
-                    </div>
-                    <div className="p-4 grid grid-cols-1 gap-4 divide-y divide-gray-200 md:grid-cols-3 md:divide-y-0 md:divide-x [&>*:not(:first-child)]:pt-3 [&>*:not(:first-child)]:md:pt-0 [&>*:not(:first-child)]:md:pl-4">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
-                          Hotels
-                        </p>
-                        {formik.values.hotels.length ? (
-                          <div className="flex flex-wrap gap-2">
-                            {formik.values.hotels.map((hotel, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
-                              >
-                                {hotel.name || "Unnamed Hotel"}
-                                {hotel.location?.city ? ` - ${hotel.location.city}` : ""}
-                                {hotel.nights ? ` (${hotel.nights}N)` : ""}
-                              </span>
-                            ))}
-                          </div>
+                      <div className="flex items-center gap-2">
+                        {editingCopiedSections ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={cancelEditingCopiedSections}
+                              className="rounded-md bg-linear-to-r from-red-500 to-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-red-600 hover:to-red-700 transition-colors duration-200"
+                            >
+                              ✕ Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={finishEditingCopiedSections}
+                              className="rounded-md bg-linear-to-r from-green-500 to-green-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-green-600 hover:to-green-700 transition-colors duration-200"
+                            >
+                              ✓ Done Editing
+                            </button>
+                          </>
                         ) : (
-                          <p className="text-xs italic text-gray-400">No hotels</p>
+                          <button
+                            type="button"
+                            onClick={startEditingCopiedSections}
+                            className="rounded-md bg-linear-to-r from-blue-500 to-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-blue-600 hover:to-blue-700 transition-colors duration-200"
+                          >
+                            ✎ Edit
+                          </button>
                         )}
                       </div>
-
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
-                          Transport
-                        </p>
-                        {formik.values.transports.some((t) => t.route) ? (
-                          <div className="flex flex-wrap gap-2">
-                            {formik.values.transports
-                              .filter((t) => t.route)
-                              .map((transport, idx) => (
+                    </div>
+                    {!editingCopiedSections && (
+                      <div className="p-4 grid grid-cols-1 gap-4 divide-y divide-gray-200 md:grid-cols-3 md:divide-y-0 md:divide-x [&>*:not(:first-child)]:pt-3 [&>*:not(:first-child)]:md:pt-0 [&>*:not(:first-child)]:md:pl-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                            Hotels
+                          </p>
+                          {formik.values.hotels.length ? (
+                            <div className="flex flex-wrap gap-2">
+                              {formik.values.hotels.map((hotel, idx) => (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
+                                  className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
                                 >
-                                  {transport.route}
-                                  {transport.transportType ? ` (${transport.transportType})` : ""}
+                                  {hotel.name || "Unnamed Hotel"}
+                                  {hotel.location?.city ? ` - ${hotel.location.city}` : ""}
+                                  {hotel.nights ? ` (${hotel.nights}N)` : ""}
                                 </span>
                               ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs italic text-gray-400">No transport</p>
-                        )}
-                      </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs italic text-gray-400">No hotels</p>
+                          )}
+                        </div>
 
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
-                          Visa
-                        </p>
-                        {formik.values.visa ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                            {formik.values.visa.visaType || "Visa"}
-                            {" "}
-                            ({formik.values.visa.withTransport ? "With Transport" : "Without Transport"})
-                          </span>
-                        ) : (
-                          <p className="text-xs italic text-gray-400">No visa</p>
-                        )}
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                            Transport
+                          </p>
+                          {formik.values.transports.some((t) => t.route) ? (
+                            <div className="flex flex-wrap gap-2">
+                              {formik.values.transports
+                                .filter((t) => t.route)
+                                .map((transport, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
+                                  >
+                                    {transport.route}
+                                    {transport.transportType ? ` (${transport.transportType})` : ""}
+                                  </span>
+                                ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs italic text-gray-400">No transport</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                            Visa
+                          </p>
+                          {formik.values.visa ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                              {formik.values.visa.visaType || "Visa"}
+                              {" "}
+                              ({formik.values.visa.withTransport ? "With Transport" : "Without Transport"})
+                            </span>
+                          ) : (
+                            <p className="text-xs italic text-gray-400">No visa</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -1745,716 +1890,716 @@ const UmrahPackage = () => {
                 </div>
                 */}
                 {!isCopyMode && (
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Package Duration (Days)</label>
-                    <input
-                      type="number"
-                      name="days"
-                      onChange={formik.handleChange}
-                      value={formik.values.days || ""}
-                      className="border p-2 w-full rounded text-sm h-9"
-                      min={0}
-                      placeholder="0"
-                    />
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Package Duration (Days)</label>
+                      <input
+                        type="number"
+                        name="days"
+                        onChange={formik.handleChange}
+                        value={formik.values.days || ""}
+                        className="border p-2 w-full rounded text-sm h-9"
+                        min={0}
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
-                </div>
                 )}
 
-                {/* Hotels - New Design matching screenshot: hidden in copy mode -
-                    the copied hotel rows (with their pricing) stay in formik state
-                    and are submitted unchanged, they're just not re-editable here. */}
-                {!isCopyMode && (
-                <div>
-                  {formik.values.hotels.map((hotel, index) => (
+                {/* Hotels - New Design matching screenshot: hidden in copy mode unless
+                    the admin clicked "Edit" on the "Copied From Source Package" panel
+                    above - then it's the exact same editable section as Create Umrah
+                    Package, operating on the same formik state that was pre-filled
+                    from the source package. */}
+                {(!isCopyMode || editingCopiedSections) && (
+                  <div>
+                    {formik.values.hotels.map((hotel, index) => (
 
-                    <div key={index} className="border rounded-lg mb-4 overflow-hidden shadow-sm">
-                      {/* Header */}
-                      <div className="bg-blue-600 text-white px-4 py-2 flex justify-between items-center">
-                        <h4 className="text-sm font-semibold">Hotel Details</h4>
-                        {index !== 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newHotels = [...formik.values.hotels];
-                              newHotels.splice(index, 1);
-                              formik.setFieldValue("hotels", newHotels);
-                            }}
-                            className="text-white text-xs hover:text-red-200"
-                          >
-                            ✕ Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="p-4 space-y-4">
-                        {/* Row 1: Supplier, Rate Volume, Hotel Name, City */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Select Supplier Account</label>
-                            <Select
-                              value={getSupplierSelectValue(hotel.supplier)}
-                              onChange={(option) => updateHotel(index, { supplier: toSupplier(option as any) })}
-                              options={supplierOptions}
-                              placeholder="Select Hotel"
-                              isClearable
-                              isSearchable
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                      <div key={index} className="border rounded-lg mb-4 overflow-hidden shadow-sm">
+                        {/* Header */}
+                        <div className="bg-blue-600 text-white px-4 py-2 flex justify-between items-center">
+                          <h4 className="text-sm font-semibold">Hotel Details</h4>
+                          {index !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newHotels = [...formik.values.hotels];
+                                newHotels.splice(index, 1);
+                                formik.setFieldValue("hotels", newHotels);
                               }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Rate Volume</label>
-                            <Select
-                              options={rateVolumeOptions}
-                              value={
-                                selectedRateVolumeByHotel[index]
-                                  ? rateVolumeOptions.find((v) => v.value === selectedRateVolumeByHotel[index]) ?? null
-                                  : null
-                              }
-                              onChange={(option) => {
-                                if (!option) {
-                                  setSelectedRateVolumeByHotel((prev) => {
-                                    const next = { ...prev };
-                                    delete next[index];
-                                    return next;
-                                  });
-                                  return;
-                                }
-                                setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
-                                // Keep the root volume selected even when the hotel has not been
-                                // chosen yet; selecting the hotel later resolves its nested rate.
-                                if (hotel.hotelId) applyRateVolumeToHotel(index, hotel, option.data);
-                              }}
-                              placeholder="Select Volume"
-                              isClearable
-                              isSearchable
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Hotel Name</label>
-                            <CreatableSelect
-                              options={hotelOptions}
-                              onCreateOption={(inputValue) => {
-                                clearSelectedRateVolume(index);
-                                updateHotel(index, { name: inputValue, hotelId: "" });
-                              }}
-                              onChange={(option: any) => {
-                                const selected = option as HotelOption;
-                                if (!selected) {
-                                  clearSelectedRateVolume(index);
-                                  updateHotel(index, { name: "", hotelId: "", location: { city: hotel.location.city, mapUrl: "" }, rating: 0 });
-                                  return;
-                                }
-                                if (selected.data) {
-                                  applyHotelSelection(index, hotel, selected);
-                                  return;
-                                }
-                                clearSelectedRateVolume(index);
-                                updateHotel(index, { name: selected.label || "", hotelId: "" });
-                              }}
-                              value={hotel.name ? { value: hotel.name, label: hotel.name } : null}
-                              placeholder="Hotel Name"
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">City</label>
-                            <CreatableSelect
-                              options={cityOptions}
-                              value={hotel.location.city ? { value: hotel.location.city, label: hotel.location.city } : null}
-                              onChange={(option: any) => updateHotel(index, { location: { ...hotel.location, city: option?.value || "" } })}
-                              onCreateOption={(inputValue) => updateHotel(index, { location: { ...hotel.location, city: inputValue } })}
-                              placeholder="Select or type City"
-                              isClearable
-                              isSearchable
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                              }}
-                            />
-                          </div>
+                              className="text-white text-xs hover:text-red-200"
+                            >
+                              ✕ Remove
+                            </button>
+                          )}
                         </div>
 
-                        {/* Row 2: Check-in, Check-out, Nights, Buying Price/Room, Buying ROE, Currency, Selling Price/Room, Selling ROE */}
-                        <div className="grid grid-cols-2 md:grid-cols-9 gap-3 items-end">
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Check-in Date</label>
-                            <DatePicker
-                              selected={parseISODate(hotel.checkIn)}
-                              onChange={(date: Date | null) => updateHotel(index, { checkIn: date ? dateToISO(date) : "" })}
-                              dateFormat="dd-MM-yyyy"
-                              minDate={getTodayDate()}
-                              customInput={<input type="text" placeholder="dd-----yyyy" className="border p-2 w-full rounded text-xs h-9" />}
-                            />
+                        <div className="p-4 space-y-4">
+                          {/* Row 1: Supplier, Rate Volume, Hotel Name, City */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Select Supplier Account</label>
+                              <Select
+                                value={getSupplierSelectValue(hotel.supplier)}
+                                onChange={(option) => updateHotel(index, { supplier: toSupplier(option as any) })}
+                                options={supplierOptions}
+                                placeholder="Select Hotel"
+                                isClearable
+                                isSearchable
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Rate Volume</label>
+                              <Select
+                                options={rateVolumeOptions}
+                                value={
+                                  selectedRateVolumeByHotel[index]
+                                    ? rateVolumeOptions.find((v) => v.value === selectedRateVolumeByHotel[index]) ?? null
+                                    : null
+                                }
+                                onChange={(option) => {
+                                  if (!option) {
+                                    setSelectedRateVolumeByHotel((prev) => {
+                                      const next = { ...prev };
+                                      delete next[index];
+                                      return next;
+                                    });
+                                    return;
+                                  }
+                                  setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
+                                  // applyRateVolumeToHotel resolves the hotel id itself (falling back to
+                                  // a Hotel Name match) and always reports an error if it still can't
+                                  // find one, so a row missing hotelId never fails to apply silently.
+                                  applyRateVolumeToHotel(index, hotel, option.data);
+                                }}
+                                placeholder="Select Volume"
+                                isClearable
+                                isSearchable
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Hotel Name</label>
+                              <CreatableSelect
+                                options={hotelOptions}
+                                onCreateOption={(inputValue) => {
+                                  clearSelectedRateVolume(index);
+                                  updateHotel(index, { name: inputValue, hotelId: "" });
+                                }}
+                                onChange={(option: any) => {
+                                  const selected = option as HotelOption;
+                                  if (!selected) {
+                                    clearSelectedRateVolume(index);
+                                    updateHotel(index, { name: "", hotelId: "", location: { city: hotel.location.city, mapUrl: "" }, rating: 0 });
+                                    return;
+                                  }
+                                  if (selected.data) {
+                                    applyHotelSelection(index, hotel, selected);
+                                    return;
+                                  }
+                                  clearSelectedRateVolume(index);
+                                  updateHotel(index, { name: selected.label || "", hotelId: "" });
+                                }}
+                                value={hotel.name ? { value: hotel.name, label: hotel.name } : null}
+                                placeholder="Hotel Name"
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">City</label>
+                              <CreatableSelect
+                                options={cityOptions}
+                                value={hotel.location.city ? { value: hotel.location.city, label: hotel.location.city } : null}
+                                onChange={(option: any) => updateHotel(index, { location: { ...hotel.location, city: option?.value || "" } })}
+                                onCreateOption={(inputValue) => updateHotel(index, { location: { ...hotel.location, city: inputValue } })}
+                                placeholder="Select or type City"
+                                isClearable
+                                isSearchable
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Check-out Date</label>
-                            <DatePicker
-                              selected={parseISODate(hotel.checkOut)}
-                              onChange={(date: Date | null) => updateHotel(index, { checkOut: date ? dateToISO(date) : "" })}
-                              dateFormat="dd-MM-yyyy"
-                              minDate={hotel.checkIn ? parseISODate(hotel.checkIn) || getTodayDate() : getTodayDate()}
-                              customInput={<input type="text" placeholder="dd-----yyyy" className="border p-2 w-full rounded text-xs h-9" />}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Nights</label>
-                            <input
-                              type="number"
-                              value={hotel.nights || ""}
-                              readOnly
-                              className="border p-2 w-full rounded text-xs h-9 bg-gray-100"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Buying Price/Room</label>
-                            <input
-                              type="number"
-                              value={hotel.buyingPrice ?? ""}
-                              onChange={(e) => handleManualBuyingPrice(index, hotel, e.target.value)}
-                              className="border p-2 w-full rounded text-xs h-9"
-                              placeholder=""
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Buying ROE</label>
-                            <input
-                              type="number"
-                              value={hotel.buyingRoe ?? 1}
-                              onChange={(e) => {
-                                clearSelectedRateVolume(index);
-                                const roe = Number(e.target.value || 1);
-                                const buying = hotel.buyingPrice || 0;
-                                const selling = parseFloat((buying * roe).toFixed(2));
-                                updateHotel(index, {
-                                  buyingRoe: roe,
-                                  sellingPrice: selling,
-                                  doubleRoom: { ...hotel.doubleRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 2).toFixed(2)) },
-                                  tripleRoom: { ...hotel.tripleRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 3).toFixed(2)) },
-                                  quadRoom: { ...hotel.quadRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 4).toFixed(2)) },
-                                  sharedRoom: { ...hotel.sharedRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 5).toFixed(2)) },
-                                });
-                              }}
-                              className="border p-2 w-full rounded text-xs h-9"
-                              placeholder="1"
-                              step="0.01"
-                              min={1}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Currency</label>
-                            <Select
-                              options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
-                              value={hotel.buyingCurrency ? { value: hotel.buyingCurrency, label: hotel.buyingCurrency } : null}
-                              onChange={(opt) => {
-                                clearSelectedRateVolume(index);
-                                updateHotel(index, { buyingCurrency: opt?.value || "PKR", sellingCurrency: opt?.value || "PKR" });
-                              }}
-                              placeholder="Currency"
-                              isSearchable
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Selling Price/Room</label>
-                            <div className="flex gap-1">
+
+                          {/* Row 2: Check-in, Check-out, Nights, Buying Price/Room, Buying ROE, Currency, Selling Price/Room, Selling ROE */}
+                          <div className="grid grid-cols-2 md:grid-cols-9 gap-3 items-end">
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Check-in Date</label>
+                              <DatePicker
+                                selected={parseISODate(hotel.checkIn)}
+                                onChange={(date: Date | null) => updateHotel(index, { checkIn: date ? dateToISO(date) : "" })}
+                                dateFormat="dd-MM-yyyy"
+                                minDate={getTodayDate()}
+                                customInput={<input type="text" placeholder="dd-----yyyy" className="border p-2 w-full rounded text-xs h-9" />}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Check-out Date</label>
+                              <DatePicker
+                                selected={parseISODate(hotel.checkOut)}
+                                onChange={(date: Date | null) => updateHotel(index, { checkOut: date ? dateToISO(date) : "" })}
+                                dateFormat="dd-MM-yyyy"
+                                minDate={hotel.checkIn ? parseISODate(hotel.checkIn) || getTodayDate() : getTodayDate()}
+                                customInput={<input type="text" placeholder="dd-----yyyy" className="border p-2 w-full rounded text-xs h-9" />}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Nights</label>
                               <input
                                 type="number"
-                                value={hotel.sellingPrice ?? ""}
-                                onChange={(e) => handleManualSellingPrice(index, hotel, e.target.value)}
+                                value={hotel.nights || ""}
+                                readOnly
+                                className="border p-2 w-full rounded text-xs h-9 bg-gray-100"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Buying Price/Room</label>
+                              <input
+                                type="number"
+                                value={hotel.buyingPrice ?? ""}
+                                onChange={(e) => handleManualBuyingPrice(index, hotel, e.target.value)}
                                 className="border p-2 w-full rounded text-xs h-9"
                                 placeholder=""
                               />
-                              {index !== 0 && (
-                                <button
-                                  type="button"
-                                  className="bg-pink-500 text-white px-2 rounded text-xs h-9 hover:bg-pink-600"
-                                  onClick={() => {
-                                    const newHotels = [...formik.values.hotels];
-                                    newHotels.splice(index, 1);
-                                    formik.setFieldValue("hotels", newHotels);
-                                  }}
-                                >
-                                  ✕
-                                </button>
-                              )}
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Buying ROE</label>
+                              <input
+                                type="number"
+                                value={hotel.buyingRoe ?? 1}
+                                onChange={(e) => {
+                                  clearSelectedRateVolume(index);
+                                  const roe = Number(e.target.value || 1);
+                                  const buying = hotel.buyingPrice || 0;
+                                  const selling = parseFloat((buying * roe).toFixed(2));
+                                  updateHotel(index, {
+                                    buyingRoe: roe,
+                                    sellingPrice: selling,
+                                    doubleRoom: { ...hotel.doubleRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 2).toFixed(2)) },
+                                    tripleRoom: { ...hotel.tripleRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 3).toFixed(2)) },
+                                    quadRoom: { ...hotel.quadRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 4).toFixed(2)) },
+                                    sharedRoom: { ...hotel.sharedRoom, buyingRoe: roe, sellingPrice: parseFloat((selling / 5).toFixed(2)) },
+                                  });
+                                }}
+                                className="border p-2 w-full rounded text-xs h-9"
+                                placeholder="1"
+                                step="0.01"
+                                min={1}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Currency</label>
+                              <Select
+                                options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
+                                value={hotel.buyingCurrency ? { value: hotel.buyingCurrency, label: hotel.buyingCurrency } : null}
+                                onChange={(opt) => {
+                                  clearSelectedRateVolume(index);
+                                  updateHotel(index, { buyingCurrency: opt?.value || "PKR", sellingCurrency: opt?.value || "PKR" });
+                                }}
+                                placeholder="Currency"
+                                isSearchable
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Selling Price/Room</label>
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  value={hotel.sellingPrice ?? ""}
+                                  onChange={(e) => handleManualSellingPrice(index, hotel, e.target.value)}
+                                  className="border p-2 w-full rounded text-xs h-9"
+                                  placeholder=""
+                                />
+                                {index !== 0 && (
+                                  <button
+                                    type="button"
+                                    className="bg-pink-500 text-white px-2 rounded text-xs h-9 hover:bg-pink-600"
+                                    onClick={() => {
+                                      const newHotels = [...formik.values.hotels];
+                                      newHotels.splice(index, 1);
+                                      formik.setFieldValue("hotels", newHotels);
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Selling ROE</label>
+                              <input
+                                type="number"
+                                value={hotel.sellingRoe ?? 1}
+                                onChange={(e) => {
+                                  clearSelectedRateVolume(index);
+                                  const roe = Number(e.target.value || 1);
+                                  updateHotel(index, {
+                                    sellingRoe: roe,
+                                    doubleRoom: { ...hotel.doubleRoom, sellingRoe: roe },
+                                    tripleRoom: { ...hotel.tripleRoom, sellingRoe: roe },
+                                    quadRoom: { ...hotel.quadRoom, sellingRoe: roe },
+                                    sharedRoom: { ...hotel.sharedRoom, sellingRoe: roe },
+                                  });
+                                }}
+                                className="border p-2 w-full rounded text-xs h-9"
+                                placeholder="1"
+                                step="0.01"
+                                min={1}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold mb-1">Selling Currency</label>
+                              <Select
+                                options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
+                                value={hotel.sellingCurrency ? { value: hotel.sellingCurrency, label: hotel.sellingCurrency } : null}
+                                onChange={(opt) => {
+                                  clearSelectedRateVolume(index);
+                                  updateHotel(index, { sellingCurrency: opt?.value || "PKR" });
+                                }}
+                                placeholder="Currency"
+                                isSearchable
+                                className="text-xs"
+                                styles={{
+                                  control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                                  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                                  input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                                }}
+                              />
                             </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Selling ROE</label>
-                            <input
-                              type="number"
-                              value={hotel.sellingRoe ?? 1}
-                              onChange={(e) => {
-                                clearSelectedRateVolume(index);
-                                const roe = Number(e.target.value || 1);
-                                updateHotel(index, {
-                                  sellingRoe: roe,
-                                  doubleRoom: { ...hotel.doubleRoom, sellingRoe: roe },
-                                  tripleRoom: { ...hotel.tripleRoom, sellingRoe: roe },
-                                  quadRoom: { ...hotel.quadRoom, sellingRoe: roe },
-                                  sharedRoom: { ...hotel.sharedRoom, sellingRoe: roe },
-                                });
-                              }}
-                              className="border p-2 w-full rounded text-xs h-9"
-                              placeholder="1"
-                              step="0.01"
-                              min={1}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold mb-1">Selling Currency</label>
-                            <Select
-                              options={currency_list.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
-                              value={hotel.sellingCurrency ? { value: hotel.sellingCurrency, label: hotel.sellingCurrency } : null}
-                              onChange={(opt) => {
-                                clearSelectedRateVolume(index);
-                                updateHotel(index, { sellingCurrency: opt?.value || "PKR" });
-                              }}
-                              placeholder="Currency"
-                              isSearchable
-                              className="text-xs"
-                              styles={{
-                                control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                                valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                                input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                              }}
-                            />
-                          </div>
-                        </div>
 
-                        {/* Room Type Cards - single row */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          {([
-                            { key: "doubleRoom", label: "Double Room (2 Pax)", color: "bg-green-600", paxLabel: "Price/Pax" },
-                            { key: "tripleRoom", label: "Triple Room (3 Pax)", color: "bg-teal-500", paxLabel: `Price/Pax${""}` },
-                            { key: "quadRoom", label: "Quad Room (4 Pax)", color: "bg-blue-500", paxLabel: "Price/Pax" },
-                            { key: "sharedRoom", label: "Shared Room", color: "bg-yellow-500", paxLabel: "Total Price" },
-                          ] as const).map(({ key, label, color, paxLabel }) => {
-                            const room = hotel[key] as RoomPricing;
-                            const updateRoom = (fields: Partial<RoomPricing>) => {
-                              updateHotel(index, { [key]: { ...room, ...fields } });
-                            };
-                            return (
-                              <div key={key} className="border rounded overflow-hidden">
-                                <div className={`${color} text-white px-3 py-2`}>
-                                  <span className="text-xs font-bold">{label}</span>
-                                </div>
-                                <div className="p-3 space-y-3">
-                                  {/* Buying */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-red-500 mb-2">Buying</p>
-                                    <div className="grid grid-cols-3 gap-1">
-                                      <div>
-                                        <label className="block text-xs mb-1">{paxLabel} ({hotel.buyingCurrency || "PKR"})</label>
-                                        <input
-                                          type="number"
-                                          value={room.buyingPrice || ""}
-                                          onChange={(e) => {
-                                            const val = Number(e.target.value || 0);
-                                            if (key === "doubleRoom") {
-                                              updateHotel(index, {
-                                                buyingPrice: parseFloat((val * 2).toFixed(2)),
-                                                doubleRoom: { ...hotel.doubleRoom, buyingPrice: val },
-                                                tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat(((val * 2) / 3).toFixed(2)) },
-                                                quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat(((val * 2) / 4).toFixed(2)) },
-                                                sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat(((val * 2) / 5).toFixed(2)) },
-                                              });
-                                            } else {
-                                              updateRoom({ buyingPrice: val });
-                                            }
-                                          }}
-                                          className="border p-1 w-full rounded text-xs h-7"
-                                          placeholder="0.00"
-                                          step="0.01"
-                                        />
+                          {/* Room Type Cards - single row */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            {([
+                              { key: "doubleRoom", label: "Double Room (2 Pax)", color: "bg-green-600", paxLabel: "Price/Pax" },
+                              { key: "tripleRoom", label: "Triple Room (3 Pax)", color: "bg-teal-500", paxLabel: `Price/Pax${""}` },
+                              { key: "quadRoom", label: "Quad Room (4 Pax)", color: "bg-blue-500", paxLabel: "Price/Pax" },
+                              { key: "sharedRoom", label: "Shared Room", color: "bg-yellow-500", paxLabel: "Total Price" },
+                            ] as const).map(({ key, label, color, paxLabel }) => {
+                              const room = hotel[key] as RoomPricing;
+                              const updateRoom = (fields: Partial<RoomPricing>) => {
+                                updateHotel(index, { [key]: { ...room, ...fields } });
+                              };
+                              return (
+                                <div key={key} className="border rounded overflow-hidden">
+                                  <div className={`${color} text-white px-3 py-2`}>
+                                    <span className="text-xs font-bold">{label}</span>
+                                  </div>
+                                  <div className="p-3 space-y-3">
+                                    {/* Buying */}
+                                    <div>
+                                      <p className="text-xs font-semibold text-red-500 mb-2">Buying</p>
+                                      <div className="grid grid-cols-3 gap-1">
+                                        <div>
+                                          <label className="block text-xs mb-1">{paxLabel} ({hotel.buyingCurrency || "PKR"})</label>
+                                          <input
+                                            type="number"
+                                            value={room.buyingPrice || ""}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value || 0);
+                                              if (key === "doubleRoom") {
+                                                updateHotel(index, {
+                                                  buyingPrice: parseFloat((val * 2).toFixed(2)),
+                                                  doubleRoom: { ...hotel.doubleRoom, buyingPrice: val },
+                                                  tripleRoom: { ...hotel.tripleRoom, buyingPrice: parseFloat(((val * 2) / 3).toFixed(2)) },
+                                                  quadRoom: { ...hotel.quadRoom, buyingPrice: parseFloat(((val * 2) / 4).toFixed(2)) },
+                                                  sharedRoom: { ...hotel.sharedRoom, buyingPrice: parseFloat(((val * 2) / 5).toFixed(2)) },
+                                                });
+                                              } else {
+                                                updateRoom({ buyingPrice: val });
+                                              }
+                                            }}
+                                            className="border p-1 w-full rounded text-xs h-7"
+                                            placeholder="0.00"
+                                            step="0.01"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs mb-1">ROE</label>
+                                          <input
+                                            type="number"
+                                            value={room.buyingRoe || 1}
+                                            onChange={(e) => updateRoom({ buyingRoe: Number(e.target.value || 1) })}
+                                            className="border p-1 w-full rounded text-xs h-7"
+                                            placeholder="1"
+                                            step="0.01"
+                                            min={1}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs mb-1">PKR</label>
+                                          <input
+                                            type="number"
+                                            value={room.buyingPrice && room.buyingRoe ? (room.buyingPrice * room.buyingRoe).toFixed(2) : "0.00"}
+                                            readOnly
+                                            className="border p-1 w-full rounded text-xs h-7 bg-gray-100"
+                                          />
+                                        </div>
                                       </div>
-                                      <div>
-                                        <label className="block text-xs mb-1">ROE</label>
-                                        <input
-                                          type="number"
-                                          value={room.buyingRoe || 1}
-                                          onChange={(e) => updateRoom({ buyingRoe: Number(e.target.value || 1) })}
-                                          className="border p-1 w-full rounded text-xs h-7"
-                                          placeholder="1"
-                                          step="0.01"
-                                          min={1}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs mb-1">PKR</label>
-                                        <input
-                                          type="number"
-                                          value={room.buyingPrice && room.buyingRoe ? (room.buyingPrice * room.buyingRoe).toFixed(2) : "0.00"}
-                                          readOnly
-                                          className="border p-1 w-full rounded text-xs h-7 bg-gray-100"
-                                        />
+                                    </div>
+                                    {/* Selling */}
+                                    <div>
+                                      <p className="text-xs font-semibold text-green-600 mb-2">Selling</p>
+                                      <div className="grid grid-cols-3 gap-1">
+                                        <div>
+                                          <label className="block text-xs mb-1">{paxLabel} ({hotel.sellingCurrency || "PKR"})</label>
+                                          <input
+                                            type="number"
+                                            value={room.sellingPrice || ""}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value || 0);
+                                              if (key === "doubleRoom") {
+                                                updateHotel(index, {
+                                                  sellingPrice: parseFloat((val * 2).toFixed(2)),
+                                                  doubleRoom: { ...hotel.doubleRoom, sellingPrice: val },
+                                                  tripleRoom: { ...hotel.tripleRoom, sellingPrice: parseFloat(((val * 2) / 3).toFixed(2)) },
+                                                  quadRoom: { ...hotel.quadRoom, sellingPrice: parseFloat(((val * 2) / 4).toFixed(2)) },
+                                                  sharedRoom: { ...hotel.sharedRoom, sellingPrice: parseFloat(((val * 2) / 5).toFixed(2)) },
+                                                });
+                                              } else {
+                                                updateRoom({ sellingPrice: val });
+                                              }
+                                            }}
+                                            className="border p-1 w-full rounded text-xs h-7"
+                                            placeholder="0.00"
+                                            step="0.01"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs mb-1">ROE</label>
+                                          <input
+                                            type="number"
+                                            value={room.sellingRoe || 1}
+                                            onChange={(e) => updateRoom({ sellingRoe: Number(e.target.value || 1) })}
+                                            className="border p-1 w-full rounded text-xs h-7"
+                                            placeholder="1"
+                                            step="0.01"
+                                            min={1}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs mb-1">PKR</label>
+                                          <input
+                                            type="number"
+                                            value={room.sellingPrice && room.sellingRoe ? (room.sellingPrice * room.sellingRoe).toFixed(2) : ""}
+                                            readOnly
+                                            className="border p-1 w-full rounded text-xs h-7 bg-gray-100"
+                                          />
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                  {/* Selling */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-green-600 mb-2">Selling</p>
-                                    <div className="grid grid-cols-3 gap-1">
-                                      <div>
-                                        <label className="block text-xs mb-1">{paxLabel} ({hotel.sellingCurrency || "PKR"})</label>
-                                        <input
-                                          type="number"
-                                          value={room.sellingPrice || ""}
-                                          onChange={(e) => {
-                                            const val = Number(e.target.value || 0);
-                                            if (key === "doubleRoom") {
-                                              updateHotel(index, {
-                                                sellingPrice: parseFloat((val * 2).toFixed(2)),
-                                                doubleRoom: { ...hotel.doubleRoom, sellingPrice: val },
-                                                tripleRoom: { ...hotel.tripleRoom, sellingPrice: parseFloat(((val * 2) / 3).toFixed(2)) },
-                                                quadRoom: { ...hotel.quadRoom, sellingPrice: parseFloat(((val * 2) / 4).toFixed(2)) },
-                                                sharedRoom: { ...hotel.sharedRoom, sellingPrice: parseFloat(((val * 2) / 5).toFixed(2)) },
-                                              });
-                                            } else {
-                                              updateRoom({ sellingPrice: val });
-                                            }
-                                          }}
-                                          className="border p-1 w-full rounded text-xs h-7"
-                                          placeholder="0.00"
-                                          step="0.01"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs mb-1">ROE</label>
-                                        <input
-                                          type="number"
-                                          value={room.sellingRoe || 1}
-                                          onChange={(e) => updateRoom({ sellingRoe: Number(e.target.value || 1) })}
-                                          className="border p-1 w-full rounded text-xs h-7"
-                                          placeholder="1"
-                                          step="0.01"
-                                          min={1}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-xs mb-1">PKR</label>
-                                        <input
-                                          type="number"
-                                          value={room.sellingPrice && room.sellingRoe ? (room.sellingPrice * room.sellingRoe).toFixed(2) : ""}
-                                          readOnly
-                                          className="border p-1 w-full rounded text-xs h-7 bg-gray-100"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {/* Add More Hotels */}
-                  <div className="flex justify-center mt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // The new hotel's Check-in Date starts where the previous
-                        // hotel's Check-out Date left off, so consecutive hotel stays
-                        // chain together instead of both defaulting to blank.
-                        const hotels = formik.values.hotels;
-                        const previousHotel = hotels[hotels.length - 1];
-                        formik.setFieldValue("hotels", [
-                          ...hotels,
-                          {
-                            name: "",
-                            supplier: { name: "", _id: "" },
-                            location: { city: "", mapUrl: "" },
-                            rating: 0,
-                            checkIn: previousHotel?.checkOut || "",
-                            checkOut: "",
-                            nights: 0,
-                            nightCount: 0,
-                            buyingPrice: undefined,
-                            buyingRoe: 1,
-                            buyingCurrency: "PKR",
-                            sellingPrice: undefined,
-                            sellingRoe: 1,
-                            sellingCurrency: "PKR",
-                            currency: "PKR",
-                            doubleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-                            tripleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-                            quadRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-                            sharedRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-                          },
-                        ]);
-                      }}
-                      className="bg-green-600 text-white px-6 py-2 rounded text-sm hover:bg-green-700"
-                    >
-                      + Add More Hotels
-                    </button>
+                    {/* Add More Hotels */}
+                    <div className="flex justify-center mt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // The new hotel's Check-in Date starts where the previous
+                          // hotel's Check-out Date left off, so consecutive hotel stays
+                          // chain together instead of both defaulting to blank.
+                          const hotels = formik.values.hotels;
+                          const previousHotel = hotels[hotels.length - 1];
+                          formik.setFieldValue("hotels", [
+                            ...hotels,
+                            {
+                              name: "",
+                              supplier: { name: "", _id: "" },
+                              location: { city: "", mapUrl: "" },
+                              rating: 0,
+                              checkIn: previousHotel?.checkOut || "",
+                              checkOut: "",
+                              nights: 0,
+                              nightCount: 0,
+                              buyingPrice: undefined,
+                              buyingRoe: 1,
+                              buyingCurrency: "PKR",
+                              sellingPrice: undefined,
+                              sellingRoe: 1,
+                              sellingCurrency: "PKR",
+                              currency: "PKR",
+                              doubleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+                              tripleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+                              quadRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+                              sharedRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
+                            },
+                          ]);
+                        }}
+                        className="bg-green-600 text-white px-6 py-2 rounded text-sm hover:bg-green-700"
+                      >
+                        + Add More Hotels
+                      </button>
+                    </div>
                   </div>
-                </div>
                 )}
 
                 {/* ✅ NEW: Transport Section - same pattern as Hotels: hidden in copy
-                    mode, the copied transports stay in formik state and are submitted
-                    unchanged. */}
-                {!isCopyMode && (
-                <div className="border rounded p-3">
-                  <h4 className="text-sm font-semibold mb-2">Transport</h4>
-                  {formik.values.transports.map((transport, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2 pb-2 border-b last:border-b-0"
-                    >
-                      {/* Route */}
-                      <div>
-                        <label className="block text-xs mb-1">Route</label>
-                        <CreatableSelect
-                          options={transportOptions}
-                          onCreateOption={(inputValue) => {
-                            updateTransport(index, { route: inputValue });
-                          }}
-                          onChange={(option: any) => {
-                            const selected = option as TransportOption;
-                            if (!selected) {
-                              updateTransport(index, { route: "", transportType: "" });
-                              return;
-                            }
+                    mode unless the admin clicked "Edit" above. */}
+                {(!isCopyMode || editingCopiedSections) && (
+                  <div className="border rounded p-3">
+                    <h4 className="text-sm font-semibold mb-2">Transport</h4>
+                    {formik.values.transports.map((transport, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2 pb-2 border-b last:border-b-0"
+                      >
+                        {/* Route */}
+                        <div>
+                          <label className="block text-xs mb-1">Route</label>
+                          <CreatableSelect
+                            options={transportOptions}
+                            onCreateOption={(inputValue) => {
+                              updateTransport(index, { route: inputValue });
+                            }}
+                            onChange={(option: any) => {
+                              const selected = option as TransportOption;
+                              if (!selected) {
+                                updateTransport(index, { route: "", transportType: "" });
+                                return;
+                              }
 
-                            if (selected.data) {
-                              updateTransport(index, {
-                                route: selected.data.route || selected.label,
-                                transportType: selected.data.transportType || "",
-                              });
-                              return;
-                            }
+                              if (selected.data) {
+                                updateTransport(index, {
+                                  route: selected.data.route || selected.label,
+                                  transportType: selected.data.transportType || "",
+                                });
+                                return;
+                              }
 
-                            updateTransport(index, { route: selected.label || "" });
-                          }}
-                          value={transport.route ? { value: transport.route, label: transport.route } : null}
-                          placeholder="Type route..."
-                          className="text-xs"
-                          styles={{
-                            control: (base) => ({ ...base, minHeight: "32px", height: "32px", fontSize: "0.75rem" }),
-                            valueContainer: (base) => ({ ...base, padding: "0 6px" }),
-                            input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                          }}
-                        />
-                      </div>
-
-                      {/* Supplier */}
-                      <div>
-                        <label className="block text-xs mb-1">Supplier</label>
-                        <Select
-                          value={getSupplierSelectValue(transport.supplier)}
-                          onChange={(option) => updateTransport(index, { supplier: toSupplier(option as any) })}
-                          options={supplierOptions}
-                          placeholder="Select supplier"
-                          isClearable
-                          isSearchable
-                          className="text-xs"
-                          styles={{
-                            control: (base) => ({ ...base, minHeight: "32px", height: "32px", fontSize: "0.75rem" }),
-                            valueContainer: (base) => ({ ...base, padding: "0 6px" }),
-                            input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                          }}
-                        />
-                      </div>
-
-                      {/* Transport Type */}
-                      <div>
-                        <label className="block text-xs mb-1">Transport Type</label>
-                        <select
-                          value={transport.transportType}
-                          onChange={(e) => updateTransport(index, { transportType: e.target.value })}
-                          className="border p-1.5 w-full rounded text-xs h-8 outline-none focus:border-blue-500"
-                        >
-                          <option value="">Select type</option>
-                          {TRANSPORT_TYPES.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Remove */}
-                      {index !== 0 && (
-                        <div className="flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeTransport(index)}
-                            className="text-red-500 text-xs hover:text-red-700 px-2 h-8"
-                          >
-                            Remove
-                          </button>
+                              updateTransport(index, { route: selected.label || "" });
+                            }}
+                            value={transport.route ? { value: transport.route, label: transport.route } : null}
+                            placeholder="Type route..."
+                            className="text-xs"
+                            styles={{
+                              control: (base) => ({ ...base, minHeight: "32px", height: "32px", fontSize: "0.75rem" }),
+                              valueContainer: (base) => ({ ...base, padding: "0 6px" }),
+                              input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                            }}
+                          />
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addTransport}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 mt-2"
-                  >
-                    + Add Transport
-                  </button>
-                </div>
-                )}
 
-                {/* Visa Selection: hidden in copy mode, the copied visa stays in
-                    formik state and is submitted unchanged. */}
-                {!isCopyMode && (
-                <div className="border rounded-lg overflow-hidden shadow-sm">
-                  <div className="px-4 py-2 border-b bg-white">
-                    <h4 className="text-sm font-semibold">Visa</h4>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold mb-1">Visa Type</label>
-                        <Select
-                          options={visaOptions}
-                          value={visaOptions.find((v) => v.value === formik.values.visa?.visaId) ?? null}
-                          onChange={(option) => {
-                            if (option?.data) {
-                              formik.setFieldValue("visa", {
-                                visaId: option.value,
-                                visaType: option.data.visaType,
-                                supplier: formik.values.visa?.supplier || { name: "", _id: "" },
-                                withTransport: option.data.withTransport,
-                                buyingPrice: option.data.buyingPrice,
-                                buyingRoe: option.data.buyingRoe || 1,
-                                buyingCurrency: option.data.buyingCurrency || option.data.currency || "PKR",
-                                sellingPrice: option.data.sellingPrice,
-                                sellingRoe: option.data.sellingRoe || 1,
-                                sellingCurrency: option.data.sellingCurrency || option.data.currency || "PKR",
-                                currency: option.data.currency,
-                              });
-                            } else {
-                              formik.setFieldValue("visa", null);
-                            }
-                          }}
-                          placeholder="Select visa..."
-                          isClearable
-                          isSearchable
-                          className="text-xs"
-                          styles={{
-                            control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
-                            valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                            input: (base) => ({ ...base, margin: "0", padding: "0" }),
-                          }}
-                        />
-                        {formik.errors.visa && formik.touched.visa && (
-                          <p className="text-red-500 text-xs mt-1">{String(formik.errors.visa)}</p>
+                        {/* Supplier */}
+                        <div>
+                          <label className="block text-xs mb-1">Supplier</label>
+                          <Select
+                            value={getSupplierSelectValue(transport.supplier)}
+                            onChange={(option) => updateTransport(index, { supplier: toSupplier(option as any) })}
+                            options={supplierOptions}
+                            placeholder="Select supplier"
+                            isClearable
+                            isSearchable
+                            className="text-xs"
+                            styles={{
+                              control: (base) => ({ ...base, minHeight: "32px", height: "32px", fontSize: "0.75rem" }),
+                              valueContainer: (base) => ({ ...base, padding: "0 6px" }),
+                              input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                            }}
+                          />
+                        </div>
+
+                        {/* Transport Type */}
+                        <div>
+                          <label className="block text-xs mb-1">Transport Type</label>
+                          <select
+                            value={transport.transportType}
+                            onChange={(e) => updateTransport(index, { transportType: e.target.value })}
+                            className="border p-1.5 w-full rounded text-xs h-8 outline-none focus:border-blue-500"
+                          >
+                            <option value="">Select type</option>
+                            {TRANSPORT_TYPES.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Remove */}
+                        {index !== 0 && (
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeTransport(index)}
+                              className="text-red-500 text-xs hover:text-red-700 px-2 h-8"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold mb-1">Select Supplier Account</label>
-                        <Select
-                          value={getSupplierSelectValue(formik.values.visa?.supplier)}
-                          onChange={(option) =>
-                            formik.setFieldValue("visa", {
-                              ...formik.values.visa,
-                              supplier: toSupplier(option as any),
-                            })
-                          }
-                          options={supplierOptions}
-                          placeholder="Select Supplier"
-                          isClearable
-                          isSearchable
-                          className="text-xs"
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addTransport}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 mt-2"
+                    >
+                      + Add Transport
+                    </button>
+                  </div>
+                )}
 
-                          menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                          menuPosition="fixed"
-
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              minHeight: "36px",
-                              fontSize: "0.75rem",
-                            }),
-
-                            valueContainer: (base) => ({
-                              ...base,
-                              padding: "0 8px",
-                            }),
-
-                            input: (base) => ({
-                              ...base,
-                              margin: "0",
-                              padding: "0",
-                            }),
-
-                            menuPortal: (base) => ({
-                              ...base,
-                              zIndex: 99999,
-                            }),
-
-                            menu: (base) => ({
-                              ...base,
-                              zIndex: 99999,
-                            }),
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold mb-1">Buying Price</label>
-                        <input
-                          type="number"
-                          value={formik.values.visa ? (formik.values.visa.buyingPrice || 0) * (formik.values.visa.buyingRoe || 1) : ""}
-                          readOnly
-                          className="border p-2 w-full rounded text-sm h-9 bg-white"
-                          placeholder=""
-                        />
-                      </div>
+                {/* Visa Selection: hidden in copy mode unless the admin clicked "Edit"
+                    above. */}
+                {(!isCopyMode || editingCopiedSections) && (
+                  <div className="border rounded-lg overflow-hidden shadow-sm">
+                    <div className="px-4 py-2 border-b bg-white">
+                      <h4 className="text-sm font-semibold">Visa</h4>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold mb-1">Selling Price</label>
-                        <input
-                          type="number"
-                          value={formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : ""}
-                          readOnly
-                          className="border p-2 w-full rounded text-sm h-9 bg-white"
-                          placeholder=""
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold mb-1">Currency</label>
-                        <input
-                          type="text"
-                          value={formik.values.visa?.currency || formik.values.visa?.sellingCurrency || "PKR"}
-                          readOnly
-                          className="border p-2 w-full rounded text-sm h-9 bg-white"
-                          placeholder=""
-                        />
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Visa Type</label>
+                          <Select
+                            options={visaOptions}
+                            value={visaOptions.find((v) => v.value === formik.values.visa?.visaId) ?? null}
+                            onChange={(option) => {
+                              if (option?.data) {
+                                formik.setFieldValue("visa", {
+                                  visaId: option.value,
+                                  visaType: option.data.visaType,
+                                  supplier: formik.values.visa?.supplier || { name: "", _id: "" },
+                                  withTransport: option.data.withTransport,
+                                  buyingPrice: option.data.buyingPrice,
+                                  buyingRoe: option.data.buyingRoe || 1,
+                                  buyingCurrency: option.data.buyingCurrency || option.data.currency || "PKR",
+                                  sellingPrice: option.data.sellingPrice,
+                                  sellingRoe: option.data.sellingRoe || 1,
+                                  sellingCurrency: option.data.sellingCurrency || option.data.currency || "PKR",
+                                  currency: option.data.currency,
+                                });
+                              } else {
+                                formik.setFieldValue("visa", null);
+                              }
+                            }}
+                            placeholder="Select visa..."
+                            isClearable
+                            isSearchable
+                            className="text-xs"
+                            styles={{
+                              control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
+                              valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                              input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                            }}
+                          />
+                          {formik.errors.visa && formik.touched.visa && (
+                            <p className="text-red-500 text-xs mt-1">{String(formik.errors.visa)}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Select Supplier Account</label>
+                          <Select
+                            value={getSupplierSelectValue(formik.values.visa?.supplier)}
+                            onChange={(option) =>
+                              formik.setFieldValue("visa", {
+                                ...formik.values.visa,
+                                supplier: toSupplier(option as any),
+                              })
+                            }
+                            options={supplierOptions}
+                            placeholder="Select Supplier"
+                            isClearable
+                            isSearchable
+                            className="text-xs"
+
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                            menuPosition="fixed"
+
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: "36px",
+                                fontSize: "0.75rem",
+                              }),
+
+                              valueContainer: (base) => ({
+                                ...base,
+                                padding: "0 8px",
+                              }),
+
+                              input: (base) => ({
+                                ...base,
+                                margin: "0",
+                                padding: "0",
+                              }),
+
+                              menuPortal: (base) => ({
+                                ...base,
+                                zIndex: 99999,
+                              }),
+
+                              menu: (base) => ({
+                                ...base,
+                                zIndex: 99999,
+                              }),
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Buying Price</label>
+                          <input
+                            type="number"
+                            value={formik.values.visa ? (formik.values.visa.buyingPrice || 0) * (formik.values.visa.buyingRoe || 1) : ""}
+                            readOnly
+                            className="border p-2 w-full rounded text-sm h-9 bg-white"
+                            placeholder=""
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Selling Price</label>
+                          <input
+                            type="number"
+                            value={formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : ""}
+                            readOnly
+                            className="border p-2 w-full rounded text-sm h-9 bg-white"
+                            placeholder=""
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Currency</label>
+                          <input
+                            type="text"
+                            value={formik.values.visa?.currency || formik.values.visa?.sellingCurrency || "PKR"}
+                            readOnly
+                            className="border p-2 w-full rounded text-sm h-9 bg-white"
+                            placeholder=""
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
                 )}
 
                 {/* Profit Breakdown Card - Shown above Submit */}

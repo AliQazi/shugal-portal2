@@ -294,8 +294,20 @@ const UpdateUmrahPackage = () => {
   const originalGroupPriceRef = useRef<GroupTicketPrice | null>(null);
   const packageTotalsAutoSyncLockedRef = useRef(false);
   const [internalStatus, setInternalStatus] = useState<"Public" | "Private">("Public");
-  // Tracks how many more sync-effect skips are needed after initial load
-  const skipSyncCountRef = useRef(0);
+  // Skips the packageTotals auto-sync effect while the values it depends on (hotels,
+  // visa, selectedGroupTicketId) still match exactly what fetchPackageDetails just set
+  // them to, so the loaded packageTotals (including any manual incentive) aren't
+  // clobbered by a spurious re-render (umrahGroups arriving, etc.) before the admin
+  // makes a real edit. Storing a content signature instead of a fixed render count
+  // avoids a race where fetchUmrahGroups resolves before fetchPackageDetails: a fixed
+  // counter would get consumed by that unrelated render and then skip the admin's very
+  // first real edit instead.
+  const loadedTotalsBaselineRef = useRef<string | null>(null);
+  // Tracks which hotel-row indexes have already been checked to restore their "Rate
+  // Volume" dropdown selection (see the effect below), so a row is only ever attempted
+  // once - otherwise re-checking on every hotels change would keep re-selecting a
+  // volume the admin had deliberately cleared by hand.
+  const restoredRateVolumeIndexesRef = useRef<Set<number>>(new Set());
   const { data3 = [] } = useAccountsList();
 
   const supplierOptions = data3.map((account: any) => ({
@@ -729,13 +741,16 @@ const UpdateUmrahPackage = () => {
           currency: data.visa.currency || "PKR",
         } : null;
 
+        const loadedSelectedGroupTicketId = data.selectedGroupTicketId || "";
+        const loadedHotels = formattedHotels.length ? formattedHotels : [];
+
         formik.setValues({
           packageName: data.packageName || "",
-          selectedGroupTicketId: data.selectedGroupTicketId || "",
+          selectedGroupTicketId: loadedSelectedGroupTicketId,
           logo: data.logo || "",
           flightLogo: data.flightLogo || "",
           flights: formattedFlights,
-          hotels: formattedHotels.length ? formattedHotels : [],
+          hotels: loadedHotels,
           transports: formattedTransports,
           visa: formattedVisa,
           rooms: data.rooms || {
@@ -768,10 +783,15 @@ const UpdateUmrahPackage = () => {
             infant: data.packageTotals.infant || 0,
             incentive: inc,
           });
-          // Mark initial load as done so the sync effect won't overwrite saved values
-          // The effect fires multiple times during load (formik values + umrahGroups arriving),
-          // so we skip 2 times to cover both triggers.
-          skipSyncCountRef.current = 2;
+          // Record what hotels/visa/selectedGroupTicketId looked like right after this
+          // load, so the totals-sync effect below can tell a spurious re-render
+          // (umrahGroups arriving, etc., in whichever order) apart from the admin's
+          // first real edit and only recompute once something has actually changed.
+          loadedTotalsBaselineRef.current = JSON.stringify({
+            selectedGroupTicketId: loadedSelectedGroupTicketId,
+            hotels: loadedHotels,
+            visa: formattedVisa,
+          });
         }
 
         if (data.internalStatus) setInternalStatus(data.internalStatus);
@@ -936,15 +956,54 @@ const UpdateUmrahPackage = () => {
 
   // ✅ Effect to sync packageTotals from form values
   useEffect(() => {
-    // Skip recalculation during initial load to preserve saved packageTotals (including incentive).
-    // We skip multiple times because the effect fires for each dependency that changes on load
-    // (formik values set by fetchPackageDetails, then umrahGroups arriving).
-    if (skipSyncCountRef.current > 0) {
-      skipSyncCountRef.current -= 1;
-      return;
+    // Skip recalculation while hotels/visa/selectedGroupTicketId still match exactly
+    // what fetchPackageDetails just loaded, so the saved packageTotals (including any
+    // incentive) aren't overwritten by a spurious re-render before a real edit. The
+    // moment any of them actually differ, drop the baseline for good and recompute
+    // normally from then on.
+    if (loadedTotalsBaselineRef.current !== null) {
+      const currentSignature = JSON.stringify({
+        selectedGroupTicketId: formik.values.selectedGroupTicketId,
+        hotels: formik.values.hotels,
+        visa: formik.values.visa,
+      });
+      if (currentSignature === loadedTotalsBaselineRef.current) {
+        return;
+      }
+      loadedTotalsBaselineRef.current = null;
     }
     recalculatePackageTotalsFromCurrentState();
   }, [formik.values.selectedGroupTicketId, formik.values.hotels, formik.values.visa, umrahGroups]);
+
+  // A copied/loaded hotel only carries the Rate Volume's name (rateVolumeName) - the
+  // dropdown selection itself is UI-only state that starts empty. Once the volume list
+  // has loaded, resolve each untried hotel row's volume name (and hotel identity,
+  // falling back by name via resolveHotelId) back to an actual option so "Rate Volume"
+  // shows what was really used instead of appearing blank.
+  useEffect(() => {
+    if (!rateVolumeOptions.length) return;
+    setSelectedRateVolumeByHotel((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      formik.values.hotels.forEach((hotel, index) => {
+        if (restoredRateVolumeIndexesRef.current.has(index)) return;
+        restoredRateVolumeIndexesRef.current.add(index);
+        if (!hotel.rateVolumeName) return;
+        const hotelId = resolveHotelId(hotel);
+        if (!hotelId) return;
+        const match = rateVolumeOptions.find(
+          (option) =>
+            option.data.volumeName === hotel.rateVolumeName &&
+            option.data.hotelRates.some((rate) => rate.hotelId === hotelId)
+        );
+        if (match) {
+          next[index] = match.value;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [rateVolumeOptions, formik.values.hotels]);
 
   useEffect(() => {
     if (!umrahGroups.length || formik.values.selectedGroupTicketId || !formik.values.flights.length) {
@@ -1154,17 +1213,18 @@ const UpdateUmrahPackage = () => {
     // Whenever the stay dates change, auto-apply the Rate Volume (if any) for this
     // hotel whose date range covers the (possibly just-recalculated) check-in/check-out.
     const datesChanged = fields.checkIn !== undefined || fields.checkOut !== undefined || fields.nights !== undefined;
-    if (datesChanged && row.hotelId && row.checkIn && row.checkOut) {
+    const resolvedHotelIdForDates = datesChanged ? resolveHotelId(row) : undefined;
+    if (datesChanged && resolvedHotelIdForDates && row.checkIn && row.checkOut) {
       const selectedVolumeId = selectedRateVolumeByHotel[index];
       const selectedOption = selectedVolumeId
         ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
         : undefined;
       const selectedRate = selectedOption
-        ? findHotelRateInVolume(selectedOption.data, row.hotelId, row.checkIn, row.checkOut)
+        ? findHotelRateInVolume(selectedOption.data, resolvedHotelIdForDates, row.checkIn, row.checkOut)
         : undefined;
       const match = selectedOption
         ? selectedRate ? { option: selectedOption, rate: selectedRate } : undefined
-        : findMatchingRateVolume(row.hotelId, row.checkIn, row.checkOut);
+        : findMatchingRateVolume(resolvedHotelIdForDates, row.checkIn, row.checkOut);
       if (match) {
         Object.assign(row, computeVolumeFields(row, match.option.data.volumeName, match.rate));
         setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
@@ -1231,9 +1291,26 @@ const UpdateUmrahPackage = () => {
     });
   };
 
+  // Rate Volume matching keys off hotelId, but rows carried over from an older/copied
+  // package (or typed freehand before this tracking existed) can have it blank even
+  // though the name matches a real Hotel - fall back to a name match so those rows
+  // still resolve instead of silently failing to apply/validate a Rate Volume.
+  const resolveHotelId = (hotel: HotelForm): string | undefined => {
+    if (hotel.hotelId) return hotel.hotelId;
+    const name = hotel.name?.trim().toLowerCase();
+    if (!name) return undefined;
+    return hotelOptions.find(
+      (option) => (option.data?.hotelName || option.label).trim().toLowerCase() === name
+    )?.value;
+  };
+
   const applyRateVolumeToHotel = (index: number, hotel: HotelForm, volume: RateVolumeData) => {
-    if (!hotel.hotelId) return;
-    const rate = findHotelRateInVolume(volume, hotel.hotelId, hotel.checkIn, hotel.checkOut);
+    const hotelId = resolveHotelId(hotel);
+    if (!hotelId) {
+      toast.error(`Select a Hotel Name for this row first so "${volume.volumeName}" can be matched to it.`);
+      return;
+    }
+    const rate = findHotelRateInVolume(volume, hotelId, hotel.checkIn, hotel.checkOut);
     if (!rate) {
       updateHotel(index, emptyRateFields());
       toast.error(
@@ -1241,7 +1318,7 @@ const UpdateUmrahPackage = () => {
       );
       return;
     }
-    updateHotel(index, computeVolumeFields(hotel, volume.volumeName, rate));
+    updateHotel(index, computeVolumeFields(hotel.hotelId ? hotel : { ...hotel, hotelId }, volume.volumeName, rate));
   };
 
   // Manual entry for Buying Price/Room (used when no Rate Volume is picked) - mirrors
@@ -1731,9 +1808,10 @@ const UpdateUmrahPackage = () => {
                             return;
                           }
                           setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: option.value }));
-                          // The volume can be chosen before the hotel; its nested rate is
-                          // resolved as soon as a hotel is selected.
-                          if (hotel.hotelId) applyRateVolumeToHotel(index, hotel, option.data);
+                          // applyRateVolumeToHotel resolves the hotel id itself (falling back to
+                          // a Hotel Name match) and always reports an error if it still can't
+                          // find one, so a row missing hotelId never fails to apply silently.
+                          applyRateVolumeToHotel(index, hotel, option.data);
                         }}
                         placeholder="Select Volume"
                         isClearable
@@ -2227,7 +2305,7 @@ const UpdateUmrahPackage = () => {
           {/* Visa Section */}
           <div className="border rounded p-3">
             <h4 className="text-sm font-semibold mb-2">Visa</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs mb-1">Visa Type</label>
                 <Select

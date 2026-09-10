@@ -26,33 +26,55 @@ const getRoomPrice = (pkg, key) => {
 };
 
 // --- LOGO HELPER ---
-const addLogoToHeader = async (doc, x, y, logoWidth = 35) => { // Increased logo width
+// Resolves with the rendered logo height so the caller can vertically
+// center the header text against it (the logo's own aspect ratio makes it
+// taller than a fixed offset can account for).
+const addLogoToHeader = async (doc, x, y, logoWidth = 35) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const aspectRatio = img.width / img.height;
       const logoHeight = logoWidth / aspectRatio;
       doc.addImage(img, "PNG", x, y, logoWidth, logoHeight);
-      resolve();
+      resolve(logoHeight);
     };
     img.src = logo;
   });
 };
 
-const addBrandHeader = async (doc, startY = 15) => {
-  await addLogoToHeader(doc, 15, startY, 35);
+const PAGE_MARGIN = 8;
+const HEADER_LOGO_WIDTH = 24;
+const HEADER_TEXT_X = PAGE_MARGIN + HEADER_LOGO_WIDTH + 6;
 
-  // Adjusted text offset (55) to accommodate larger logo
+// mm-per-line for a given pt font size, used to vertically center the
+// title/subtitle block against the logo instead of a fixed offset.
+const lineHeightMm = (fontSize) => fontSize * 0.352778 * 1.15;
+
+const addBrandHeader = async (doc, startY = 12) => {
+  const logoHeight = await addLogoToHeader(doc, PAGE_MARGIN, startY, HEADER_LOGO_WIDTH);
+
+  const titleSize = 14;
+  const subtitleSize = 8;
+  const titleLine = lineHeightMm(titleSize);
+  const subtitleLine = lineHeightMm(subtitleSize);
+  const gap = 1.2;
+  const blockHeight = titleLine + gap + subtitleLine;
+  const blockTop = startY + Math.max(0, (logoHeight - blockHeight) / 2);
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(titleSize);
   doc.setTextColor(22, 78, 99);
-  doc.text("Abid Air Travel & Tours", 55, startY + 8);
+  doc.text("Abid Air Travel & Tours", HEADER_TEXT_X, blockTop + titleLine * 0.75);
 
-  doc.setFontSize(11);
+  doc.setFontSize(subtitleSize);
   doc.setTextColor(100, 116, 139);
-  doc.text("Umrah Group Package Offer", 55, startY + 14);
+  doc.text(
+    "Umrah Group Package Offer",
+    HEADER_TEXT_X,
+    blockTop + titleLine + gap + subtitleLine * 0.75,
+  );
 
-  return startY + 20;
+  return startY + Math.max(logoHeight, blockHeight) + 5;
 };
 
 // --- CORE TABLE DRAWING LOGIC ---
@@ -63,18 +85,18 @@ const drawBatchTable = (doc, batch, startY) => {
 
   // 1. Header Blue Bar
   doc.setFillColor(22, 78, 99);
-  doc.rect(15, startY, pageWidth - 30, 10, "F");
+  doc.rect(PAGE_MARGIN, startY, pageWidth - PAGE_MARGIN * 2, 9, "F");
 
   // 2. Airline & Sector Title
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(255, 255, 255);
-  doc.text(`${headerPkg.airlineName} - ${headerPkg.sector}`, 20, startY + 6.5);
+  doc.text(`${headerPkg.airlineName} - ${headerPkg.sector}`, PAGE_MARGIN + 5, startY + 6);
 
   // 3. Duration Badge
-  doc.text(`${headerPkg.packageDuration} Days`, pageWidth - 20, startY + 6.5, { align: "right" });
+  doc.text(`${headerPkg.packageDuration} Days`, pageWidth - PAGE_MARGIN - 5, startY + 6, { align: "right" });
 
-  let yPos = startY + 10;
+  let yPos = startY + 9;
 
   // 4. Transport Bar
   const transports = [];
@@ -91,11 +113,11 @@ const drawBatchTable = (doc, batch, startY) => {
 
   if (transports.length > 0) {
     doc.setFillColor(240, 249, 255);
-    doc.rect(15, yPos, pageWidth - 30, 7, "F");
-    doc.setFontSize(8.5);
+    doc.rect(PAGE_MARGIN, yPos, pageWidth - PAGE_MARGIN * 2, 6, "F");
+    doc.setFontSize(7.5);
     doc.setTextColor(7, 89, 133);
-    doc.text(`Transport: ${transports.join("  |  ")}`, 20, yPos + 4.5);
-    yPos += 7;
+    doc.text(`Transport: ${transports.join("  |  ")}`, PAGE_MARGIN + 5, yPos + 4);
+    yPos += 6;
   }
 
   // 5. Build Table Data
@@ -139,17 +161,17 @@ const drawBatchTable = (doc, batch, startY) => {
       lineColor: [200, 200, 200]
     },
     styles: {
-      fontSize: 8,
-      cellPadding: 2.5, // Reduced padding for compactness
+      fontSize: 7,
+      cellPadding: 1.8, // Reduced padding for compactness
       valign: "middle",
       overflow: 'linebreak',
       cellWidth: 'wrap'
     },
-    margin: { left: 15, right: 15 },
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
     columnStyles: {
-      0: { cellWidth: 65 }, // Hotel column
-      1: { cellWidth: 60 }, // Schedule column
-      2: { cellWidth: 22, halign: "center" }, // Luggage
+      0: { cellWidth: 50 }, // Hotel column
+      1: { cellWidth: 55 }, // Schedule column
+      2: { cellWidth: 16, halign: "center" }, // Luggage
       3: { halign: "center" },
       4: { halign: "center" },
       5: { halign: "center" },
@@ -165,22 +187,22 @@ const drawBatchTable = (doc, batch, startY) => {
 // --- EXPORTED FUNCTIONS ---
 
 export const generateBatchPDF = async (batch) => {
-  const doc = new jsPDF("l", "mm", "a4");
-  const headerEndY = await addBrandHeader(doc, 15);
-  drawBatchTable(doc, batch, headerEndY + 5);
+  const doc = new jsPDF("p", "mm", "a4");
+  const headerEndY = await addBrandHeader(doc, PAGE_MARGIN);
+  drawBatchTable(doc, batch, headerEndY + 4);
 
   // Single page footer
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text(`Abid Air Travel & Tours | Generated on ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text(`Abid Air Travel & Tours | Generated on ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - 8, { align: "center" });
 
   doc.save(`${batch.packages[0].airlineName}_${batch.packages[0].sector}.pdf`);
 };
 
 export const generateUmrahPackagesPDF = async (packages) => {
-  const doc = new jsPDF("l", "mm", "a4");
+  const doc = new jsPDF("p", "mm", "a4");
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -194,22 +216,22 @@ export const generateUmrahPackagesPDF = async (packages) => {
   });
   const batches = Array.from(batchMap.values());
 
-  let yPos = await addBrandHeader(doc, 15);
-  doc.setFontSize(10);
+  let yPos = await addBrandHeader(doc, PAGE_MARGIN);
+  doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Available Umrah Packages - ${new Date().toLocaleDateString()}`, 55, yPos);
-  yPos += 8;
+  doc.text(`Available Umrah Packages - ${new Date().toLocaleDateString()}`, HEADER_TEXT_X, yPos);
+  yPos += 7;
 
   for (const batch of batches) {
     // Check if next table fits (approximate 50mm height check)
     if (yPos > pageHeight - 50) {
       doc.addPage();
-      yPos = 20;
+      yPos = 16;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
+      doc.setFontSize(10);
       doc.setTextColor(22, 78, 99);
-      doc.text("Abid Air Travel & Tours - Continued", 15, yPos);
-      yPos += 10;
+      doc.text("Abid Air Travel & Tours - Continued", PAGE_MARGIN, yPos);
+      yPos += 8;
     }
     yPos = drawBatchTable(doc, batch, yPos);
   }
@@ -218,13 +240,13 @@ export const generateUmrahPackagesPDF = async (packages) => {
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFontSize(9);
+    doc.setFontSize(7.5);
     doc.setTextColor(150);
-    // x = pageWidth/2 (Center), y = pageHeight - 10 (Bottom)
+    // x = pageWidth/2 (Center), y = pageHeight - 8 (Bottom)
     doc.text(
       `Page ${i} of ${pageCount} | Abid Air Travel & Tours`,
       pageWidth / 2,
-      pageHeight - 10,
+      pageHeight - 8,
       { align: "center" }
     );
   }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import axiosInstance from "../Api/axios";
 import PageMeta from "../components/common/PageMeta";
@@ -201,6 +201,27 @@ const formatCurrency = (amount?: number, currency = "PKR") => {
   return `${currency} ${Number(amount).toLocaleString()}`;
 };
 
+const LIST_STATE_STORAGE_KEY = "groupTicketingListState";
+const LIST_SCROLL_STORAGE_KEY = "groupTicketingListScrollY";
+
+interface SavedListState {
+  searchTerm?: string;
+  sectorFilter?: string;
+  groupTypeFilter?: string;
+  statusFilter?: string;
+  entriesPerPage?: number;
+  currentPage?: number;
+}
+
+const readSavedListState = (): SavedListState => {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
 interface PriceEditValues {
   sellingAdultPriceB2B: number;
   sellingChildPriceB2B: number;
@@ -322,12 +343,16 @@ const GroupTicketing = () => {
   const [airlines, setAirlines] = useState<Airline[]>([]);
   const [bookedSeatsData, setBookedSeatsData] = useState<Map<string, BookedSeatsData>>(new Map());
 
-  // Filters
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sectorFilter, setSectorFilter] = useState<string>("All");
-  const [groupTypeFilter, setGroupTypeFilter] = useState<string>("All");
-  const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [entriesPerPage, setEntriesPerPage] = useState(50);
+  // Filters — restored from sessionStorage so returning from the edit page keeps the same view
+  const savedListState = useMemo(() => readSavedListState(), []);
+  const [searchTerm, setSearchTerm] = useState(savedListState.searchTerm ?? "");
+  const [sectorFilter, setSectorFilter] = useState<string>(savedListState.sectorFilter ?? "All");
+  const [groupTypeFilter, setGroupTypeFilter] = useState<string>(savedListState.groupTypeFilter ?? "All");
+  const [statusFilter, setStatusFilter] = useState<string>(savedListState.statusFilter ?? "All");
+  const [entriesPerPage, setEntriesPerPage] = useState(savedListState.entriesPerPage ?? 50);
+  const [currentPage, setCurrentPage] = useState(savedListState.currentPage ?? 1);
+  const isFirstFilterRun = useRef(true);
+  const hasRestoredScroll = useRef(false);
 
   // Modal state for viewing bookings
   const [isBookingsModalOpen, setIsBookingsModalOpen] = useState(false);
@@ -369,8 +394,49 @@ const GroupTicketing = () => {
 
   useEffect(() => {
     const queryGroupType = new URLSearchParams(location.search).get("groupType");
-    setGroupTypeFilter(queryGroupType || "All");
+    if (queryGroupType) {
+      setGroupTypeFilter(queryGroupType);
+    }
   }, [location.search]);
+
+  useEffect(() => {
+    if (isFirstFilterRun.current) {
+      isFirstFilterRun.current = false;
+      return;
+    }
+    setCurrentPage(1);
+  }, [searchTerm, sectorFilter, groupTypeFilter, statusFilter, entriesPerPage]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        LIST_STATE_STORAGE_KEY,
+        JSON.stringify({
+          searchTerm,
+          sectorFilter,
+          groupTypeFilter,
+          statusFilter,
+          entriesPerPage,
+          currentPage,
+        })
+      );
+    } catch {
+      // sessionStorage may be unavailable (e.g. private browsing quota) — safe to ignore
+    }
+  }, [searchTerm, sectorFilter, groupTypeFilter, statusFilter, entriesPerPage, currentPage]);
+
+  useEffect(() => {
+    if (loading || hasRestoredScroll.current) return;
+    hasRestoredScroll.current = true;
+
+    const savedScrollY = sessionStorage.getItem(LIST_SCROLL_STORAGE_KEY);
+    if (savedScrollY) {
+      sessionStorage.removeItem(LIST_SCROLL_STORAGE_KEY);
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: Number(savedScrollY), behavior: "auto" });
+      });
+    }
+  }, [loading]);
 
   const fetchBookings = async () => {
     try {
@@ -418,6 +484,11 @@ const GroupTicketing = () => {
     if (!canUseActions) {
       window.alert("You don't have permission to manage groups");
       return;
+    }
+    try {
+      sessionStorage.setItem(LIST_SCROLL_STORAGE_KEY, String(window.scrollY));
+    } catch {
+      // sessionStorage may be unavailable — scroll position just won't be restored
     }
     navigate(`/group-ticketing/edit/${bookingId}`);
   };
@@ -654,6 +725,13 @@ const GroupTicketing = () => {
 
       return dateA - dateB;
     });
+
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / entriesPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedBookings = filteredBookings.slice(
+    (safeCurrentPage - 1) * entriesPerPage,
+    safeCurrentPage * entriesPerPage
+  );
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { All: bookings.length };
@@ -926,7 +1004,7 @@ const GroupTicketing = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800/50 dark:divide-gray-700">
-                  {filteredBookings.slice(0, entriesPerPage).map((booking, index) => {
+                  {paginatedBookings.map((booking, index) => {
                     const bookedInfo = bookedSeatsData.get(booking._id);
                     const bookedSeats = bookedInfo?.totalSeats || 0;
                     const totalSeats = booking.totalSeats || 0;
@@ -938,7 +1016,7 @@ const GroupTicketing = () => {
                       <tr key={booking._id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                         {/* Index */}
                         <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">
-                          {index + 1}
+                          {(safeCurrentPage - 1) * entriesPerPage + index + 1}
                         </td>
 
                         {/* Group & Voucher Info */}
@@ -1123,6 +1201,37 @@ const GroupTicketing = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {!loading && filteredBookings.length > 0 && (
+            <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {(safeCurrentPage - 1) * entriesPerPage + 1} to{" "}
+                {Math.min(safeCurrentPage * entriesPerPage, filteredBookings.length)} of{" "}
+                {filteredBookings.length} entries
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Previous
+                </button>
+                <span className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Page {safeCurrentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

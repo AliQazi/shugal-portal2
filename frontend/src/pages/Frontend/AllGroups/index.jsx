@@ -736,13 +736,22 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
             ? airlineCodeByKey[airlineName.trim().toLowerCase()]
             : undefined;
 
-          const sectorPoints =
-            flights.length > 0
-              ? [
-                firstFlight.sectorFrom || "",
-                ...flights.map((f) => f.sectorTo || ""),
-              ].filter(Boolean)
-              : [];
+          // Built leg-by-leg (not just first departure + each arrival) so an
+          // overland transfer between legs — e.g. fly into JED, fly home
+          // from MED — shows up as LHE-JED-MED-LHE instead of collapsing to
+          // LHE-JED-LHE like a true JED round trip. Two itineraries that
+          // only differ by that transfer must produce different sector
+          // strings, since sector is also the batching key below and an
+          // identical string would merge them into the same card.
+          const sectorPoints = [];
+          flights.forEach((f) => {
+            const from = f.sectorFrom || "";
+            const to = f.sectorTo || "";
+            if (from && sectorPoints[sectorPoints.length - 1] !== from) {
+              sectorPoints.push(from);
+            }
+            if (to) sectorPoints.push(to);
+          });
           const sector = sectorPoints.join("-");
 
           const toDate = (dateStr) => {
@@ -975,9 +984,14 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
   filteredGroups.forEach((group) => {
     const airlineKey = (group.airlineName || "").trim().toLowerCase();
     const sectorKey = (group.sector || "").trim().toUpperCase();
+    // Duration is part of the key too — same airline/sector but a 21-day
+    // vs. 28-day itinerary are different packages and must not collapse
+    // into one card (the header only shows one duration badge, so merging
+    // them made a 28-day option look like it belonged under 21 days).
+    const durationKey = parseInt(group.packageDuration);
     const key =
       airlineKey && sectorKey
-        ? `route-${airlineKey}|${sectorKey}`
+        ? `route-${airlineKey}|${sectorKey}|${Number.isNaN(durationKey) ? "" : durationKey}`
         : group.groupTiktId
           ? `ticket-${group.groupTiktId}`
           : `single-${group.id || group._id}`;

@@ -248,6 +248,19 @@ const UmrahPackageBookingSchema = new mongoose.Schema(
       ref: "Register",
       required: true,
     },
+    bookingChannel: {
+      type: String,
+      enum: ["portal", "external_api"],
+      default: "portal",
+      index: true,
+    },
+    externalApiClientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ExternalApiClient",
+      default: null,
+      index: true,
+    },
+    inventoryDeducted: { type: Boolean, default: false },
 
     // Passenger Details Array (Add More functionality)
     passengers: {

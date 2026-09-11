@@ -34,6 +34,7 @@ import umrahCalculatorRoutes from "./routes/umrahCalculator.routes.js";
 import ummrahVisaRoutes from "./routes/ummrahVisa.routes.js";
 import transportRouteRatesRoutes from "./routes/transportRouteRates.routes.js";
 import rateVolumeRoutes from "./routes/rateVolume.routes.js";
+import externalApiRoutes from "./routes/externalApi.routes.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -95,6 +96,16 @@ app.use("/api/umrah-calculator", umrahCalculatorRoutes);
 app.use("/api/ummrah-visa", ummrahVisaRoutes);
 app.use("/api/transport-route-rates", transportRouteRatesRoutes);
 app.use("/api/rate-volumes", rateVolumeRoutes);
+app.use("/api/external/v1", externalApiRoutes);
+app.get("/api/external/docs", (req, res) => {
+  res.type("text/markdown").sendFile(path.join(__dirname, "docs/external-api/README.md"));
+});
+app.use("/api/external/docs", express.static(path.join(__dirname, "docs/external-api")));
+
+app.use("/api/external/v1", (error, req, res, next) => {
+  console.error("External API error:", error);
+  res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred." } });
+});
 // Sabaoon integration removed. Only Al-Haider API is used for group data.
 
 /* 🔥 Start Expiry Cron Job */

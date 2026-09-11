@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Abid Air Partner API — Integration Guide</title>
+<style>
+  @page { size: A4; margin: 17mm 16mm 18mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #17233c; font: 10.2pt/1.55 Arial, Helvetica, sans-serif; }
+  h1, h2, h3 { color: #063b68; margin: 0 0 10px; line-height: 1.18; }
+  h1 { font-size: 31pt; letter-spacing: -.8px; }
+  h2 { font-size: 19pt; padding-bottom: 7px; border-bottom: 2px solid #09a9e8; }
+  h3 { font-size: 12.5pt; margin-top: 18px; }
+  p { margin: 6px 0 10px; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; }
+  pre { margin: 8px 0 14px; padding: 12px 14px; border-radius: 7px; color: #e8f4ff; background: #092d4b; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 9pt; }
+  th { color: white; background: #086fa8; text-align: left; padding: 8px; }
+  td { padding: 8px; border-bottom: 1px solid #d7e3ed; vertical-align: top; }
+  tr:nth-child(even) td { background: #f4f8fb; }
+  .cover { height: 258mm; display: flex; flex-direction: column; position: relative; page-break-after: always; }
+  .cover:before { content: ""; position: absolute; width: 95mm; height: 95mm; border-radius: 50%; background: #e2f6fd; right: -45mm; top: -35mm; }
+  .logo { width: 75mm; margin: 14mm 0 35mm; position: relative; }
+  .eyebrow { color: #049ed9; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .subtitle { max-width: 125mm; color: #52657a; font-size: 15pt; margin-top: 14px; }
+  .version { margin-top: auto; padding: 16px 0; border-top: 1px solid #c9dbe8; color: #52657a; }
+  .band { height: 8px; background: linear-gradient(90deg,#063b68 0 60%,#09a9e8 60%); margin: 18px 0; }
+  .page { page-break-before: always; }
+  .no-break { page-break-inside: avoid; }
+  .callout { border-left: 4px solid #09a9e8; background: #edf8fd; padding: 10px 13px; margin: 12px 0; }
+  .warning { border-color: #f4a340; background: #fff7e8; }
+  .method { display: inline-block; min-width: 39px; padding: 2px 6px; border-radius: 4px; color: white; background: #16844a; font-weight: bold; text-align: center; }
+  .post { background: #176fb8; }
+  .path { color: #063b68; font-weight: bold; font-family: "DejaVu Sans Mono", monospace; }
+  .flow { display: flex; align-items: center; gap: 6px; margin: 15px 0; }
+  .flow span { flex: 1; padding: 11px 7px; border: 1px solid #bdd5e5; border-radius: 6px; text-align: center; background: #f6fafc; font-weight: bold; }
+  .flow b { color: #09a9e8; font-size: 15pt; }
+  .muted { color: #627386; }
+  .footer-note { color: #6a7a8a; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+<section class="cover">
+  <img class="logo" src="../../../frontend/public/logo.png" alt="Abid Air">
+  <div class="eyebrow">Partner Integration</div>
+  <h1>External API<br>Integration Guide</h1>
+  <div class="band"></div>
+  <p class="subtitle">Live group-ticketing and Umrah-package inventory through one secure, unified booking workflow.</p>
+  <div class="version"><strong>API version 1.0</strong><br>Production integration document · September 2026<br><span class="muted">Abid Air International (Pvt.) Ltd.</span></div>
+</section>
+
+<section>
+  <h2>Integration overview</h2>
+  <p>The Partner API gives approved server-side integrations access to Abid Air’s live public inventory. Inventory remains shared with the Abid Air portal; availability and fares can change between requests.</p>
+  <div class="flow"><span>1. Fetch inventory</span><b>›</b><span>2. Select inventoryId</span><b>›</b><span>3. Create booking</span><b>›</b><span>4. Save reference</span></div>
+  <div class="callout"><strong>One booking endpoint.</strong> Submit a group-ticketing or Umrah-package ID as <code>inventoryId</code>. The API identifies its type, calculates the authoritative price, reserves the correct inventory, and returns the new booking’s <code>_id</code>.</div>
+
+  <h3>Base URL</h3>
+  <pre>https://abidairtravels.com/api/external/v1</pre>
+
+  <h3>Authentication</h3>
+  <p>Send the issued API key with every request. Keys must only be stored and used on your server.</p>
+  <pre>Authorization: Bearer aa_live_REPLACE_WITH_YOUR_KEY
+Accept: application/json</pre>
+  <p>Alternatively, send <code>X-API-Key: aa_live_…</code>. Available scopes are <code>inventory:read</code>, <code>bookings:read</code>, and <code>bookings:write</code>.</p>
+  <div class="callout warning"><strong>Security:</strong> Never place an API key in browser JavaScript, mobile-app source, public repositories, screenshots, or client-visible logs.</div>
+
+  <h3>Operational defaults</h3>
+  <table><tr><th>Setting</th><th>Value</th><th>Notes</th></tr>
+  <tr><td>Format</td><td>JSON</td><td>Use <code>Content-Type: application/json</code> for POST requests.</td></tr>
+  <tr><td>Rate limit</td><td>120/minute</td><td>Per API client; inspect response rate-limit headers.</td></tr>
+  <tr><td>Pagination</td><td>25 default</td><td><code>limit</code> accepts 1–100.</td></tr>
+  <tr><td>Dates</td><td>ISO 8601</td><td>Send calendar dates as <code>YYYY-MM-DD</code>.</td></tr></table>
+</section>
+
+<section class="page">
+  <h2>Endpoint directory</h2>
+  <table><tr><th>Method</th><th>Path</th><th>Scope</th><th>Purpose</th></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/group-ticketing</td><td>inventory:read</td><td>List available public ticket groups.</td></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/group-ticketing/{id}</td><td>inventory:read</td><td>Fetch one available group.</td></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/umrah-packages</td><td>inventory:read</td><td>List available public Umrah packages.</td></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/umrah-packages/{id}</td><td>inventory:read</td><td>Fetch one available package.</td></tr>
+  <tr><td><span class="method post">POST</span></td><td class="path">/availability</td><td>inventory:read</td><td>Check requested availability and obtain a token.</td></tr>
+  <tr><td><span class="method post">POST</span></td><td class="path">/bookings</td><td>bookings:write</td><td>Create either booking type using an availability token.</td></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/bookings</td><td>bookings:read</td><td>List this API client’s bookings.</td></tr>
+  <tr><td><span class="method">GET</span></td><td class="path">/bookings/{bookingId}</td><td>bookings:read</td><td>Fetch this API client’s booking.</td></tr>
+  <tr><td><span class="method post">POST</span></td><td class="path">/bookings/{bookingId}/cancel</td><td>bookings:write</td><td>Cancel an on-hold booking.</td></tr></table>
+
+  <h3>Group-ticketing inventory</h3>
+  <pre>GET /group-ticketing?page=1&amp;limit=25&amp;groupType=Umrah%20Groups&amp;airline=PIA</pre>
+  <p>Only groups with <code>internalStatus = Public</code> and positive seat availability are returned. The response exposes selling fares and PNR; internal buying prices, payment data, and supplier accounts are excluded.</p>
+  <pre>{
+  "success": true,
+  "data": [{
+    "id": "6a9174db6190d2c2cff3f950",
+    "groupCode": "GRP-1787917531522-K50T7I",
+    "name": "PK-MUX-JED-MUX",
+    "type": "Umrah Groups",
+    "sector": "MUX-JED-MUX",
+    "airline": "PAKISTAN INTERNATIONAL AIRLINE",
+    "pnr": "9EPUMT",
+    "availableSeats": 16,
+    "currency": "PKR",
+    "fares": { "adult": 148000, "child": 130000, "infant": 30000 },
+    "flights": []
+  }],
+  "meta": { "page": 1, "limit": 25, "total": 1, "pages": 1 }
+}</pre>
+</section>
+
+<section class="page">
+  <h2>Umrah-package inventory</h2>
+  <pre>GET /umrah-packages?page=1&amp;limit=25&amp;source=local-db</pre>
+  <p>Only public packages with positive <code>availableRooms</code> are returned. The optional <code>source</code> filter accepts <code>local-db</code> or <code>travel-network</code>.</p>
+  <pre>{
+  "success": true,
+  "data": [{
+    "id": "65fd12ab34cd56ef7890abcd",
+    "name": "21 Day Umrah Package",
+    "source": "local-db",
+    "days": 21,
+    "availableRooms": 12,
+    "packageTotals": {
+      "double": 285000, "triple": 255000, "quad": 235000,
+      "shared": 220000, "childWithBed": 195000,
+      "childWithoutBed": 125000, "infant": 45000
+    },
+    "flights": [], "hotels": [], "transports": [], "visa": null
+  }],
+  "meta": { "page": 1, "limit": 25, "total": 1, "pages": 1 }
+}</pre>
+  <div class="callout"><strong>Freshness:</strong> Fetch the selected inventory item immediately before creating a booking. A successful inventory response is not a reservation.</div>
+
+  <h3>Get one inventory item</h3>
+  <pre>GET /group-ticketing/6a9174db6190d2c2cff3f950
+GET /umrah-packages/65fd12ab34cd56ef7890abcd</pre>
+  <p>A private, sold-out, exhausted, or unknown item returns <code>404</code>. An invalid MongoDB identifier returns <code>400</code>.</p>
+</section>
+
+<section class="page">
+  <h2>Create a unified booking</h2>
+  <p><span class="method post">POST</span> <span class="path">/bookings</span></p>
+  <p>First call <code>POST /availability</code> with <code>inventoryId</code> and the Adult, Child, and Infant counts. If available, use the returned five-minute token with the exact same inventory and passenger counts. Each successful booking request reserves inventory.</p>
+  <pre>{ "inventoryId": "65fd12ab34cd56ef7890abcd", "adults": 1, "children": 1, "infants": 0 }</pre>
+  <pre>Authorization: Bearer aa_live_REPLACE_WITH_YOUR_KEY
+Content-Type: application/json
+X-Availability-Token: REPLACE_WITH_AVAILABILITY_TOKEN</pre>
+
+  <h3>Common request fields</h3>
+  <table><tr><th>Field</th><th>Required</th><th>Rules</th></tr>
+  <tr><td><code>inventoryId</code></td><td>Yes</td><td>ID returned by either inventory endpoint.</td></tr>
+  <tr><td><code>contactPersonName</code></td><td>Yes</td><td>Non-empty string.</td></tr>
+  <tr><td><code>roomType</code></td><td>Umrah only</td><td><code>sharing</code>, <code>quad</code>, <code>triple</code>, or <code>double</code>.</td></tr>
+  <tr><td><code>passengers</code></td><td>Yes</td><td>At least one Adult or Child; array must not be empty.</td></tr></table>
+
+  <h3>Passenger fields</h3>
+  <table><tr><th>Field</th><th>Rules</th></tr>
+  <tr><td><code>type</code></td><td>Exactly <code>Adult</code>, <code>Child</code>, or <code>Infant</code>.</td></tr>
+  <tr><td><code>title</code></td><td>Examples: <code>MR</code>, <code>MRS</code>, <code>MS</code>, <code>CHD</code>, <code>INF</code>.</td></tr>
+  <tr><td><code>givenName</code>, <code>surName</code></td><td>Required.</td></tr>
+  <tr><td><code>passport</code>, <code>nationality</code></td><td>Required.</td></tr>
+  <tr><td><code>dateOfBirth</code>, <code>passportExpiry</code></td><td>Required for Umrah; valid ISO dates when supplied.</td></tr>
+  <tr><td><code>passportIssue</code></td><td>Optional valid ISO date.</td></tr>
+  <tr><td><code>childType</code></td><td>For Umrah Child pricing: <code>withBed</code> or <code>withoutBed</code>.</td></tr></table>
+</section>
+
+<section class="page">
+  <h2>Booking request example</h2>
+  <pre>curl -X POST "https://abidairtravels.com/api/external/v1/bookings" \
+  -H "Authorization: Bearer aa_live_REPLACE_WITH_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -H "X-Availability-Token: REPLACE_WITH_AVAILABILITY_TOKEN" \
+  -d '{
+    "inventoryId": "65fd12ab34cd56ef7890abcd",
+    "contactPersonName": "Muhammad Ali",
+    "roomType": "double",
+    "passengers": [{
+      "type": "Adult",
+      "title": "MR",
+      "givenName": "Muhammad",
+      "surName": "Ali",
+      "passport": "AB1234567",
+      "dateOfBirth": "1990-05-15",
+      "passportIssue": "2022-06-01",
+      "passportExpiry": "2032-05-31",
+      "nationality": "Pakistan"
+    }]
+  }'</pre>
+
+  <h3>Group-ticketing response</h3>
+  <pre>{
+  "success": true,
+  "data": {
+    "_id": "6aa3e6b9a88c2c844c958b54",
+    "status": "on hold",
+    "expiresAt": "2026-09-11T14:30:00.000Z",
+    "passengerCounts": { "adults": 1, "children": 0, "infants": 0, "total": 1 },
+    "pricing": { "adultPrice": 148000, "grandTotal": 148000 }
+  }
+}</pre>
+
+  <h3>Umrah-package response</h3>
+  <pre>{
+  "success": true,
+  "data": {
+    "_id": "6aa3e76ca88c2c844c958b61",
+    "status": "On Hold",
+    "packageId": "65fd12ab34cd56ef7890abcd",
+    "packageName": "21 Day Umrah Package",
+    "roomType": "double",
+    "pricing": { "pricePerPerson": 285000, "totalPrice": 285000, "currency": "PKR" }
+  }
+}</pre>
+  <p class="footer-note">Successful creation returns HTTP 201.</p>
+</section>
+
+<section class="page">
+  <h2>Fetch and cancel bookings</h2>
+  <h3>List your bookings</h3>
+  <pre>GET /bookings?page=1&amp;limit=25</pre>
+  <p>Returns only bookings created by the authenticated API client. Group-ticketing and Umrah-package bookings are combined, sorted newest first, and paginated.</p>
+  <h3>Fetch</h3>
+  <pre>GET /bookings/6aa3e6b9a88c2c844c958b54</pre>
+  <p>The API searches the correct booking collection using the booking <code>_id</code>. A client may retrieve only bookings created using its own API key.</p>
+
+  <h3>Cancel</h3>
+  <pre>POST /bookings/6aa3e6b9a88c2c844c958b54/cancel</pre>
+  <p>Only on-hold bookings may be cancelled through the API. Successful cancellation releases the previously reserved seats or package availability. Repeating a completed cancellation returns the already-cancelled booking.</p>
+
+  <h2 style="margin-top:30px">Errors and recovery</h2>
+  <pre>{
+  "success": false,
+  "error": {
+    "code": "INSUFFICIENT_INVENTORY",
+    "message": "The inventory does not have enough availability."
+  }
+}</pre>
+  <table><tr><th>Status</th><th>Meaning</th><th>Recommended action</th></tr>
+  <tr><td>400</td><td>Malformed identifier/request</td><td>Correct the request before retrying.</td></tr>
+  <tr><td>401</td><td>Missing, invalid, or revoked key</td><td>Check authentication; do not repeatedly retry.</td></tr>
+  <tr><td>403</td><td>Missing scope or inactive owner</td><td>Contact Abid Air integration support.</td></tr>
+  <tr><td>404</td><td>Inventory/booking unavailable</td><td>Refresh inventory or verify the reference.</td></tr>
+  <tr><td>409</td><td>Availability/state conflict</td><td>Refresh state; offer another option.</td></tr>
+  <tr><td>422</td><td>Validation failed</td><td>Display field details and correct the payload.</td></tr>
+  <tr><td>429</td><td>Rate limit exceeded</td><td>Honor <code>Retry-After</code>; use exponential backoff.</td></tr>
+  <tr><td>500</td><td>Unexpected server error</td><td>Check the booking list before deciding whether to retry.</td></tr></table>
+</section>
+
+<section class="page">
+  <h2>Production checklist</h2>
+  <table><tr><th>Area</th><th>Requirement</th></tr>
+  <tr><td>Credentials</td><td>Store the key in a server-side secret manager or protected environment variable.</td></tr>
+  <tr><td>Booking IDs</td><td>Persist the exact booking <code>_id</code> returned by the creation response.</td></tr>
+  <tr><td>Pricing</td><td>Display API-returned selling prices; never submit or calculate authoritative prices locally.</td></tr>
+  <tr><td>Availability</td><td>Refresh the selected item immediately before booking and handle HTTP 409.</td></tr>
+  <tr><td>Logging</td><td>Log request IDs, status codes, and references—never API keys or full passport records.</td></tr>
+  <tr><td>Retries</td><td>Back off on 429/5xx responses and verify the booking list before retrying creation.</td></tr>
+  <tr><td>Privacy</td><td>Encrypt passenger data in transit and at rest; restrict access and retention.</td></tr></table>
+
+  <div class="callout"><strong>Source of truth:</strong> The machine-readable OpenAPI contract is distributed alongside this guide as <code>openapi.yaml</code>. Contact Abid Air before relying on undocumented fields.</div>
+  <h3>Support handoff information</h3>
+  <p>When reporting an integration issue, include the timestamp and timezone, endpoint, HTTP status, error code, and returned booking ID. Redact API keys and sensitive passenger data.</p>
+  <div class="band"></div>
+  <p class="footer-note">© 2026 Abid Air International (Pvt.) Ltd. · Partner API v1 · Confidential integration material</p>
+</section>
+</body>
+</html>

@@ -125,7 +125,7 @@ export const createUmrahBooking = async (req, res) => {
       { $inc: { seq: 1 } },
       { new: true, upsert: true },
     );
-    const bookingNumber = String(umrahCounter.seq).padStart(4, "0");
+    const bookingNumber = `UP-${String(umrahCounter.seq).padStart(4, "0")}`;
 
     // Get pricing from parsed data
     const pricing = parsedData.pricing || {};

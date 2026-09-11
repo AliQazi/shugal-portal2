@@ -1638,6 +1638,14 @@ export const updateBookingStatus = async (req, res) => {
       );
     }
 
+    if (status === "cancelled" && booking.inventoryDeducted) {
+      await GroupTicketing.updateOne(
+        { _id: booking.groupId },
+        { $inc: { totalSeats: seats } },
+      );
+      booking.inventoryDeducted = false;
+    }
+
     if (oldStatus !== "confirmed" && status === "confirmed") {
       const bookingData = Array.isArray(booking) ? booking[0] : booking;
 
@@ -1874,7 +1882,18 @@ export const updateBooking = async (req, res) => {
     const newSeats = booking.adultsCount + booking.childrenCount;
     const diff = newSeats - oldSeats;
 
-    if (diff > 0) {
+    if (booking.inventoryDeducted && diff > 0) {
+      const reserved = await GroupTicketing.updateOne(
+        { _id: booking.groupId, totalSeats: { $gte: diff } },
+        { $inc: { totalSeats: -diff } },
+      );
+      if (!reserved.modifiedCount) throw new Error("Not enough seats available");
+    } else if (booking.inventoryDeducted && diff < 0) {
+      await GroupTicketing.updateOne(
+        { _id: booking.groupId },
+        { $inc: { totalSeats: Math.abs(diff) } },
+      );
+    } else if (diff > 0) {
       await adjustSeatsIfLocalGroup(booking.groupId, -diff, true);
     } else if (diff < 0) {
       await adjustSeatsIfLocalGroup(booking.groupId, Math.abs(diff));
@@ -1918,7 +1937,16 @@ export const cancelBooking = async (req, res) => {
     booking.autoCancelled = false;
     await booking.save();
 
-    await adjustSeatsIfLocalGroup(booking.groupId, seats);
+    if (booking.inventoryDeducted) {
+      await GroupTicketing.updateOne(
+        { _id: booking.groupId },
+        { $inc: { totalSeats: seats } },
+      );
+      booking.inventoryDeducted = false;
+      await booking.save();
+    } else {
+      await adjustSeatsIfLocalGroup(booking.groupId, seats);
+    }
 
     await ActivityLog.create({
       user: req.user._id,
@@ -1944,7 +1972,14 @@ export const deleteBooking = async (req, res) => {
 
     if (booking.status !== "cancelled") {
       const seats = booking.adultsCount + booking.childrenCount;
-      await adjustSeatsIfLocalGroup(booking.groupId, seats);
+      if (booking.inventoryDeducted) {
+        await GroupTicketing.updateOne(
+          { _id: booking.groupId },
+          { $inc: { totalSeats: seats } },
+        );
+      } else {
+        await adjustSeatsIfLocalGroup(booking.groupId, seats);
+      }
     }
 
     await booking.deleteOne();

@@ -4,19 +4,15 @@ const getTotalRoomsForBooking = (booking) =>
   booking?.passengerCount?.total || booking?.passengers?.length || 0;
 
 export const restockUmrahPackageRooms = async (booking) => {
-  if (!booking || !booking.packageId) return null;
-
-  //   const totalRoomsToRestore = getTotalRoomsForBooking(booking);
-  //   if (!totalRoomsToRestore || totalRoomsToRestore <= 0) return null;
-
-  //   const linkedPackage = await GroupTicketing.findById(booking.packageId);
-  //   if (!linkedPackage) return null;
-
-  //   return GroupTicketing.findByIdAndUpdate(
-  //     booking.packageId,
-  //     { $inc: { availableRooms: totalRoomsToRestore } },
-  //     { new: true },
-  //   );
+  if (!booking || !booking.packageId || !booking.inventoryDeducted) return null;
+  const totalRoomsToRestore = getTotalRoomsForBooking(booking);
+  if (!totalRoomsToRestore || totalRoomsToRestore <= 0) return null;
+  booking.inventoryDeducted = false;
+  return GroupTicketing.findByIdAndUpdate(
+    booking.packageId,
+    { $inc: { availableRooms: totalRoomsToRestore } },
+    { new: true },
+  );
 };
 
 export const reserveUmrahPackageRooms = async (booking) => {

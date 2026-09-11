@@ -221,6 +221,19 @@ const bookingSchema = new mongoose.Schema(
       ref: "Register",
       required: true,
     },
+    bookingChannel: {
+      type: String,
+      enum: ["portal", "external_api"],
+      default: "portal",
+      index: true,
+    },
+    externalApiClientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ExternalApiClient",
+      default: null,
+      index: true,
+    },
+    inventoryDeducted: { type: Boolean, default: false },
 
     // Metadata
     bookingReference: {
@@ -447,19 +460,30 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.pre("save", async function () {
   if (this.bookingReference) return;
 
+  const [storedMaximum] = await this.constructor.aggregate([
+    { $match: { bookingReference: /^(GT-)?\d+$/ } },
+    { $project: { sequence: { $convert: { input: { $replaceOne: { input: "$bookingReference", find: "GT-", replacement: "" } }, to: "int", onError: 0, onNull: 0 } } } },
+    { $group: { _id: null, sequence: { $max: "$sequence" } } },
+  ]);
+
+  await BookingCounter.updateOne(
+    { date: "global" },
+    { $max: { seq: storedMaximum?.sequence || 0 } },
+    { upsert: true },
+  );
+
   const counter = await BookingCounter.findOneAndUpdate(
     { date: "global" },
     { $inc: { seq: 1 } },
     { new: true, upsert: true },
   );
 
-  this.bookingReference = String(counter.seq).padStart(4, "0");
+  this.bookingReference = `GT-${String(counter.seq).padStart(4, "0")}`;
 });
 
 // Index for faster queries
 bookingSchema.index({ userId: 1, createdAt: -1 });
 bookingSchema.index({ status: 1 });
-
 const Booking = mongoose.model("Booking", bookingSchema);
 
 export default Booking;

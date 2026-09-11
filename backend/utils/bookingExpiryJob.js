@@ -1,5 +1,5 @@
 import Booking from "../models/Booking.js";
-// import GroupTicketing from "../models/GroupTicketing.js";
+import GroupTicketing from "../models/GroupTicketing.js";
 import UmrahPackageBooking from "../models/UmrahPackageBooking.js";
 import { restockUmrahPackageRooms } from "../utils/umrahPackageInventory.js";
 
@@ -13,6 +13,18 @@ export const startBookingExpiryJob = () => {
 
       for (const booking of expiredBookings) {
         console.log("Running booking expiry job...");
+        if (booking.inventoryDeducted) {
+          const claimed = await Booking.updateOne(
+            { _id: booking._id, inventoryDeducted: true, status: { $ne: "cancelled" } },
+            { $set: { inventoryDeducted: false } },
+          );
+          if (!claimed.modifiedCount) continue;
+          await GroupTicketing.updateOne(
+            { _id: booking.groupId },
+            { $inc: { totalSeats: booking.adultsCount + booking.childrenCount } },
+          );
+          booking.inventoryDeducted = false;
+        }
         booking.status = "cancelled";
         booking.expiresAt = null;
         booking.cancelledAt = new Date();

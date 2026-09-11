@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "setup": "node setup.js"
+    "setup": "node setup.js",
+    "api-client:create": "node scripts/createExternalApiClient.js"
   },
   "keywords": [],
   "author": "",

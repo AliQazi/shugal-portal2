@@ -1407,10 +1407,10 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                                                 <div style={rowFieldLabelStyle}>City</div>
                                                                 <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.city || hotel.location?.city || "—"}</div>
                                                             </div>
-                                                            <div>
+                                                            {/* <div>
                                                                 <div style={rowFieldLabelStyle}>Nights</div>
                                                                 <input type="number" min="0" value={hotel.nightCount ?? hotel.nights ?? 0} onChange={(e) => updateHotelNights(index, Number(e.target.value) || 0)} style={compactSelectFieldStyle} />
-                                                            </div>
+                                                            </div> */}
                                                             <div>
                                                                 <div style={rowFieldLabelStyle}>Rating</div>
                                                                 <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "—"}</div>
@@ -1426,7 +1426,8 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                                 <thead>
                                                     <tr style={{ background: "#DBEAFE" }}>
-                                                        {["Hotel", "City", "Nights", "Rating"].map((h) => (
+                                                        {/* {["Hotel", "City", "Nights", "Rating"].map((h) => ( */}
+                                                        {["Hotel", "City", "Rating"].map((h) => (
                                                             <th key={h} style={{ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</th>
                                                         ))}
                                                     </tr>
@@ -1436,7 +1437,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                                         <tr key={index} style={{ background: "white", borderTop: index === 0 ? "none" : "1px solid #EFF6FF" }}>
                                                             <td style={{ padding: "7px 10px", fontSize: "0.78rem", fontWeight: 700, color: "#0F172A" }}>{hotel.name || "Hotel N/A"}</td>
                                                             <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.location?.city || hotel.city || "N/A"}</td>
-                                                            <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.nightCount || hotel.nights || 0}</td>
+                                                            {/* <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.nightCount || hotel.nights || 0}</td> */}
                                                             <td style={{ padding: "7px 10px", fontSize: "0.76rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "N/A"}</td>
                                                         </tr>
                                                     ))}

@@ -1428,10 +1428,8 @@ const UmrahPackage = () => {
       quad: Math.round(flightSellingPrice + hotelTotals.quad + visaSellingPKR),
       shared: Math.round(flightSellingPrice + hotelTotals.shared + visaSellingPKR),
       childWithoutBed: Math.round(childSellingPrice + visaSellingPKR),
-      // Default assumption: a "with bed" child shares a double room, so the hotel's
-      // double-room selling price is added on top of the child fare + visa. Admin can
-      // still override this manually below.
-      childWithBed: Math.round(childSellingPrice + hotelTotals.double + visaSellingPKR),
+      // A child with bed uses the same hotel pricing basis as the shared package.
+      childWithBed: Math.round(childSellingPrice + hotelTotals.shared + visaSellingPKR),
       infant: Math.round(infantSellingPrice + visaSellingPKR),
     };
     baseTotalsRef.current = base;

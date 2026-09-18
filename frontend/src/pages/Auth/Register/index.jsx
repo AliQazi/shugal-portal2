@@ -7,6 +7,7 @@ import Select from "react-select";
 import Header from "../../../components/Header";
 import bg from "../../../assets/images/bahrain.webp";
 import { theme } from "../../../theme/theme";
+import { Eye, EyeOff } from "lucide-react";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -18,8 +19,12 @@ const Register = () => {
     city: "",
     role: "Agency",
     companyName: "",
+    password: "",
+    confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -37,17 +42,25 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
-    // Auto-generate a secure password since the form omits password fields
-    const generatedPassword = Math.random().toString(36).slice(-10) + "A1!";
+    if (formData.password.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
-        password: generatedPassword,
-        plainPassword: generatedPassword,
+        password: formData.password,
+        plainPassword: formData.password,
         companyName: formData.companyName.trim(),
         phone: `${formData.countryCode || ""}${formData.phone.trim()}`.trim(),
         address: formData.address.trim(),
@@ -267,6 +280,69 @@ const Register = () => {
                       required
                       className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-400 text-sm text-gray-900 placeholder:text-gray-400 transition-colors"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1.5">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        placeholder="Create Password"
+                        autoComplete="new-password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        minLength={8}
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-400 text-sm text-gray-900 placeholder:text-gray-400 transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute p-0! right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-1.5">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        name="confirmPassword"
+                        placeholder="Re-enter Password"
+                        autoComplete="new-password"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        required
+                        minLength={8}
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-neutral-200 focus:outline-none focus:border-neutral-400 text-sm text-gray-900 placeholder:text-gray-400 transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        className="absolute p-0! right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

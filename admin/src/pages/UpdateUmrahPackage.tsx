@@ -524,10 +524,8 @@ const UpdateUmrahPackage = () => {
       quad: Math.round(flightSellingPrice + hotelTotals.quad + visaSellingPKR),
       shared: Math.round(flightSellingPrice + hotelTotals.shared + visaSellingPKR),
       childWithoutBed: Math.round(childSellingPrice + visaSellingPKR),
-      // Default assumption: a "with bed" child shares a double room, so the hotel's
-      // double-room selling price is added on top of the child fare + visa. Admin can
-      // still override this manually below.
-      childWithBed: Math.round(childSellingPrice + hotelTotals.double + visaSellingPKR),
+      // A child with bed uses the same hotel pricing basis as the shared package.
+      childWithBed: Math.round(childSellingPrice + hotelTotals.shared + visaSellingPKR),
       infant: Math.round(infantSellingPrice + visaSellingPKR),
     };
 
@@ -555,10 +553,10 @@ const UpdateUmrahPackage = () => {
         recalculatePackageTotalsFromCurrentState(nextPrice);
       } else if (field === "sellingChildPriceB2B") {
         const visaSellingPKR = formik.values.visa ? (formik.values.visa.sellingPrice || 0) * (formik.values.visa.sellingRoe || 1) : 0;
-        let hotelDoubleTotal = 0;
+        let hotelSharedTotal = 0;
         formik.values.hotels.forEach((hotel) => {
           const nights = hotel.nights || 0;
-          hotelDoubleTotal += (hotel.doubleRoom.sellingPrice || 0) * (hotel.doubleRoom.sellingRoe || 1) * nights;
+          hotelSharedTotal += (hotel.sharedRoom.sellingPrice || 0) * (hotel.sharedRoom.sellingRoe || 1) * nights;
         });
         setPackageTotals((prevTotals) => ({
           ...prevTotals,
@@ -569,7 +567,7 @@ const UpdateUmrahPackage = () => {
           childWithBed:
             prevTotals.childWithBed === 0
               ? prevTotals.childWithBed
-              : Math.round(value + hotelDoubleTotal + visaSellingPKR + prevTotals.incentive),
+              : Math.round(value + hotelSharedTotal + visaSellingPKR + prevTotals.incentive),
         }));
       } else if (field === "sellingInfantPriceB2B") {
         setPackageTotals((prevTotals) =>

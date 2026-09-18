@@ -1060,8 +1060,8 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
         }));
     const setHotelName = (index: number, name: string) =>
         setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, name, hotelId: "" } : h));
-    const updateHotelNights = (index: number, nights: number) =>
-        setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, nightCount: nights } : h));
+    // const updateHotelNights = (index: number, nights: number) =>
+    //     setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, nightCount: nights } : h));
     const addHotelRow = () =>
         setHotelsEdit(prev => [...prev, { name: "", hotelId: "", city: "", location: { city: "" }, nightCount: 0, rating: 0 }]);
     const removeHotelRow = (index: number) =>
@@ -1111,10 +1111,10 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
         fontSize: "0.6rem", color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px",
     };
 
-    const compactSelectFieldStyle: React.CSSProperties = {
-        width: "100%", padding: "6px 8px", border: "1px solid #E2E8F0", borderRadius: "6px",
-        fontSize: "0.72rem", outline: "none", boxSizing: "border-box", background: "white",
-    };
+    // const compactSelectFieldStyle: React.CSSProperties = {
+    //     width: "100%", padding: "6px 8px", border: "1px solid #E2E8F0", borderRadius: "6px",
+    //     fontSize: "0.72rem", outline: "none", boxSizing: "border-box", background: "white",
+    // };
 
     const editRowCardStyle: React.CSSProperties = {
         padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", position: "relative",

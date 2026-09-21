@@ -280,7 +280,10 @@ export default function UmrahBooking() {
 
   const buildUmrahTicketPrintBooking = (booking, packageData, groupTicket) => {
     const source = { ...(packageData || {}), ...(groupTicket || {}) };
-    const rawFlights = source.flights || packageData?.flights || [];
+    // Admin's per-booking edit wins, then the live group ticket, then the package's saved copy.
+    const rawFlights = booking.packageDetailsOverride?.flights?.length
+      ? booking.packageDetailsOverride.flights
+      : source.flights || packageData?.flights || [];
     const flights = rawFlights.map(normalizePrintFlight);
     const firstFlight = flights[0] || {};
     const lastFlight = flights[flights.length - 1] || firstFlight;
@@ -1193,9 +1196,13 @@ export default function UmrahBooking() {
                       groupTicketsMap[rowGroupTicketId] ||
                       rowPackageData?.groupTicket ||
                       null;
-                    const rowFlights = rowPackageData?.flights?.length
-                      ? rowPackageData.flights
-                      : rowGroupTicket?.flights || [];
+                    // Admin's per-booking edit wins, then the live group ticket, then the package's saved copy.
+                    const rowFlights = booking.packageDetailsOverride?.flights
+                      ?.length
+                      ? booking.packageDetailsOverride.flights
+                      : rowGroupTicket?.flights?.length
+                        ? rowGroupTicket.flights
+                        : rowPackageData?.flights || [];
                     const rowFirstFlight = rowFlights[0] || {};
                     // Flight PNR lives on the group ticket, not the package.
                     const rowPnr =
@@ -2090,7 +2097,7 @@ export default function UmrahBooking() {
             onClick={handleCloseDetailsModal}
           ></div>
 
-          <div className="relative flex h-[96vh] w-full max-w-[1360px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="relative flex h-[96vh] w-full max-w-340 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             {/* Header */}
             <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 bg-linear-to-r from-slate-900 via-slate-800 to-emerald-800 px-6 py-4">
               <div className="min-w-0 flex-1">

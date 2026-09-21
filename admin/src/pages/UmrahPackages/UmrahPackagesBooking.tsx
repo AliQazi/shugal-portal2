@@ -398,7 +398,10 @@ export default function UmrahPackagesBooking() {
         groupTicket: GroupTicketPrintData | null,
     ) => {
         const source = ({ ...(packageData || {}), ...(groupTicket || {}) }) as PrintSource;
-        const rawFlights = source.flights || packageData?.flights || [];
+        // Admin's per-booking edit wins, then the live group ticket, then the package's saved copy.
+        const rawFlights = booking.packageDetailsOverride?.flights?.length
+            ? booking.packageDetailsOverride.flights
+            : source.flights || packageData?.flights || [];
         const flights = rawFlights.map(normalizePrintFlight);
         const firstFlight = flights[0] || {};
         const airlineName =
@@ -697,7 +700,12 @@ export default function UmrahPackagesBooking() {
                                         (rowPackageData as any)?.groupTicket?.id,
                                     );
                                     const rowGroupTicket = groupTicketsMap[rowGroupTicketId] || (rowPackageData as any)?.groupTicket || null;
-                                    const rowFlights = rowPackageData?.flights?.length ? rowPackageData.flights : rowGroupTicket?.flights || [];
+                                    // Admin's per-booking edit wins, then the live group ticket, then the package's saved copy.
+                                    const rowFlights = b.packageDetailsOverride?.flights?.length
+                                        ? b.packageDetailsOverride.flights
+                                        : rowGroupTicket?.flights?.length
+                                            ? rowGroupTicket.flights
+                                            : rowPackageData?.flights || [];
                                     const rowFirstFlight = rowFlights[0] || {};
                                     const rowAirline = (rowFirstFlight as any)?.airline || (rowPackageData as any)?.airlineName || rowGroupTicket?.airline || "N/A";
                                     const rowPnr = (rowPackageData as any)?.pnr || rowGroupTicket?.pnr || (rowFirstFlight as any)?.pnr || (b as any)?.pnr || "N/A";
@@ -942,6 +950,23 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
         booking.packageId && typeof booking.packageId === "object" ? booking.packageId : booking.packageData || null;
     const packageTotals = packageDetails?.packageTotals || booking.packageData?.packageTotals;
 
+    const [liveGroupTicket, setLiveGroupTicket] = useState<{ flights?: UmrahPackageDetails["flights"] } | null>(null);
+    useEffect(() => {
+        const rawGroupId: unknown = packageDetails?.selectedGroupTicketId;
+        const groupTicketId =
+            typeof rawGroupId === "string"
+                ? rawGroupId
+                : String((rawGroupId as { _id?: string } | null)?._id || "");
+        if (!groupTicketId) return;
+        let cancelled = false;
+        axiosInstance
+            .get(`/group-ticketing/${groupTicketId}`)
+            .then((res) => { if (!cancelled) setLiveGroupTicket(res.data?.data || null); })
+            .catch(() => { });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [booking._id]);
+
     // Admin's booking-specific edit of Flights/Hotels/Transport (view-mode source of truth).
     // Saving replaces this in full - it does not touch the shared package.
     const [packageOverride, setPackageOverride] = useState<UmrahBooking["packageDetailsOverride"]>(booking.packageDetailsOverride || null);
@@ -1010,7 +1035,10 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
             .finally(() => setLoadingSelectors(false));
     }, [canManage]);
 
-    const baseFlights = packageDetails?.flights || booking.packageData?.flights || [];
+    // Prefer the live group ticket's flights over the package's saved copy, so edits to the group show up.
+    const baseFlights = liveGroupTicket?.flights?.length
+        ? liveGroupTicket.flights
+        : packageDetails?.flights || booking.packageData?.flights || [];
     const baseHotels = packageDetails?.hotels || booking.packageData?.hotels || [];
     const baseTransports =
         (packageDetails as any)?.transport?.length

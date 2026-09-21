@@ -59,7 +59,22 @@ const rateVolumeSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // One shared date range for every hotel rate in this volume.
+    // All date ranges in which this volume's pricing applies (must not overlap).
+    // Legacy documents have no dateRanges and fall back to fromDate/toDate below.
+    dateRanges: {
+      type: [
+        new mongoose.Schema(
+          {
+            fromDate: { type: Date, required: true },
+            toDate: { type: Date, required: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
+
+    // Mirrors the first date range so older consumers keep working.
     fromDate: {
       type: Date,
       required: true,

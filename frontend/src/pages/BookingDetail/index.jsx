@@ -631,7 +631,7 @@ export default function BookingDetail() {
               <div className="flex flex-col gap-2">
                 {(booking.status === "pending" ||
                   booking.status === "on hold") && (
-                  <>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => navigate(`/dashboard/edit-booking/${id}`)}
                       className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -644,7 +644,7 @@ export default function BookingDetail() {
                     >
                       Cancel Booking
                     </button>
-                  </>
+                  </div>
                 )}
                 {booking.status === "cancelled" && (
                   <div className="w-full text-center py-2.5 bg-red-50 border border-red-200 rounded-lg">

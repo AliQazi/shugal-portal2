@@ -49,9 +49,15 @@ interface HotelRateForm {
     sharedRoomSellingCurrency: string;
 }
 
+interface DateRangeForm {
+    fromDate: string;
+    toDate: string;
+}
+
 interface RateVolumeType extends Partial<HotelRateForm> {
     _id?: string;
     volumeName: string;
+    dateRanges?: { fromDate?: string; toDate?: string }[];
     hotelRates?: HotelRateForm[];
     isActive?: boolean;
     createdAt?: string;
@@ -60,8 +66,7 @@ interface RateVolumeType extends Partial<HotelRateForm> {
 interface RateVolumeForm {
     volumeName: string;
     isActive: boolean;
-    fromDate: string;
-    toDate: string;
+    dateRanges: DateRangeForm[];
     hotelRates: HotelRateForm[];
 }
 
@@ -82,11 +87,12 @@ const emptyHotelRate = (): HotelRateForm => ({
     sharedRoomSellingCurrency: "PKR",
 });
 
+const emptyDateRange = (): DateRangeForm => ({ fromDate: "", toDate: "" });
+
 const initialState = (): RateVolumeForm => ({
     volumeName: "",
     isActive: true,
-    fromDate: "",
-    toDate: "",
+    dateRanges: [emptyDateRange()],
     hotelRates: [emptyHotelRate()],
 });
 
@@ -126,10 +132,65 @@ const normalizeHotelRates = (volume: RateVolumeType): HotelRateForm[] => {
     }));
 };
 
-const getVolumeDateRange = (volume: RateVolumeType) => ({
-    fromDate: toDateInput(volume.fromDate || volume.hotelRates?.[0]?.fromDate),
-    toDate: toDateInput(volume.toDate || volume.hotelRates?.[0]?.toDate),
-});
+// Volumes created before multi-date support only have a single root fromDate/toDate.
+const getVolumeDateRanges = (volume: RateVolumeType): DateRangeForm[] => {
+    if (volume.dateRanges?.length) {
+        return volume.dateRanges.map((range) => ({
+            fromDate: toDateInput(range.fromDate),
+            toDate: toDateInput(range.toDate),
+        }));
+    }
+    return [
+        {
+            fromDate: toDateInput(volume.fromDate || volume.hotelRates?.[0]?.fromDate),
+            toDate: toDateInput(volume.toDate || volume.hotelRates?.[0]?.toDate),
+        },
+    ];
+};
+
+const formatRange = (range: DateRangeForm) =>
+    `${dayjs(range.fromDate).format("DD MMM YYYY")} - ${dayjs(range.toDate).format("DD MMM YYYY")}`;
+
+// Returns an error message when a range is incomplete/inverted or two ranges share any day.
+const validateDateRanges = (ranges: DateRangeForm[]): string | null => {
+    for (let index = 0; index < ranges.length; index += 1) {
+        const { fromDate, toDate } = ranges[index];
+        if (!fromDate || !toDate) return `Please select both dates in Date Range ${index + 1}`;
+        if (fromDate > toDate) return `From date cannot be after to date in Date Range ${index + 1}`;
+    }
+    for (let i = 0; i < ranges.length; i += 1) {
+        for (let j = i + 1; j < ranges.length; j += 1) {
+            // ISO yyyy-mm-dd strings compare correctly as text; ranges are inclusive.
+            if (ranges[i].fromDate <= ranges[j].toDate && ranges[j].fromDate <= ranges[i].toDate) {
+                return `Date Range ${i + 1} (${formatRange(ranges[i])}) overlaps with Date Range ${j + 1} (${formatRange(ranges[j])}). Date ranges in a volume must be unique.`;
+            }
+        }
+    }
+    return null;
+};
+
+// Index of another range that the candidate range (or a single picked date) collides with, or -1.
+const findConflictingRangeIndex = (ranges: DateRangeForm[], index: number, candidate: DateRangeForm): number => {
+    const { fromDate, toDate } = candidate;
+    if (!fromDate && !toDate) return -1;
+    const start = fromDate || toDate;
+    const end = toDate || fromDate;
+    if (start > end) return -1; // inverted range is reported by validateDateRanges
+    return ranges.findIndex(
+        (other, otherIndex) => otherIndex !== index && other.fromDate && other.toDate && start <= other.toDate && other.fromDate <= end,
+    );
+};
+
+// Day before the next range that starts after fromDate, so the To Date picker cannot run into it.
+const getMaxToDate = (ranges: DateRangeForm[], index: number): string | undefined => {
+    const { fromDate } = ranges[index];
+    if (!fromDate) return undefined;
+    const nextStart = ranges
+        .filter((other, otherIndex) => otherIndex !== index && other.fromDate && other.fromDate > fromDate)
+        .map((other) => other.fromDate)
+        .sort()[0];
+    return nextStart ? dayjs(nextStart).subtract(1, "day").format("YYYY-MM-DD") : undefined;
+};
 
 const currencyOptions = currency_list.map((currency) => ({
     value: currency.code,
@@ -314,6 +375,28 @@ export default function RateVolumes() {
         }));
     };
 
+    const updateDateRange = (index: number, field: keyof DateRangeForm, value: string) => {
+        // The native date picker fires change while the user is only paging through months,
+        // so don't block here; conflicts are shown inline and re-checked on submit.
+        setFormData((current) => ({
+            ...current,
+            dateRanges: current.dateRanges.map((range, rangeIndex) =>
+                rangeIndex === index ? { ...range, [field]: value } : range,
+            ),
+        }));
+    };
+
+    const addDateRange = () => {
+        setFormData((current) => ({ ...current, dateRanges: [...current.dateRanges, emptyDateRange()] }));
+    };
+
+    const removeDateRange = (index: number) => {
+        setFormData((current) => ({
+            ...current,
+            dateRanges: current.dateRanges.filter((_, rangeIndex) => rangeIndex !== index),
+        }));
+    };
+
     const resetForm = () => {
         setEditId(null);
         setFormData(initialState());
@@ -328,12 +411,9 @@ export default function RateVolumes() {
             return;
         }
 
-        if (!formData.fromDate || !formData.toDate) {
-            alert("Please select the volume date range");
-            return;
-        }
-        if (new Date(formData.fromDate) > new Date(formData.toDate)) {
-            alert("From date cannot be after to date");
+        const dateError = validateDateRanges(formData.dateRanges);
+        if (dateError) {
+            alert(dateError);
             return;
         }
 
@@ -354,8 +434,7 @@ export default function RateVolumes() {
             const payload = {
                 volumeName: formData.volumeName.trim(),
                 isActive: formData.isActive,
-                fromDate: formData.fromDate,
-                toDate: formData.toDate,
+                dateRanges: formData.dateRanges,
                 hotelRates: formData.hotelRates.map((rate) => ({
                     hotel: getHotelId(rate.hotel),
                     city: rate.city,
@@ -395,11 +474,10 @@ export default function RateVolumes() {
 
     const handleEdit = (volume: RateVolumeType) => {
         const hotelRates = normalizeHotelRates(volume);
-        const dateRange = getVolumeDateRange(volume);
         setFormData({
             volumeName: volume.volumeName,
             isActive: volume.isActive !== false,
-            ...dateRange,
+            dateRanges: getVolumeDateRanges(volume),
             hotelRates: hotelRates.length ? hotelRates : [emptyHotelRate()],
         });
         setEditId(volume._id || null);
@@ -469,21 +547,13 @@ export default function RateVolumes() {
                             <h2 className="text-2xl font-bold text-gray-800">{editId ? "Update Volume" : "Create New Volume"}</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(140px,auto)] xl:items-end">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_minmax(140px,auto)] xl:items-end">
                             <div>
                                 <label className="mb-1.5 block text-xs font-semibold text-gray-700">Volume Name <span className="text-red-500">*</span></label>
                                 <div className="relative">
                                     <FiPackage className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input value={formData.volumeName} onChange={(event) => setFormData((current) => ({ ...current, volumeName: event.target.value }))} placeholder="e.g. Ramadan Volume 2027" required className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-500" />
                                 </div>
-                            </div>
-                            <div>
-                                <label className="mb-1.5 block text-xs font-semibold text-gray-700">From Date <span className="text-red-500">*</span></label>
-                                <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={formData.fromDate} onChange={(event) => setFormData((current) => ({ ...current, fromDate: event.target.value }))} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                            </div>
-                            <div>
-                                <label className="mb-1.5 block text-xs font-semibold text-gray-700">To Date <span className="text-red-500">*</span></label>
-                                <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={formData.toDate} min={formData.fromDate || undefined} onChange={(event) => setFormData((current) => ({ ...current, toDate: event.target.value }))} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
                             </div>
                             <div>
                                 <label className="mb-1.5 block text-xs font-semibold text-gray-700">Status</label>
@@ -501,6 +571,30 @@ export default function RateVolumes() {
                                 </button>
                             </div>
                         </div>
+
+                        <section className="rounded-2xl border-2 border-purple-200 bg-purple-50/40 p-5">
+                            <div className="mb-3 flex flex-wrap items-center gap-2"><div className="rounded-lg bg-purple-100 p-1.5"><FiCalendar className="h-4 w-4 text-purple-600" /></div><h3 className="font-bold text-purple-800">Date Ranges</h3><span className="text-xs text-gray-500">Pricing applies in any of these ranges (ranges must not overlap)</span></div>
+                            <div className="space-y-3">
+                                {formData.dateRanges.map((range, index) => {
+                                    const conflictIndex = findConflictingRangeIndex(formData.dateRanges, index, range);
+                                    return (
+                                    <div key={index} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-semibold text-gray-700">From Date {index + 1} <span className="text-red-500">*</span></label>
+                                            <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={range.fromDate} onChange={(event) => updateDateRange(index, "fromDate", event.target.value)} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                        </div>
+                                        <div>
+                                            <label className="mb-1.5 block text-xs font-semibold text-gray-700">To Date {index + 1} <span className="text-red-500">*</span></label>
+                                            <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={range.toDate} min={range.fromDate || undefined} max={getMaxToDate(formData.dateRanges, index)} onChange={(event) => updateDateRange(index, "toDate", event.target.value)} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                                        </div>
+                                        {formData.dateRanges.length > 1 ? <button type="button" onClick={() => removeDateRange(index)} className="inline-flex h-10.5 items-center gap-1 rounded-lg px-3 text-sm font-medium text-red-600 hover:bg-red-50"><FiTrash2 /> Remove</button> : <span className="hidden sm:block" />}
+                                        {conflictIndex !== -1 && <p className="flex items-center gap-1 text-xs text-red-600 sm:col-span-3"><FiAlertCircle />This overlaps with Date Range {conflictIndex + 1} ({formatRange(formData.dateRanges[conflictIndex])}). Please choose dates outside it.</p>}
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                            <button type="button" onClick={addDateRange} className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-purple-300 px-4 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-50"><FiPlus className="h-4 w-4" />Add More Date</button>
+                        </section>
 
                         <div className="space-y-5">
                             {formData.hotelRates.map((rate, index) => {
@@ -558,7 +652,7 @@ export default function RateVolumes() {
                             <tbody>
                                 {volumes.length ? volumes.map((volume, index) => {
                                     const rates = normalizeHotelRates(volume);
-                                    const dateRange = getVolumeDateRange(volume);
+                                    const dateRanges = getVolumeDateRanges(volume);
                                     const isExpanded = volume._id ? expandedVolumeIds.has(volume._id) : false;
                                     return (
                                         <React.Fragment key={volume._id || index}>
@@ -578,7 +672,7 @@ export default function RateVolumes() {
                                                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100"><FiPackage className="text-blue-600" /></div>
                                                         <div>
                                                             <div className="font-semibold text-gray-800">{volume.volumeName}</div>
-                                                            <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-500"><FiCalendar />{dayjs(dateRange.fromDate).format("DD MMM YYYY")} - {dayjs(dateRange.toDate).format("DD MMM YYYY")}</div>
+                                                            <div className="mt-0.5 space-y-0.5 text-xs text-gray-500">{dateRanges.map((range, rangeIndex) => <div key={rangeIndex} className="flex items-center gap-1"><FiCalendar />{formatRange(range)}</div>)}</div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -599,7 +693,7 @@ export default function RateVolumes() {
                                                             <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50/60 px-4 py-3">
                                                                 <div>
                                                                     <h3 className="text-sm font-bold text-gray-800">Hotels in {volume.volumeName}</h3>
-                                                                    <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500"><FiCalendar />{dayjs(dateRange.fromDate).format("DD MMM YYYY")} - {dayjs(dateRange.toDate).format("DD MMM YYYY")} applies to every hotel</p>
+                                                                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500"><FiCalendar />{dateRanges.map(formatRange).join(", ")} <span>applies to every hotel</span></p>
                                                                 </div>
                                                                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm">{rates.length} total</span>
                                                             </div>

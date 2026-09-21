@@ -201,6 +201,8 @@ interface RateVolumeData {
   volumeName: string;
   fromDate?: string;
   toDate?: string;
+  // Every date range the volume applies to (falls back to fromDate/toDate for old volumes).
+  dateRanges: { fromDate?: string; toDate?: string }[];
   hotelRates: RateVolumeHotelRate[];
 }
 
@@ -386,6 +388,8 @@ const UmrahPackage = () => {
             const rawRates: RateVolumeApiHotelRate[] = Array.isArray(v.hotelRates) && v.hotelRates.length ? v.hotelRates : [v];
             const fromDate = v.fromDate || rawRates[0]?.fromDate;
             const toDate = v.toDate || rawRates[0]?.toDate;
+            const dateRanges: { fromDate?: string; toDate?: string }[] =
+              Array.isArray(v.dateRanges) && v.dateRanges.length ? v.dateRanges : [{ fromDate, toDate }];
             const hotelRates: RateVolumeHotelRate[] = rawRates.map((rate) => ({
               hotelId: typeof rate.hotel === "string" ? rate.hotel : rate.hotel?._id,
               city: rate.city,
@@ -409,6 +413,7 @@ const UmrahPackage = () => {
                 volumeName: v.volumeName,
                 fromDate,
                 toDate,
+                dateRanges,
                 hotelRates,
               },
             };
@@ -1114,7 +1119,7 @@ const UmrahPackage = () => {
     checkOut?: string
   ): RateVolumeHotelRate | undefined => {
     if (!hotelId) return undefined;
-    if (checkIn && checkOut && !isStayWithinVolumeRange(checkIn, checkOut, volume.fromDate, volume.toDate)) {
+    if (checkIn && checkOut && !volume.dateRanges.some((range) => isStayWithinVolumeRange(checkIn, checkOut, range.fromDate, range.toDate))) {
       return undefined;
     }
     return volume.hotelRates.find((rate) => rate.hotelId === hotelId);

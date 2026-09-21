@@ -1059,7 +1059,34 @@ const attachGroupData = async (bookings) => {
 
   const groupMap = {};
   groups.forEach((group) => {
+    // Flight details are snapshotted on the booking at creation; overlay the
+    // group's current ones so later edits to the group show up. Pricing is left alone.
+    const groupFlights = (group.flights || []).map((f) => ({
+      airline: f.airline,
+      flightClass: f.flightClass,
+      fromTerminal: f.fromTerminal,
+      toTerminal: f.toTerminal,
+      sectorFrom: f.sectorFrom,
+      sectorTo: f.sectorTo,
+      flightNo: f.flightNo,
+      depDate: f.depDate,
+      depTime: f.depTime,
+      origin: f.sectorFrom,
+      destination: f.sectorTo,
+      arrDate: f.arrDate,
+      arrTime: f.arrTime,
+      baggage: f.baggage,
+      meal: f.meal,
+    }));
+
     groupMap[group._id.toString()] = {
+      flightDetails: {
+        flights: groupFlights,
+        sector: group.sector,
+        airlineName: group.airline,
+        departureDate: groupFlights[0]?.depDate,
+        arrivalDate: groupFlights[groupFlights.length - 1]?.arrDate,
+      },
       groupTicketData: {
         // Buying prices
         buyingCurrency: group.price?.buyingCurrency || "PKR",
@@ -1086,7 +1113,22 @@ const attachGroupData = async (bookings) => {
     const bookingObj = booking.toObject ? booking.toObject() : booking;
     const groupData = groupMap[booking.groupId];
 
-    return groupData ? { ...bookingObj, ...groupData } : bookingObj;
+    if (!groupData) return bookingObj;
+
+    const { flightDetails, groupTicketData } = groupData;
+    const merged = { ...bookingObj, groupTicketData };
+
+    if (flightDetails.flights.length > 0) {
+      merged.flights = flightDetails.flights;
+      merged.departureDate = flightDetails.departureDate || bookingObj.departureDate;
+      merged.arrivalDate = flightDetails.arrivalDate || bookingObj.arrivalDate;
+    }
+    if (flightDetails.sector) merged.sector = flightDetails.sector;
+    if (flightDetails.airlineName) {
+      merged.airline = { ...bookingObj.airline, name: flightDetails.airlineName };
+    }
+
+    return merged;
   });
 
   return Array.isArray(bookings) ? result : result[0];

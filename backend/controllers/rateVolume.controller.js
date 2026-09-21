@@ -56,24 +56,59 @@ const validateHotelRates = (hotelRates) => {
   return null;
 };
 
-const getDateRangeFromBody = (body) => {
+// Accepts body.dateRanges (new) or the single body.fromDate/toDate (old clients).
+const getDateRangesFromBody = (body) => {
+  if (Array.isArray(body.dateRanges)) {
+    return body.dateRanges.map((range) => ({ fromDate: range?.fromDate, toDate: range?.toDate }));
+  }
+
   const firstHotelRate = Array.isArray(body.hotelRates) ? body.hotelRates[0] : undefined;
-  return {
-    // The nested fallbacks accept payloads sent by the short-lived version that
-    // stored a separate date range in every hotelRates item.
-    fromDate: body.fromDate || firstHotelRate?.fromDate,
-    toDate: body.toDate || firstHotelRate?.toDate,
-  };
+  return [
+    {
+      // The nested fallbacks accept payloads sent by the short-lived version that
+      // stored a separate date range in every hotelRates item.
+      fromDate: body.fromDate || firstHotelRate?.fromDate,
+      toDate: body.toDate || firstHotelRate?.toDate,
+    },
+  ];
 };
 
-const validateDateRange = ({ fromDate, toDate }) => {
-  if (!fromDate || !toDate) return "From date and to date are required";
-  const from = new Date(fromDate);
-  const to = new Date(toDate);
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return "Date range is invalid";
-  if (from > to) return "From date cannot be after to date";
+const formatDate = (date) => date.toISOString().slice(0, 10);
+
+const validateDateRanges = (dateRanges) => {
+  if (!dateRanges.length) return "At least one date range is required";
+
+  const parsed = [];
+  for (let index = 0; index < dateRanges.length; index += 1) {
+    const { fromDate, toDate } = dateRanges[index];
+    if (!fromDate || !toDate) return `From date and to date are required for date range ${index + 1}`;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      return `Date range ${index + 1} is invalid`;
+    }
+    if (from > to) return `From date cannot be after to date in date range ${index + 1}`;
+    parsed.push({ index, from, to });
+  }
+
+  // Ranges are inclusive, so sharing even a single day counts as an overlap.
+  for (let i = 0; i < parsed.length; i += 1) {
+    for (let j = i + 1; j < parsed.length; j += 1) {
+      if (parsed[i].from <= parsed[j].to && parsed[j].from <= parsed[i].to) {
+        return `Date range ${i + 1} (${formatDate(parsed[i].from)} to ${formatDate(parsed[i].to)}) overlaps with date range ${j + 1} (${formatDate(parsed[j].from)} to ${formatDate(parsed[j].to)})`;
+      }
+    }
+  }
+
   return null;
 };
+
+// dateRanges plus the root fromDate/toDate mirror (first range) for legacy readers.
+const dateFieldsFromRanges = (dateRanges) => ({
+  dateRanges,
+  fromDate: dateRanges[0].fromDate,
+  toDate: dateRanges[0].toDate,
+});
 
 const legacyFieldsFromFirstRate = (hotelRates) => {
   const firstRate = hotelRates[0];
@@ -109,15 +144,15 @@ export const createRateVolume = async (req, res) => {
       });
     }
 
-    const dateRange = getDateRangeFromBody(req.body);
-    const dateValidationError = validateDateRange(dateRange);
+    const dateRanges = getDateRangesFromBody(req.body);
+    const dateValidationError = validateDateRanges(dateRanges);
     if (dateValidationError) {
       return res.status(400).json({ success: false, message: dateValidationError });
     }
 
     const rateVolume = await RateVolume.create({
       volumeName,
-      ...dateRange,
+      ...dateFieldsFromRanges(dateRanges),
       hotelRates,
       ...legacyFieldsFromFirstRate(hotelRates),
       isActive: isActive !== undefined ? isActive : true,
@@ -218,14 +253,18 @@ export const updateRateVolume = async (req, res) => {
       Object.assign(updateData, legacyFieldsFromFirstRate(hotelRates));
     }
 
-    const hasDatePayload = req.body.fromDate !== undefined || req.body.toDate !== undefined || Array.isArray(req.body.hotelRates);
+    const hasDatePayload =
+      Array.isArray(req.body.dateRanges) ||
+      req.body.fromDate !== undefined ||
+      req.body.toDate !== undefined ||
+      Array.isArray(req.body.hotelRates);
     if (hasDatePayload) {
-      const dateRange = getDateRangeFromBody(req.body);
-      const dateValidationError = validateDateRange(dateRange);
+      const dateRanges = getDateRangesFromBody(req.body);
+      const dateValidationError = validateDateRanges(dateRanges);
       if (dateValidationError) {
         return res.status(400).json({ success: false, message: dateValidationError });
       }
-      Object.assign(updateData, dateRange);
+      Object.assign(updateData, dateFieldsFromRanges(dateRanges));
     }
 
     const rateVolume = await populateRateVolume(

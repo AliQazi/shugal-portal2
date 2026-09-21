@@ -655,7 +655,7 @@ export const getUmrahPackageXOReportData = async (req, res) => {
 
     const groupTickets = groupTicketIds.length
       ? await GroupTicket.find({ _id: { $in: groupTicketIds } })
-          .select("price user pnr")
+          .select("price user pnr flights airline")
           .populate("user", "name")
           .lean()
       : [];
@@ -798,7 +798,9 @@ export const getUmrahPackageXOReportData = async (req, res) => {
             : "Multiple Suppliers"
           : "N/A";
 
-        flights = (pkg.flights || []).map((f) => ({
+        // Prefer the live group ticket's flights over the package's saved copy
+        const liveFlights = ticket?.flights?.length ? ticket.flights : pkg.flights;
+        flights = (liveFlights || []).map((f) => ({
           flightNo: f.flightNo,
           depDate: f.depDate,
           depTime: f.depTime,
@@ -809,7 +811,7 @@ export const getUmrahPackageXOReportData = async (req, res) => {
         }));
         if (flights.length) {
           sector = `${flights[0].origin || "?"}-${flights[flights.length - 1].destination || "?"}`;
-          airlineName = pkg.flights?.[0]?.airline || "N/A";
+          airlineName = liveFlights?.[0]?.airline || "N/A";
         }
       }
 
@@ -1851,7 +1853,17 @@ export const updateOverallStatus = async (req, res) => {
       // =========================================
       // FLIGHT INFO FOR DESCRIPTION
       // =========================================
-      const firstFlight = linkedPackage.flights?.[0] || {};
+      let liveTicketFlights = null;
+      if (linkedPackage.selectedGroupTicketId) {
+        const ticketForFlights = await GroupTicket.findById(
+          linkedPackage.selectedGroupTicketId,
+        ).select("flights");
+        if (ticketForFlights?.flights?.length) {
+          liveTicketFlights = ticketForFlights.flights;
+        }
+      }
+      const firstFlight =
+        (liveTicketFlights || linkedPackage.flights)?.[0] || {};
       const travelDate = firstFlight.depDate
         ? new Date(firstFlight.depDate).toLocaleDateString("en-GB", {
             day: "2-digit",

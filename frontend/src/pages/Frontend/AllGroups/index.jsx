@@ -658,6 +658,9 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
       }
 
       const groupTicketTotalSeats = {};
+      // Live group tickets by id, so edits made to a group ticket after the
+      // package was saved show up here (the package only holds a saved copy).
+      const groupTicketById = {};
       if (
         groupTicketRes.status === "fulfilled" &&
         groupTicketRes.value.data?.success
@@ -665,6 +668,7 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
         (groupTicketRes.value.data.data || []).forEach((ticket) => {
           const ticketId = getId(ticket._id || ticket.id);
           if (!ticketId) return;
+          groupTicketById[ticketId] = ticket;
           groupTicketTotalSeats[ticketId] = Number(ticket.totalSeats) || 0;
         });
       }
@@ -715,11 +719,22 @@ export default function AllGroups({ headerType, header, searchParams, user }) {
 
       const formattedGroups = filtered
         .map((pkg) => {
-          const flights = pkg.groupTicket?.flights || pkg.flights || [];
+          const liveTicket =
+            groupTicketById[
+              getId(
+                pkg.selectedGroupTicketId ||
+                pkg.groupTicket?._id ||
+                pkg.groupTicket?.id,
+              )
+            ];
+          const flights = liveTicket?.flights?.length
+            ? liveTicket.flights
+            : pkg.groupTicket?.flights || pkg.flights || [];
           const firstFlight = flights[0] || {};
           const lastFlight = flights[flights.length - 1] || {};
 
           const airlineName =
+            liveTicket?.airline ||
             pkg.groupTicket?.airline ||
             firstFlight.airlineName ||
             firstFlight.airline ||

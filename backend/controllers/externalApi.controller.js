@@ -155,6 +155,20 @@ const presentUmrahPackage = (pkg) => ({
   } : null,
 });
 
+// A package only holds a saved copy of its group ticket's flights, so swap in the
+// live ones (when the group ticket still exists) so later edits are reflected.
+const withLiveFlights = async (pkgs) => {
+  const list = pkgs.map((pkg) => (pkg?.toObject ? pkg.toObject() : pkg));
+  const ids = [...new Set(list.map((pkg) => String(pkg?.selectedGroupTicketId || "")).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+  if (!ids.length) return list;
+  const tickets = await GroupTicketing.find({ _id: { $in: ids } }).select("flights").lean();
+  const flightsById = new Map(tickets.filter((t) => t.flights?.length).map((t) => [String(t._id), t.flights]));
+  return list.map((pkg) => {
+    const flights = flightsById.get(String(pkg?.selectedGroupTicketId || ""));
+    return flights ? { ...pkg, flights } : pkg;
+  });
+};
+
 const apiError = (res, status, code, message, details) =>
   res.status(status).json({ success: false, error: { code, message, ...(details && { details }) } });
 
@@ -196,7 +210,7 @@ export const listUmrahPackages = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: packages.map(presentUmrahPackage),
+      data: (await withLiveFlights(packages)).map(presentUmrahPackage),
       meta: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) { next(error); }
@@ -209,7 +223,8 @@ export const getUmrahPackage = async (req, res, next) => {
     }
     const pkg = await UmrahPackage.findOne({ _id: req.params.id, ...publicUmrahPackageQuery() }).lean();
     if (!pkg) return apiError(res, 404, "PACKAGE_NOT_FOUND", "The package is unavailable or does not exist.");
-    res.json({ success: true, data: presentUmrahPackage(pkg) });
+    const [livePkg] = await withLiveFlights([pkg]);
+    res.json({ success: true, data: presentUmrahPackage(livePkg) });
   } catch (error) { next(error); }
 };
 
@@ -329,7 +344,7 @@ export const createExternalBooking = async (req, res, next) => {
       const booking = await UmrahPackageBooking.create({
         bookingNumber,
         packageId: String(reservedPackage._id), packageName: reservedPackage.packageName,
-        packageSource: reservedPackage.packageSource, packageData: presentUmrahPackage(reservedPackage),
+        packageSource: reservedPackage.packageSource, packageData: presentUmrahPackage((await withLiveFlights([reservedPackage]))[0]),
         user: String(req.user._id), roomType, passengers: umrahPassengers,
         pricing: { pricePerPerson: adultPrice, adultTotal, childTotal, infantTotal, totalPrice, currency: "PKR" },
         paymentStatus: { status: "Pending", totalAmount: totalPrice, paidAmount: 0, remainingAmount: totalPrice },

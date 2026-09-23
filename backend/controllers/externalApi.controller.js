@@ -23,6 +23,58 @@ const publicUmrahPackageQuery = () => ({
   availableRooms: { $gt: 0 },
   "flights.0.depDate": { $gte: startOfToday() },
 });
+// GroupTicketing.totalSeats is the original capacity. Regular app bookings are
+// tracked in booking collections and do not consistently decrement that field.
+const getGroupBookedSeats = async (groups) => {
+  const groupIds = groups.map((group) => String(group._id));
+  if (!groupIds.length) return new Map();
+
+  const [directBookings, linkedPackages] = await Promise.all([
+    Booking.aggregate([
+      { $match: { groupId: { $in: groupIds }, status: { $nin: ["cancelled"] } } },
+      { $group: {
+        _id: "$groupId",
+        seats: { $sum: { $add: [{ $ifNull: ["$adultsCount", 0] }, { $ifNull: ["$childrenCount", 0] }] } },
+      } },
+    ]),
+    UmrahPackage.find({ selectedGroupTicketId: { $in: groupIds } })
+      .select("_id selectedGroupTicketId")
+      .lean(),
+  ]);
+
+  const bookedByGroup = new Map(
+    directBookings.map((booking) => [String(booking._id), Number(booking.seats) || 0]),
+  );
+  if (!linkedPackages.length) return bookedByGroup;
+
+  const groupByPackage = new Map(
+    linkedPackages.map((pkg) => [String(pkg._id), String(pkg.selectedGroupTicketId)]),
+  );
+  const packageBookings = await UmrahPackageBooking.aggregate([
+    { $match: { packageId: { $in: [...groupByPackage.keys()] }, overallStatus: { $nin: ["Cancelled"] } } },
+    { $group: {
+      _id: "$packageId",
+      seats: { $sum: { $add: [{ $ifNull: ["$passengerCount.adults", 0] }, { $ifNull: ["$passengerCount.children", 0] }] } },
+    } },
+  ]);
+
+  packageBookings.forEach((booking) => {
+    const groupId = groupByPackage.get(String(booking._id));
+    if (groupId) bookedByGroup.set(groupId, (bookedByGroup.get(groupId) || 0) + (Number(booking.seats) || 0));
+  });
+  return bookedByGroup;
+};
+
+const withAvailableGroupSeats = async (groups) => {
+  const bookedByGroup = await getGroupBookedSeats(groups);
+  return groups
+    .map((group) => ({
+      ...group,
+      availableSeats: Math.max(0, (Number(group.totalSeats) || 0) - (bookedByGroup.get(String(group._id)) || 0)),
+    }))
+    .filter((group) => group.availableSeats > 0);
+};
+
 const passengerTypes = ["Adult", "Child", "Infant"];
 const AVAILABILITY_TOKEN_TTL_MS = 5 * 60 * 1000;
 
@@ -188,10 +240,10 @@ export const listInventory = async (req, res, next) => {
     const query = publicGroupQuery();
     if (req.query.groupType) query.groupType = req.query.groupType;
     if (req.query.airline) query.airline = new RegExp(`^${String(req.query.airline).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-    const [groups, total] = await Promise.all([
-      GroupTicketing.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-      GroupTicketing.countDocuments(query),
-    ]);
+    const matchingGroups = await GroupTicketing.find(query).sort({ createdAt: -1 }).lean();
+    const availableGroups = await withAvailableGroupSeats(matchingGroups);
+    const total = availableGroups.length;
+    const groups = availableGroups.slice((page - 1) * limit, page * limit);
     res.json({ success: true, data: groups.map(presentGroup), meta: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (error) { next(error); }
 };
@@ -200,8 +252,9 @@ export const getInventory = async (req, res, next) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return apiError(res, 400, "INVALID_GROUP_ID", "groupId is invalid.");
     const group = await GroupTicketing.findOne({ _id: req.params.id, ...publicGroupQuery() }).lean();
-    if (!group) return apiError(res, 404, "GROUP_NOT_FOUND", "The group is unavailable or does not exist.");
-    res.json({ success: true, data: presentGroup(group) });
+    const [availableGroup] = group ? await withAvailableGroupSeats([group]) : [];
+    if (!availableGroup) return apiError(res, 404, "GROUP_NOT_FOUND", "The group is unavailable or does not exist.");
+    res.json({ success: true, data: presentGroup(availableGroup) });
   } catch (error) { next(error); }
 };
 
@@ -253,7 +306,8 @@ export const checkExternalAvailability = async (req, res, next) => {
     const inventoryKind = pkg ? "umrah-package" : "group-ticketing";
     const requestedUnits = pkg ? counts.adults + counts.children + counts.infants : counts.adults + counts.children;
     if (requestedUnits < 1) return apiError(res, 422, "VALIDATION_ERROR", "At least one reservable passenger is required.");
-    const availableUnits = pkg ? pkg.availableRooms : group.totalSeats;
+    const [availableGroup] = group ? await withAvailableGroupSeats([group]) : [];
+    const availableUnits = pkg ? pkg.availableRooms : (availableGroup?.availableSeats || 0);
     const available = availableUnits >= requestedUnits;
     const expiresAt = Date.now() + AVAILABILITY_TOKEN_TTL_MS;
     const availabilityToken = available ? signAvailabilityPayload({

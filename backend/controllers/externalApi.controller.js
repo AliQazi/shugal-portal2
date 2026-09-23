@@ -121,7 +121,7 @@ const presentUmrahPackage = (pkg) => ({
   flightLogo: pkg.flightLogo,
   source: pkg.packageSource,
   days: pkg.days,
-  availableRooms: pkg.availableRooms,
+  // availableRooms: pkg.availableRooms,
   rooms: pkg.rooms,
   packageTotals: pkg.packageTotals,
   flights: pkg.flights,

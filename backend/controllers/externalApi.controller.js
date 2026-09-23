@@ -260,7 +260,7 @@ export const checkExternalAvailability = async (req, res, next) => {
       inventoryId: String(inventoryId), clientId: String(req.apiClient._id),
       inventoryKind, requestedUnits, counts, expiresAt,
     }) : null;
-    res.json({ success: true, data: { available, requestedUnits, availableUnits, expiresAt: available ? new Date(expiresAt) : null, availabilityToken } });
+    res.json({ success: true, data: { available, requestedUnits, expiresAt: available ? new Date(expiresAt) : null } });
   } catch (error) { next(error); }
 };
 

@@ -74,7 +74,7 @@ const presentGroup = (group) => ({
   sector: group.sector,
   airline: group.airline,
   pnr: group.pnr || "",
-  availableSeats: group.totalSeats,
+  // availableSeats: group.totalSeats,
   currency: group.price?.sellingCurrencyB2B || "PKR",
   fares: {
     adult: group.price?.sellingAdultPriceB2B || 0,

@@ -1,738 +1,155 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Select, { type StylesConfig } from "react-select";
+import dayjs from "dayjs";
+import { FiAlertCircle, FiCalendar, FiChevronDown, FiChevronRight, FiDollarSign, FiEdit2, FiHome, FiMapPin, FiPackage, FiPlus, FiRefreshCw, FiSave, FiTrash2, FiX } from "react-icons/fi";
 import axiosInstance from "../Api/axios";
 import currency_list from "../data/currencies";
-import {
-    FiAlertCircle,
-    FiCalendar,
-    FiChevronDown,
-    FiChevronRight,
-    FiDollarSign,
-    FiEdit2,
-    FiHome,
-    FiMapPin,
-    FiPackage,
-    FiPlus,
-    FiRefreshCw,
-    FiSave,
-    FiTrash2,
-    FiTrendingDown,
-    FiTrendingUp,
-    FiX,
-} from "react-icons/fi";
-import dayjs from "dayjs";
+import { emptyRatePricing, normalizeRateVolume, type RatePricing, type RateVolumeDateRate } from "../utils/rateVolumePricing";
 
-interface HotelRef {
-    _id: string;
-    hotelName: string;
-    city: string;
-}
-
-interface HotelRateForm {
-    _id?: string;
-    hotel: string | HotelRef | null;
-    city: string;
-    // Legacy nested dates may still be present on transitional records.
-    fromDate?: string;
-    toDate?: string;
-    buyingPrice: number;
-    buyingRoe: number;
-    buyingCurrency: string;
-    sellingPrice: number;
-    sellingRoe: number;
-    sellingCurrency: string;
-    sharedRoomBuyingPrice: number;
-    sharedRoomBuyingRoe: number;
-    sharedRoomBuyingCurrency: string;
-    sharedRoomSellingPrice: number;
-    sharedRoomSellingRoe: number;
-    sharedRoomSellingCurrency: string;
-}
-
-interface DateRangeForm {
-    fromDate: string;
-    toDate: string;
-}
-
-interface RateVolumeType extends Partial<HotelRateForm> {
-    _id?: string;
-    volumeName: string;
-    dateRanges?: { fromDate?: string; toDate?: string }[];
-    hotelRates?: HotelRateForm[];
-    isActive?: boolean;
-    createdAt?: string;
-}
-
-interface RateVolumeForm {
-    volumeName: string;
-    isActive: boolean;
-    dateRanges: DateRangeForm[];
-    hotelRates: HotelRateForm[];
-}
-
-const emptyHotelRate = (): HotelRateForm => ({
-    hotel: "",
-    city: "",
-    buyingPrice: 0,
-    buyingRoe: 1,
-    buyingCurrency: "PKR",
-    sellingPrice: 0,
-    sellingRoe: 1,
-    sellingCurrency: "PKR",
-    sharedRoomBuyingPrice: 0,
-    sharedRoomBuyingRoe: 1,
-    sharedRoomBuyingCurrency: "PKR",
-    sharedRoomSellingPrice: 0,
-    sharedRoomSellingRoe: 1,
-    sharedRoomSellingCurrency: "PKR",
-});
+interface HotelRef { _id: string; hotelName: string; city: string }
+interface DateRangeForm { fromDate: string; toDate: string }
+interface HotelRateForm { _id?: string; hotel: string; city: string; dateRates: RateVolumeDateRate[] }
+interface RateVolumeForm { volumeName: string; isActive: boolean; dateRanges: DateRangeForm[]; hotelRates: HotelRateForm[] }
+interface RateVolumeRecord { _id?: string; volumeName: string; isActive?: boolean; dateRanges?: DateRangeForm[]; hotelRates?: any[];[key: string]: any }
+type SelectOption = { value: string; label: string };
+type PricingKey = keyof RatePricing;
 
 const emptyDateRange = (): DateRangeForm => ({ fromDate: "", toDate: "" });
-
-const initialState = (): RateVolumeForm => ({
-    volumeName: "",
-    isActive: true,
-    dateRanges: [emptyDateRange()],
-    hotelRates: [emptyHotelRate()],
-});
-
-const getHotelId = (hotel: HotelRateForm["hotel"]): string => {
-    if (!hotel) return "";
-    return typeof hotel === "string" ? hotel : hotel._id;
+const emptyDateRate = (range: DateRangeForm = emptyDateRange()): RateVolumeDateRate => ({ ...range, ...emptyRatePricing() });
+const emptyHotelRate = (ranges: DateRangeForm[]): HotelRateForm => ({ hotel: "", city: "", dateRates: ranges.map(emptyDateRate) });
+const initialState = (): RateVolumeForm => {
+  const dateRanges = [emptyDateRange()];
+  return { volumeName: "", isActive: true, dateRanges, hotelRates: [emptyHotelRate(dateRanges)] };
 };
+const toDateInput = (value?: string) => value ? value.slice(0, 10) : "";
+const formatRange = (range: DateRangeForm) => range.fromDate && range.toDate ? `${dayjs(range.fromDate).format("DD MMM YYYY")} - ${dayjs(range.toDate).format("DD MMM YYYY")}` : "Dates not selected";
 
-const getHotelName = (hotel: HotelRateForm["hotel"], hotels: HotelRef[]): string => {
-    if (!hotel) return "-";
-    if (typeof hotel === "string") {
-        return hotels.find((item) => item._id === hotel)?.hotelName || "Unknown hotel";
-    }
-    return hotel.hotelName || "Unknown hotel";
-};
-
-const toDateInput = (value?: string) => (value ? value.slice(0, 10) : "");
-
-const normalizeHotelRates = (volume: RateVolumeType): HotelRateForm[] => {
-    const source = volume.hotelRates?.length ? volume.hotelRates : volume.hotel ? [volume as HotelRateForm] : [];
-    return source.map((rate) => ({
-        _id: rate._id,
-        hotel: getHotelId(rate.hotel),
-        city: rate.city || (typeof rate.hotel === "object" && rate.hotel ? rate.hotel.city : ""),
-        buyingPrice: rate.buyingPrice ?? 0,
-        buyingRoe: rate.buyingRoe ?? 1,
-        buyingCurrency: rate.buyingCurrency || "PKR",
-        sellingPrice: rate.sellingPrice ?? 0,
-        sellingRoe: rate.sellingRoe ?? 1,
-        sellingCurrency: rate.sellingCurrency || "PKR",
-        sharedRoomBuyingPrice: rate.sharedRoomBuyingPrice ?? 0,
-        sharedRoomBuyingRoe: rate.sharedRoomBuyingRoe ?? 1,
-        sharedRoomBuyingCurrency: rate.sharedRoomBuyingCurrency || "PKR",
-        sharedRoomSellingPrice: rate.sharedRoomSellingPrice ?? 0,
-        sharedRoomSellingRoe: rate.sharedRoomSellingRoe ?? 1,
-        sharedRoomSellingCurrency: rate.sharedRoomSellingCurrency || "PKR",
-    }));
-};
-
-// Volumes created before multi-date support only have a single root fromDate/toDate.
-const getVolumeDateRanges = (volume: RateVolumeType): DateRangeForm[] => {
-    if (volume.dateRanges?.length) {
-        return volume.dateRanges.map((range) => ({
-            fromDate: toDateInput(range.fromDate),
-            toDate: toDateInput(range.toDate),
-        }));
-    }
-    return [
-        {
-            fromDate: toDateInput(volume.fromDate || volume.hotelRates?.[0]?.fromDate),
-            toDate: toDateInput(volume.toDate || volume.hotelRates?.[0]?.toDate),
-        },
-    ];
-};
-
-const formatRange = (range: DateRangeForm) =>
-    `${dayjs(range.fromDate).format("DD MMM YYYY")} - ${dayjs(range.toDate).format("DD MMM YYYY")}`;
-
-// Returns an error message when a range is incomplete/inverted or two ranges share any day.
 const validateDateRanges = (ranges: DateRangeForm[]): string | null => {
-    for (let index = 0; index < ranges.length; index += 1) {
-        const { fromDate, toDate } = ranges[index];
-        if (!fromDate || !toDate) return `Please select both dates in Date Range ${index + 1}`;
-        if (fromDate > toDate) return `From date cannot be after to date in Date Range ${index + 1}`;
+  for (let index = 0; index < ranges.length; index += 1) {
+    const range = ranges[index];
+    if (!range.fromDate || !range.toDate) return `Please select both dates in Date Range ${index + 1}`;
+    if (range.fromDate > range.toDate) return `From date cannot be after to date in Date Range ${index + 1}`;
+  }
+  for (let i = 0; i < ranges.length; i += 1) {
+    for (let j = i + 1; j < ranges.length; j += 1) {
+      if (ranges[i].fromDate <= ranges[j].toDate && ranges[j].fromDate <= ranges[i].toDate) return `Date Range ${i + 1} overlaps with Date Range ${j + 1}. Each night may belong to only one pricing band.`;
     }
-    for (let i = 0; i < ranges.length; i += 1) {
-        for (let j = i + 1; j < ranges.length; j += 1) {
-            // ISO yyyy-mm-dd strings compare correctly as text; ranges are inclusive.
-            if (ranges[i].fromDate <= ranges[j].toDate && ranges[j].fromDate <= ranges[i].toDate) {
-                return `Date Range ${i + 1} (${formatRange(ranges[i])}) overlaps with Date Range ${j + 1} (${formatRange(ranges[j])}). Date ranges in a volume must be unique.`;
-            }
-        }
-    }
-    return null;
+  }
+  return null;
 };
-
-// Index of another range that the candidate range (or a single picked date) collides with, or -1.
-const findConflictingRangeIndex = (ranges: DateRangeForm[], index: number, candidate: DateRangeForm): number => {
-    const { fromDate, toDate } = candidate;
-    if (!fromDate && !toDate) return -1;
-    const start = fromDate || toDate;
-    const end = toDate || fromDate;
-    if (start > end) return -1; // inverted range is reported by validateDateRanges
-    return ranges.findIndex(
-        (other, otherIndex) => otherIndex !== index && other.fromDate && other.toDate && start <= other.toDate && other.fromDate <= end,
-    );
-};
-
-// Day before the next range that starts after fromDate, so the To Date picker cannot run into it.
-const getMaxToDate = (ranges: DateRangeForm[], index: number): string | undefined => {
-    const { fromDate } = ranges[index];
-    if (!fromDate) return undefined;
-    const nextStart = ranges
-        .filter((other, otherIndex) => otherIndex !== index && other.fromDate && other.fromDate > fromDate)
-        .map((other) => other.fromDate)
-        .sort()[0];
-    return nextStart ? dayjs(nextStart).subtract(1, "day").format("YYYY-MM-DD") : undefined;
-};
-
-const currencyOptions = currency_list.map((currency) => ({
-    value: currency.code,
-    label: `${currency.code} - ${currency.name}`,
-}));
-
-type SelectOption = { value: string; label: string };
 
 const customSelectStyles: StylesConfig<SelectOption, false> = {
-    control: (base, state) => ({
-        ...base,
-        minHeight: "42px",
-        borderRadius: "0.75rem",
-        borderColor: state.isFocused ? "#3B82F6" : "#E5E7EB",
-        boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.1)" : "none",
-        "&:hover": { borderColor: state.isFocused ? "#3B82F6" : "#D1D5DB" },
-    }),
-    option: (base, state) => ({
-        ...base,
-        backgroundColor: state.isSelected ? "#3B82F6" : state.isFocused ? "#EFF6FF" : "white",
-        color: state.isSelected ? "white" : "#1F2937",
-        "&:active": { backgroundColor: "#2563EB" },
-    }),
-    menu: (base) => ({
-        ...base,
-        zIndex: 20,
-        borderRadius: "0.75rem",
-        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-    }),
+  control: (base, state) => ({ ...base, minHeight: "42px", borderRadius: "0.75rem", borderColor: state.isFocused ? "#3B82F6" : "#E5E7EB", boxShadow: state.isFocused ? "0 0 0 2px rgba(59,130,246,.1)" : "none" }),
+  menu: (base) => ({ ...base, zIndex: 30, borderRadius: "0.75rem" }),
 };
+const currencyOptions = currency_list.map((currency) => ({ value: currency.code, label: `${currency.code} - ${currency.name}` }));
 
-interface PricingFieldsProps {
-    title: string;
-    priceLabel: string;
-    icon: React.ReactNode;
-    classes: string;
-    price: number;
-    roe: number;
-    currency: string;
-    onPriceChange: (value: number) => void;
-    onRoeChange: (value: number) => void;
-    onCurrencyChange: (value: string) => void;
+interface PricingCategoryProps {
+  title: string; classes: string; rate: RateVolumeDateRate;
+  buyingPriceKey: PricingKey; buyingRoeKey: PricingKey; buyingCurrencyKey: PricingKey;
+  sellingPriceKey: PricingKey; sellingRoeKey: PricingKey; sellingCurrencyKey: PricingKey;
+  onChange: (key: PricingKey, value: number | string) => void;
 }
 
-function PricingFields({
-    title,
-    priceLabel,
-    icon,
-    classes,
-    price,
-    roe,
-    currency,
-    onPriceChange,
-    onRoeChange,
-    onCurrencyChange,
-}: PricingFieldsProps) {
-    return (
-        <div className={`rounded-xl border p-4 ${classes}`}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                {icon}
-                {title}
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-600">{priceLabel}</label>
-                    <input
-                        type="number"
-                        min={0}
-                        value={price || ""}
-                        onChange={(event) => onPriceChange(Number(event.target.value))}
-                        placeholder="0"
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-                <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-600">ROE</label>
-                    <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={roe}
-                        onChange={(event) => onRoeChange(Number(event.target.value))}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-                <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-600">Currency</label>
-                    <Select
-                        options={currencyOptions}
-                        value={currencyOptions.find((option) => option.value === currency) || null}
-                        onChange={(option) => onCurrencyChange(option?.value || "PKR")}
-                        isSearchable
-                        styles={customSelectStyles}
-                    />
-                </div>
-            </div>
+function PricingCategory(props: PricingCategoryProps) {
+  const side = (label: string, priceKey: PricingKey, roeKey: PricingKey, currencyKey: PricingKey, color: string) => (
+    <div className="rounded-xl border border-white/80 bg-white/80 p-3">
+      <div className={`mb-2 text-xs font-bold uppercase tracking-wide ${color}`}>{label}</div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_90px_1.2fr]">
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">Price</label>
+          <input type="number" min={0} step="0.01" value={Number(props.rate[priceKey]) || ""} onChange={(e) => props.onChange(priceKey, Number(e.target.value))} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
-    );
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">ROE</label>
+          <input type="number" min={0} step="0.01" value={Number(props.rate[roeKey])} onChange={(e) => props.onChange(roeKey, Number(e.target.value))} placeholder="1.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">Currency</label>
+          <Select options={currencyOptions} value={currencyOptions.find((item) => item.value === props.rate[currencyKey]) || null} onChange={(option) => props.onChange(currencyKey, option?.value || "PKR")} styles={customSelectStyles} isSearchable />
+        </div>
+      </div>
+    </div>
+  );
+  return <div className={`rounded-2xl border p-3 ${props.classes}`}><h5 className="mb-3 text-sm font-bold">{props.title}</h5><div className="grid gap-3 xl:grid-cols-2">{side("Buying", props.buyingPriceKey, props.buyingRoeKey, props.buyingCurrencyKey, "text-red-600")}{side("Selling", props.sellingPriceKey, props.sellingRoeKey, props.sellingCurrencyKey, "text-green-600")}</div></div>;
 }
 
 export default function RateVolumes() {
-    const [volumes, setVolumes] = useState<RateVolumeType[]>([]);
-    const [hotels, setHotels] = useState<HotelRef[]>([]);
-    const [formData, setFormData] = useState<RateVolumeForm>(initialState);
-    const [loading, setLoading] = useState(false);
-    const [editId, setEditId] = useState<string | null>(null);
-    const [showForm, setShowForm] = useState(false);
-    const [expandedVolumeIds, setExpandedVolumeIds] = useState<Set<string>>(new Set());
+  const [volumes, setVolumes] = useState<RateVolumeRecord[]>([]);
+  const [hotels, setHotels] = useState<HotelRef[]>([]);
+  const [formData, setFormData] = useState<RateVolumeForm>(initialState);
+  const [loading, setLoading] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [expandedVolumeIds, setExpandedVolumeIds] = useState<Set<string>>(new Set());
 
-    const fetchVolumes = async () => {
-        try {
-            const response = await axiosInstance.get("/rate-volumes/all");
-            setVolumes(response.data.data || []);
-        } catch (error) {
-            console.error("Unable to fetch rate volumes", error);
-        }
-    };
+  const fetchVolumes = async () => { try { const response = await axiosInstance.get("/rate-volumes/all"); setVolumes(response.data.data || []); } catch (error) { console.error("Unable to fetch rate volumes", error); } };
+  const fetchHotels = async () => { try { const response = await axiosInstance.get("/hotels/all"); setHotels(response.data.data || []); } catch (error) { console.error("Unable to fetch hotels", error); } };
+  useEffect(() => { void fetchVolumes(); void fetchHotels(); }, []);
+  const cityOptions = useMemo(() => Array.from(new Set(hotels.map((hotel) => hotel.city).filter(Boolean))).sort().map((city) => ({ value: city, label: city })), [hotels]);
 
-    const fetchHotels = async () => {
-        try {
-            const response = await axiosInstance.get("/hotels/all");
-            setHotels(response.data.data || []);
-        } catch (error) {
-            console.error("Unable to fetch hotels", error);
-        }
-    };
+  const updateDateRange = (index: number, field: keyof DateRangeForm, value: string) => setFormData((current) => ({
+    ...current,
+    dateRanges: current.dateRanges.map((range, i) => i === index ? { ...range, [field]: value } : range),
+    hotelRates: current.hotelRates.map((hotelRate) => ({ ...hotelRate, dateRates: hotelRate.dateRates.map((dateRate, i) => i === index ? { ...dateRate, [field]: value } : dateRate) })),
+  }));
+  const addDateRange = () => setFormData((current) => ({ ...current, dateRanges: [...current.dateRanges, emptyDateRange()], hotelRates: current.hotelRates.map((rate) => ({ ...rate, dateRates: [...rate.dateRates, emptyDateRate()] })) }));
+  const removeDateRange = (index: number) => setFormData((current) => ({ ...current, dateRanges: current.dateRanges.filter((_, i) => i !== index), hotelRates: current.hotelRates.map((rate) => ({ ...rate, dateRates: rate.dateRates.filter((_, i) => i !== index) })) }));
+  const updateHotel = (index: number, fields: Partial<HotelRateForm>) => setFormData((current) => ({ ...current, hotelRates: current.hotelRates.map((rate, i) => i === index ? { ...rate, ...fields } : rate) }));
+  const updateDateRate = (hotelIndex: number, rangeIndex: number, key: PricingKey, value: number | string) => setFormData((current) => ({ ...current, hotelRates: current.hotelRates.map((hotelRate, i) => i !== hotelIndex ? hotelRate : { ...hotelRate, dateRates: hotelRate.dateRates.map((dateRate, j) => j === rangeIndex ? { ...dateRate, [key]: value } : dateRate) }) }));
+  const addHotelRate = () => setFormData((current) => ({ ...current, hotelRates: [...current.hotelRates, emptyHotelRate(current.dateRanges)] }));
+  const removeHotelRate = (index: number) => setFormData((current) => ({ ...current, hotelRates: current.hotelRates.filter((_, i) => i !== index) }));
+  const resetForm = () => { setEditId(null); setFormData(initialState()); setShowForm(false); };
 
-    useEffect(() => {
-        void fetchVolumes();
-        void fetchHotels();
-    }, []);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formData.volumeName.trim()) return alert("Please enter a volume name");
+    const dateError = validateDateRanges(formData.dateRanges);
+    if (dateError) return alert(dateError);
+    const invalidIndex = formData.hotelRates.findIndex((rate) => !rate.hotel || !rate.city);
+    if (invalidIndex !== -1) return alert(`Please select city and hotel in Hotel Rate ${invalidIndex + 1}`);
+    try {
+      setLoading(true);
+      const payload = { volumeName: formData.volumeName.trim(), isActive: formData.isActive, dateRanges: formData.dateRanges, hotelRates: formData.hotelRates.map((rate) => ({ hotel: rate.hotel, city: rate.city, dateRates: rate.dateRates })) };
+      if (editId) await axiosInstance.put(`/rate-volumes/update/${editId}`, payload); else await axiosInstance.post("/rate-volumes/create", payload);
+      alert(`Volume ${editId ? "updated" : "created"} successfully`); resetForm(); await fetchVolumes();
+    } catch (error: any) { console.error(error); alert(error.response?.data?.message || "Something went wrong"); } finally { setLoading(false); }
+  };
 
-    const cityOptions = useMemo(
-        () => Array.from(new Set(hotels.map((hotel) => hotel.city).filter(Boolean))).sort().map((city) => ({ value: city, label: city })),
-        [hotels],
-    );
+  const handleEdit = (volume: RateVolumeRecord) => {
+    const normalized = normalizeRateVolume(volume).data;
+    const dateRanges = normalized.dateRanges.map((range) => ({ fromDate: toDateInput(range.fromDate), toDate: toDateInput(range.toDate) }));
+    setFormData({ volumeName: volume.volumeName, isActive: volume.isActive !== false, dateRanges, hotelRates: normalized.hotelRates.map((rate, index) => ({ _id: volume.hotelRates?.[index]?._id, hotel: rate.hotelId || "", city: rate.city || "", dateRates: rate.dateRates.map((dateRate) => ({ ...dateRate, fromDate: toDateInput(dateRate.fromDate), toDate: toDateInput(dateRate.toDate) })) })) });
+    setEditId(volume._id || null); setShowForm(true); window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const handleDelete = async (id?: string) => { if (!id || !window.confirm("Are you sure you want to delete this volume?")) return; try { await axiosInstance.delete(`/rate-volumes/delete/${id}`); alert("Volume deleted successfully"); await fetchVolumes(); } catch (error) { console.error(error); alert("Delete failed"); } };
+  const toggleDetails = (id?: string) => id && setExpandedVolumeIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
-    const updateHotelRate = <K extends keyof HotelRateForm>(index: number, field: K, value: HotelRateForm[K]) => {
-        setFormData((current) => ({
-            ...current,
-            hotelRates: current.hotelRates.map((rate, rateIndex) =>
-                rateIndex === index ? { ...rate, [field]: value } : rate,
-            ),
-        }));
-    };
+  return <div className="min-h-screen p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-7xl">
+    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="mb-2 flex items-center gap-3"><div className="rounded-lg bg-blue-100 p-2"><FiDollarSign className="h-6 w-6 text-blue-600" /></div><h1 className="text-3xl font-bold text-gray-900">Rate Volumes</h1></div><p className="ml-12 text-gray-600">Date-band hotel pricing for sharing and private rooms</p></div><button onClick={() => showForm ? resetForm() : (setFormData(initialState()), setEditId(null), setShowForm(true))} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-medium text-white shadow-lg hover:bg-blue-700">{showForm ? <><FiX />Close Form</> : <><FiPlus />Add New Volume</>}</button></div>
 
-    const handleHotelChange = (index: number, hotelId: string) => {
-        const selectedHotel = hotels.find((hotel) => hotel._id === hotelId);
-        setFormData((current) => ({
-            ...current,
-            hotelRates: current.hotelRates.map((rate, rateIndex) =>
-                rateIndex === index
-                    ? { ...rate, hotel: hotelId, city: selectedHotel?.city || rate.city }
-                    : rate,
-            ),
-        }));
-    };
+    {showForm && <form onSubmit={handleSubmit} className="mb-8 space-y-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-xl sm:p-6">
+      <div className="flex items-center gap-3"><div className="rounded-lg bg-blue-100 p-2">{editId ? <FiEdit2 className="text-blue-600" /> : <FiPlus className="text-blue-600" />}</div><h2 className="text-2xl font-bold text-gray-800">{editId ? "Update Volume" : "Create New Volume"}</h2></div>
+      <div className="grid gap-4 sm:grid-cols-[1fr_180px] sm:items-end"><div><label className="mb-1.5 block text-xs font-semibold">Volume Name *</label><input value={formData.volumeName} onChange={(e) => setFormData((current) => ({ ...current, volumeName: e.target.value }))} required placeholder="e.g. October 2026 Supplier Rates" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="mb-1.5 block text-xs font-semibold">Status</label><button type="button" role="switch" aria-checked={formData.isActive} onClick={() => setFormData((current) => ({ ...current, isActive: !current.isActive }))} className="flex h-11 w-full items-center gap-2.5 rounded-lg border border-gray-300 bg-white px-3 text-left transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500"><span className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${formData.isActive ? "bg-green-500" : "bg-gray-300"}`}><span className={`absolute left-0 top-0.5 block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${formData.isActive ? "translate-x-5" : "translate-x-0.5"}`} /></span><span className={`whitespace-nowrap text-sm font-semibold ${formData.isActive ? "text-green-700" : "text-gray-600"}`}>{formData.isActive ? "Active" : "Inactive"}</span></button></div></div>
+      <section className="rounded-2xl border-2 border-purple-200 bg-purple-50/40 p-5"><div className="mb-3 flex items-center gap-2"><FiCalendar className="text-purple-600" /><h3 className="font-bold text-purple-800">Date Bands</h3><span className="text-xs text-gray-500">Each hotel gets separate pricing in every band</span></div><div className="space-y-3">{formData.dateRanges.map((range, index) => <div key={index} className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"><div><label className="mb-1 block text-xs font-semibold">From Date {index + 1} *</label><input type="date" value={range.fromDate} onChange={(e) => updateDateRange(index, "fromDate", e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border bg-white px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="mb-1 block text-xs font-semibold">To Date {index + 1} *</label><input type="date" value={range.toDate} min={range.fromDate || undefined} onChange={(e) => updateDateRange(index, "toDate", e.target.value)} onClick={(e) => e.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border bg-white px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500" /></div>{formData.dateRanges.length > 1 && <button type="button" onClick={() => removeDateRange(index)} className="inline-flex h-11 items-center gap-1 px-3 text-sm font-medium text-red-600"><FiTrash2 />Remove</button>}</div>)}</div><button type="button" onClick={addDateRange} className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-purple-300 px-4 py-2 text-sm font-semibold text-purple-700"><FiPlus />Add Date Band</button></section>
+      <div className="space-y-5">{formData.hotelRates.map((hotelRate, hotelIndex) => {
+        const filteredHotels = hotelRate.city ? hotels.filter((hotel) => hotel.city === hotelRate.city) : hotels;
+        const hotelOptions = filteredHotels.map((hotel) => ({ value: hotel._id, label: hotel.hotelName }));
+        const selectedHotelName = hotels.find((hotel) => hotel._id === hotelRate.hotel)?.hotelName;
+        return <section key={hotelRate._id || hotelIndex} className="overflow-visible rounded-2xl border-2 border-blue-200 bg-blue-50/30"><div className="flex items-center justify-between border-b border-blue-200 px-5 py-3"><div className="flex items-center gap-2"><FiHome className="text-blue-600" /><h3 className="font-bold text-blue-800">Hotel Rate {hotelIndex + 1}{selectedHotelName ? ` - ${selectedHotelName}` : ""}</h3></div>{formData.hotelRates.length > 1 && <button type="button" onClick={() => removeHotelRate(hotelIndex)} className="inline-flex items-center gap-1 text-sm text-red-600"><FiTrash2 />Remove</button>}</div><div className="space-y-5 p-5"><div className="grid gap-4 sm:grid-cols-2"><div><label className="mb-1 block text-xs font-semibold">City *</label><Select options={cityOptions} value={hotelRate.city ? { value: hotelRate.city, label: hotelRate.city } : null} onChange={(option) => { const city = option?.value || ""; const selected = hotels.find((hotel) => hotel._id === hotelRate.hotel); updateHotel(hotelIndex, { city, hotel: selected?.city === city ? hotelRate.hotel : "" }); }} isClearable isSearchable styles={customSelectStyles} /></div><div><label className="mb-1 block text-xs font-semibold">Hotel *</label><Select options={hotelOptions} value={hotelOptions.find((option) => option.value === hotelRate.hotel) || null} onChange={(option) => { const hotel = hotels.find((item) => item._id === option?.value); updateHotel(hotelIndex, { hotel: option?.value || "", city: hotel?.city || hotelRate.city }); }} isClearable isSearchable styles={customSelectStyles} /></div></div>
+          {hotelRate.dateRates.map((dateRate, rangeIndex) => <div key={rangeIndex} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"><div className="mb-4 flex items-center gap-2 border-b pb-3"><FiCalendar className="text-purple-600" /><h4 className="font-bold text-gray-800">Band {rangeIndex + 1}: {formatRange(formData.dateRanges[rangeIndex])}</h4></div><div className="space-y-3"><PricingCategory title="Room" classes="border-blue-200 bg-blue-50 text-blue-800" rate={dateRate} buyingPriceKey="buyingPrice" buyingRoeKey="buyingRoe" buyingCurrencyKey="buyingCurrency" sellingPriceKey="sellingPrice" sellingRoeKey="sellingRoe" sellingCurrencyKey="sellingCurrency" onChange={(key, value) => updateDateRate(hotelIndex, rangeIndex, key, value)} /><PricingCategory title="Sharing" classes="border-yellow-200 bg-yellow-50 text-yellow-800" rate={dateRate} buyingPriceKey="sharedRoomBuyingPrice" buyingRoeKey="sharedRoomBuyingRoe" buyingCurrencyKey="sharedRoomBuyingCurrency" sellingPriceKey="sharedRoomSellingPrice" sellingRoeKey="sharedRoomSellingRoe" sellingCurrencyKey="sharedRoomSellingCurrency" onChange={(key, value) => updateDateRate(hotelIndex, rangeIndex, key, value)} /></div></div>)}
+        </div></section>;
+      })}</div>
+      <button type="button" onClick={addHotelRate} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-300 px-5 py-3 font-semibold text-blue-700"><FiPlus />Add More Hotel</button><div className="flex gap-3 border-t pt-4"><button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white disabled:bg-blue-400">{loading ? <><FiRefreshCw className="animate-spin" />Processing...</> : <><FiSave />{editId ? "Update Volume" : "Save Volume"}</>}</button><button type="button" onClick={resetForm} className="inline-flex items-center gap-2 rounded-xl bg-gray-200 px-6 py-3"><FiX />Cancel</button></div>
+    </form>}
 
-    const handleCityChange = (index: number, city: string) => {
-        setFormData((current) => ({
-            ...current,
-            hotelRates: current.hotelRates.map((rate, rateIndex) => {
-                if (rateIndex !== index) return rate;
-                const selectedHotel = hotels.find((hotel) => hotel._id === getHotelId(rate.hotel));
-                return {
-                    ...rate,
-                    city,
-                    hotel: selectedHotel?.city === city ? rate.hotel : "",
-                };
-            }),
-        }));
-    };
-
-    const addHotelRate = () => {
-        setFormData((current) => ({ ...current, hotelRates: [...current.hotelRates, emptyHotelRate()] }));
-    };
-
-    const removeHotelRate = (index: number) => {
-        setFormData((current) => ({
-            ...current,
-            hotelRates: current.hotelRates.filter((_, rateIndex) => rateIndex !== index),
-        }));
-    };
-
-    const updateDateRange = (index: number, field: keyof DateRangeForm, value: string) => {
-        // The native date picker fires change while the user is only paging through months,
-        // so don't block here; conflicts are shown inline and re-checked on submit.
-        setFormData((current) => ({
-            ...current,
-            dateRanges: current.dateRanges.map((range, rangeIndex) =>
-                rangeIndex === index ? { ...range, [field]: value } : range,
-            ),
-        }));
-    };
-
-    const addDateRange = () => {
-        setFormData((current) => ({ ...current, dateRanges: [...current.dateRanges, emptyDateRange()] }));
-    };
-
-    const removeDateRange = (index: number) => {
-        setFormData((current) => ({
-            ...current,
-            dateRanges: current.dateRanges.filter((_, rangeIndex) => rangeIndex !== index),
-        }));
-    };
-
-    const resetForm = () => {
-        setEditId(null);
-        setFormData(initialState());
-        setShowForm(false);
-    };
-
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (!formData.volumeName.trim()) {
-            alert("Please enter a volume name");
-            return;
-        }
-
-        const dateError = validateDateRanges(formData.dateRanges);
-        if (dateError) {
-            alert(dateError);
-            return;
-        }
-
-        for (let index = 0; index < formData.hotelRates.length; index += 1) {
-            const rate = formData.hotelRates[index];
-            if (!getHotelId(rate.hotel)) {
-                alert(`Please select a hotel in Hotel Rate ${index + 1}`);
-                return;
-            }
-            if (!rate.city) {
-                alert(`Please select a city in Hotel Rate ${index + 1}`);
-                return;
-            }
-        }
-
-        try {
-            setLoading(true);
-            const payload = {
-                volumeName: formData.volumeName.trim(),
-                isActive: formData.isActive,
-                dateRanges: formData.dateRanges,
-                hotelRates: formData.hotelRates.map((rate) => ({
-                    hotel: getHotelId(rate.hotel),
-                    city: rate.city,
-                    buyingPrice: rate.buyingPrice,
-                    buyingRoe: rate.buyingRoe,
-                    buyingCurrency: rate.buyingCurrency,
-                    sellingPrice: rate.sellingPrice,
-                    sellingRoe: rate.sellingRoe,
-                    sellingCurrency: rate.sellingCurrency,
-                    sharedRoomBuyingPrice: rate.sharedRoomBuyingPrice,
-                    sharedRoomBuyingRoe: rate.sharedRoomBuyingRoe,
-                    sharedRoomBuyingCurrency: rate.sharedRoomBuyingCurrency,
-                    sharedRoomSellingPrice: rate.sharedRoomSellingPrice,
-                    sharedRoomSellingRoe: rate.sharedRoomSellingRoe,
-                    sharedRoomSellingCurrency: rate.sharedRoomSellingCurrency,
-                })),
-            };
-
-            if (editId) {
-                await axiosInstance.put(`/rate-volumes/update/${editId}`, payload);
-                alert("Volume updated successfully");
-            } else {
-                await axiosInstance.post("/rate-volumes/create", payload);
-                alert("Volume created successfully");
-            }
-
-            resetForm();
-            await fetchVolumes();
-        } catch (error: unknown) {
-            console.error(error);
-            const responseError = error as { response?: { data?: { message?: string } } };
-            alert(responseError.response?.data?.message || "Something went wrong");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (volume: RateVolumeType) => {
-        const hotelRates = normalizeHotelRates(volume);
-        setFormData({
-            volumeName: volume.volumeName,
-            isActive: volume.isActive !== false,
-            dateRanges: getVolumeDateRanges(volume),
-            hotelRates: hotelRates.length ? hotelRates : [emptyHotelRate()],
-        });
-        setEditId(volume._id || null);
-        setShowForm(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-
-    const handleDelete = async (id?: string) => {
-        if (!id || !window.confirm("Are you sure you want to delete this volume?")) return;
-        try {
-            await axiosInstance.delete(`/rate-volumes/delete/${id}`);
-            setExpandedVolumeIds((current) => {
-                const next = new Set(current);
-                next.delete(id);
-                return next;
-            });
-            alert("Volume deleted successfully");
-            await fetchVolumes();
-        } catch (error) {
-            console.error(error);
-            alert("Delete failed");
-        }
-    };
-
-    const toggleVolumeDetails = (id?: string) => {
-        if (!id) return;
-        setExpandedVolumeIds((current) => {
-            const next = new Set(current);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    return (
-        <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">
-                <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="mb-2 flex items-center gap-3">
-                            <div className="rounded-lg bg-blue-100 p-2"><FiDollarSign className="h-6 w-6 text-blue-600" /></div>
-                            <h1 className="text-3xl font-bold text-gray-900">Rate Volumes</h1>
-                        </div>
-                        <p className="ml-12 text-gray-600">Group multiple hotel rates under one reusable volume</p>
-                    </div>
-                    <button
-                        onClick={() => {
-                            if (showForm) resetForm();
-                            else {
-                                setFormData(initialState());
-                                setEditId(null);
-                                setShowForm(true);
-                            }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 font-medium text-white shadow-lg transition hover:bg-blue-700"
-                    >
-                        {showForm ? <><FiX className="h-5 w-5" />Close Form</> : <><FiPlus className="h-5 w-5" />Add New Volume</>}
-                    </button>
-                </div>
-
-                {showForm && (
-                    <form onSubmit={handleSubmit} className="mb-8 space-y-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-xl sm:p-6">
-                        <div className="flex items-center gap-3">
-                            <div className={`rounded-lg p-2 ${editId ? "bg-yellow-100" : "bg-green-100"}`}>
-                                {editId ? <FiEdit2 className="h-5 w-5 text-yellow-600" /> : <FiPlus className="h-5 w-5 text-green-600" />}
-                            </div>
-                            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Update Volume" : "Create New Volume"}</h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_minmax(140px,auto)] xl:items-end">
-                            <div>
-                                <label className="mb-1.5 block text-xs font-semibold text-gray-700">Volume Name <span className="text-red-500">*</span></label>
-                                <div className="relative">
-                                    <FiPackage className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <input value={formData.volumeName} onChange={(event) => setFormData((current) => ({ ...current, volumeName: event.target.value }))} placeholder="e.g. Ramadan Volume 2027" required className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-500" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="mb-1.5 block text-xs font-semibold text-gray-700">Status</label>
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={formData.isActive}
-                                    onClick={() => setFormData((current) => ({ ...current, isActive: !current.isActive }))}
-                                    className="flex h-10.5 w-full items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 xl:min-w-35"
-                                >
-                                    <span className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${formData.isActive ? "bg-green-500" : "bg-gray-300"}`}>
-                                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${formData.isActive ? "translate-x-5" : "translate-x-0.5"}`} />
-                                    </span>
-                                    <span className={`text-sm font-semibold ${formData.isActive ? "text-green-700" : "text-gray-500"}`}>{formData.isActive ? "Active" : "Inactive"}</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <section className="rounded-2xl border-2 border-purple-200 bg-purple-50/40 p-5">
-                            <div className="mb-3 flex flex-wrap items-center gap-2"><div className="rounded-lg bg-purple-100 p-1.5"><FiCalendar className="h-4 w-4 text-purple-600" /></div><h3 className="font-bold text-purple-800">Date Ranges</h3><span className="text-xs text-gray-500">Pricing applies in any of these ranges (ranges must not overlap)</span></div>
-                            <div className="space-y-3">
-                                {formData.dateRanges.map((range, index) => {
-                                    const conflictIndex = findConflictingRangeIndex(formData.dateRanges, index, range);
-                                    return (
-                                    <div key={index} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-semibold text-gray-700">From Date {index + 1} <span className="text-red-500">*</span></label>
-                                            <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={range.fromDate} onChange={(event) => updateDateRange(index, "fromDate", event.target.value)} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                                        </div>
-                                        <div>
-                                            <label className="mb-1.5 block text-xs font-semibold text-gray-700">To Date {index + 1} <span className="text-red-500">*</span></label>
-                                            <div className="relative"><FiCalendar className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" /><input type="date" value={range.toDate} min={range.fromDate || undefined} max={getMaxToDate(formData.dateRanges, index)} onChange={(event) => updateDateRange(index, "toDate", event.target.value)} onClick={(event) => event.currentTarget.showPicker?.()} required className="w-full cursor-pointer rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                                        </div>
-                                        {formData.dateRanges.length > 1 ? <button type="button" onClick={() => removeDateRange(index)} className="inline-flex h-10.5 items-center gap-1 rounded-lg px-3 text-sm font-medium text-red-600 hover:bg-red-50"><FiTrash2 /> Remove</button> : <span className="hidden sm:block" />}
-                                        {conflictIndex !== -1 && <p className="flex items-center gap-1 text-xs text-red-600 sm:col-span-3"><FiAlertCircle />This overlaps with Date Range {conflictIndex + 1} ({formatRange(formData.dateRanges[conflictIndex])}). Please choose dates outside it.</p>}
-                                    </div>
-                                    );
-                                })}
-                            </div>
-                            <button type="button" onClick={addDateRange} className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-purple-300 px-4 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-50"><FiPlus className="h-4 w-4" />Add More Date</button>
-                        </section>
-
-                        <div className="space-y-5">
-                            {formData.hotelRates.map((rate, index) => {
-                                const filteredHotels = rate.city ? hotels.filter((hotel) => hotel.city === rate.city) : hotels;
-                                const hotelOptions = filteredHotels.map((hotel) => ({ value: hotel._id, label: hotel.hotelName }));
-                                const hotelId = getHotelId(rate.hotel);
-
-                                return (
-                                    <section key={rate._id || index} className="overflow-visible rounded-2xl border-2 border-blue-200 bg-blue-50/40">
-                                        <div className="flex items-center justify-between border-b border-blue-200 px-5 py-3">
-                                            <div className="flex items-center gap-2"><div className="rounded-lg bg-blue-100 p-1.5"><FiHome className="h-4 w-4 text-blue-600" /></div><h3 className="font-bold text-blue-800">Hotel Rate {index + 1}</h3></div>
-                                            {formData.hotelRates.length > 1 && <button type="button" onClick={() => removeHotelRate(index)} className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"><FiTrash2 /> Remove</button>}
-                                        </div>
-
-                                        <div className="space-y-4 p-5">
-                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                                <div>
-                                                    <label className="mb-1.5 block text-xs font-semibold text-gray-600">City <span className="text-red-500">*</span></label>
-                                                    <Select options={cityOptions} value={rate.city ? { value: rate.city, label: rate.city } : null} onChange={(option) => handleCityChange(index, option?.value || "")} placeholder="Select city" isClearable isSearchable styles={customSelectStyles} />
-                                                </div>
-                                                <div>
-                                                    <label className="mb-1.5 block text-xs font-semibold text-gray-600">Hotel <span className="text-red-500">*</span></label>
-                                                    <Select options={hotelOptions} value={hotelId ? hotelOptions.find((option) => option.value === hotelId) || null : null} onChange={(option) => handleHotelChange(index, option?.value || "")} placeholder="Select hotel" isClearable isSearchable styles={customSelectStyles} />
-                                                </div>
-                                            </div>
-
-                                            {rate.city && hotelOptions.length === 0 && <p className="flex items-center gap-1 text-xs text-amber-600"><FiAlertCircle />No hotels found in {rate.city}.</p>}
-
-                                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                                                <PricingFields title="Buying Details" priceLabel="Price/Room" icon={<FiTrendingDown />} classes="border-red-200 bg-red-50/60 text-red-700" price={rate.buyingPrice} roe={rate.buyingRoe} currency={rate.buyingCurrency} onPriceChange={(value) => updateHotelRate(index, "buyingPrice", value)} onRoeChange={(value) => updateHotelRate(index, "buyingRoe", value)} onCurrencyChange={(value) => updateHotelRate(index, "buyingCurrency", value)} />
-                                                <PricingFields title="Selling Details" priceLabel="Price/Room" icon={<FiTrendingUp />} classes="border-green-200 bg-green-50/60 text-green-700" price={rate.sellingPrice} roe={rate.sellingRoe} currency={rate.sellingCurrency} onPriceChange={(value) => updateHotelRate(index, "sellingPrice", value)} onRoeChange={(value) => updateHotelRate(index, "sellingRoe", value)} onCurrencyChange={(value) => updateHotelRate(index, "sellingCurrency", value)} />
-                                                <PricingFields title="Shared Room Buying" priceLabel="Buying Price" icon={<FiPackage />} classes="border-yellow-200 bg-yellow-50/60 text-yellow-700" price={rate.sharedRoomBuyingPrice} roe={rate.sharedRoomBuyingRoe} currency={rate.sharedRoomBuyingCurrency} onPriceChange={(value) => updateHotelRate(index, "sharedRoomBuyingPrice", value)} onRoeChange={(value) => updateHotelRate(index, "sharedRoomBuyingRoe", value)} onCurrencyChange={(value) => updateHotelRate(index, "sharedRoomBuyingCurrency", value)} />
-                                                <PricingFields title="Shared Room Selling" priceLabel="Selling Price" icon={<FiPackage />} classes="border-yellow-200 bg-yellow-50/60 text-yellow-700" price={rate.sharedRoomSellingPrice} roe={rate.sharedRoomSellingRoe} currency={rate.sharedRoomSellingCurrency} onPriceChange={(value) => updateHotelRate(index, "sharedRoomSellingPrice", value)} onRoeChange={(value) => updateHotelRate(index, "sharedRoomSellingRoe", value)} onCurrencyChange={(value) => updateHotelRate(index, "sharedRoomSellingCurrency", value)} />
-                                            </div>
-                                        </div>
-                                    </section>
-                                );
-                            })}
-                        </div>
-
-                        <button type="button" onClick={addHotelRate} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-300 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-50"><FiPlus className="h-5 w-5" />Add More Hotel</button>
-
-                        <div className="flex gap-3 border-t pt-4">
-                            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-lg transition hover:bg-blue-700 disabled:bg-blue-400">{loading ? <><FiRefreshCw className="h-5 w-5 animate-spin" />Processing...</> : <><FiSave className="h-5 w-5" />{editId ? "Update Volume" : "Save Volume"}</>}</button>
-                            <button type="button" onClick={resetForm} className="inline-flex items-center gap-2 rounded-xl bg-gray-200 px-6 py-3 font-medium text-gray-700 hover:bg-gray-300"><FiX />Cancel</button>
-                        </div>
-                    </form>
-                )}
-
-                <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl">
-                    <div className="border-b border-gray-100 p-6"><div className="flex items-center gap-3"><div className="rounded-lg bg-purple-100 p-2"><FiPackage className="h-5 w-5 text-purple-600" /></div><div><h2 className="text-2xl font-bold text-gray-800">All Volumes</h2><p className="mt-0.5 text-sm text-gray-500">{volumes.length} {volumes.length === 1 ? "volume" : "volumes"} total</p></div></div></div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead><tr className="bg-gray-50"><th className="p-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Volume Name</th><th className="p-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Hotels Included</th><th className="p-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Status</th><th className="p-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Actions</th></tr></thead>
-                            <tbody>
-                                {volumes.length ? volumes.map((volume, index) => {
-                                    const rates = normalizeHotelRates(volume);
-                                    const dateRanges = getVolumeDateRanges(volume);
-                                    const isExpanded = volume._id ? expandedVolumeIds.has(volume._id) : false;
-                                    return (
-                                        <React.Fragment key={volume._id || index}>
-                                            <tr className={`border-b border-gray-100 transition-colors hover:bg-blue-50/40 ${index % 2 ? "bg-gray-50/30" : "bg-white"}`}>
-                                                <td className="p-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleVolumeDetails(volume._id)}
-                                                            aria-expanded={isExpanded}
-                                                            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${volume.volumeName}`}
-                                                            title={isExpanded ? "Hide hotel details" : "Show hotel details"}
-                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-                                                        >
-                                                            {isExpanded ? <FiChevronDown className="h-4 w-4" /> : <FiChevronRight className="h-4 w-4" />}
-                                                        </button>
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100"><FiPackage className="text-blue-600" /></div>
-                                                        <div>
-                                                            <div className="font-semibold text-gray-800">{volume.volumeName}</div>
-                                                            <div className="mt-0.5 space-y-0.5 text-xs text-gray-500">{dateRanges.map((range, rangeIndex) => <div key={rangeIndex} className="flex items-center gap-1"><FiCalendar />{formatRange(range)}</div>)}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4">
-                                                    <button type="button" onClick={() => toggleVolumeDetails(volume._id)} className="inline-flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-1.5 text-sm font-semibold text-purple-700 transition hover:bg-purple-100">
-                                                        <FiHome className="h-4 w-4" />
-                                                        {rates.length} {rates.length === 1 ? "hotel" : "hotels"}
-                                                    </button>
-                                                </td>
-                                                <td className="p-4"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${volume.isActive !== false ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${volume.isActive !== false ? "bg-green-500" : "bg-gray-400"}`} />{volume.isActive !== false ? "Active" : "Inactive"}</span></td>
-                                                <td className="p-4"><div className="flex gap-2"><button onClick={() => handleEdit(volume)} title="Edit" className="rounded-lg border border-yellow-200 bg-yellow-50 p-2 text-yellow-700 hover:bg-yellow-100"><FiEdit2 /></button><button onClick={() => handleDelete(volume._id)} title="Delete" className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-700 hover:bg-red-100"><FiTrash2 /></button></div></td>
-                                            </tr>
-
-                                            {isExpanded && (
-                                                <tr className="border-b border-blue-100 bg-blue-50/40">
-                                                    <td colSpan={4} className="px-5 py-4">
-                                                        <div className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
-                                                            <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50/60 px-4 py-3">
-                                                                <div>
-                                                                    <h3 className="text-sm font-bold text-gray-800">Hotels in {volume.volumeName}</h3>
-                                                                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500"><FiCalendar />{dateRanges.map(formatRange).join(", ")} <span>applies to every hotel</span></p>
-                                                                </div>
-                                                                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm">{rates.length} total</span>
-                                                            </div>
-                                                            <div className="overflow-x-auto">
-                                                                <table className="w-full min-w-205">
-                                                                    <thead>
-                                                                        <tr className="border-b border-gray-100 bg-gray-50/70 text-xs uppercase tracking-wide text-gray-500">
-                                                                            <th className="px-4 py-3 text-left font-semibold">Hotel</th>
-                                                                            <th className="px-4 py-3 text-left font-semibold">Buying</th>
-                                                                            <th className="px-4 py-3 text-left font-semibold">Selling</th>
-                                                                            <th className="px-4 py-3 text-left font-semibold">Shared Buying</th>
-                                                                            <th className="px-4 py-3 text-left font-semibold">Shared Selling</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {rates.map((rate, rateIndex) => (
-                                                                            <tr key={rate._id || rateIndex} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                                                                                <td className="px-4 py-3"><div className="flex items-center gap-2 text-sm font-semibold text-gray-800"><FiHome className="shrink-0 text-blue-500" />{getHotelName(rate.hotel, hotels)}</div><div className="mt-1 flex items-center gap-1 pl-6 text-xs text-gray-500"><FiMapPin />{rate.city || "-"}</div></td>
-                                                                                <td className="px-4 py-3"><div className="whitespace-nowrap text-sm font-semibold text-red-600">{rate.buyingPrice.toLocaleString()} <span className="text-xs font-medium">{rate.buyingCurrency}</span></div><div className="mt-0.5 text-xs text-gray-400">ROE {rate.buyingRoe}</div></td>
-                                                                                <td className="px-4 py-3"><div className="whitespace-nowrap text-sm font-semibold text-green-600">{rate.sellingPrice.toLocaleString()} <span className="text-xs font-medium">{rate.sellingCurrency}</span></div><div className="mt-0.5 text-xs text-gray-400">ROE {rate.sellingRoe}</div></td>
-                                                                                <td className="px-4 py-3"><div className="whitespace-nowrap text-sm font-semibold text-amber-600">{rate.sharedRoomBuyingPrice.toLocaleString()} <span className="text-xs font-medium">{rate.sharedRoomBuyingCurrency}</span></div><div className="mt-0.5 text-xs text-gray-400">ROE {rate.sharedRoomBuyingRoe}</div></td>
-                                                                                <td className="px-4 py-3"><div className="whitespace-nowrap text-sm font-semibold text-amber-700">{rate.sharedRoomSellingPrice.toLocaleString()} <span className="text-xs font-medium">{rate.sharedRoomSellingCurrency}</span></div><div className="mt-0.5 text-xs text-gray-400">ROE {rate.sharedRoomSellingRoe}</div></td>
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                }) : <tr><td colSpan={4}><div className="flex flex-col items-center py-16 text-gray-400"><FiAlertCircle className="mb-4 h-12 w-12 text-gray-300" /><p className="text-lg font-medium text-gray-500">No volumes found</p><p className="mt-1 text-sm">Click Add New Volume to create your first volume</p></div></td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+    <div className="overflow-hidden rounded-2xl border bg-white shadow-xl"><div className="border-b p-6"><div className="flex items-center gap-3"><FiPackage className="text-purple-600" /><div><h2 className="text-2xl font-bold">All Volumes</h2><p className="text-sm text-gray-500">{volumes.length} total</p></div></div></div><div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-gray-50 text-left text-xs uppercase text-gray-600"><th className="p-4">Volume</th><th className="p-4">Hotels</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr></thead><tbody>
+      {volumes.length ? volumes.map((volume, index) => {
+        const normalized = normalizeRateVolume(volume).data; const expanded = Boolean(volume._id && expandedVolumeIds.has(volume._id));
+        return <React.Fragment key={volume._id || index}><tr className="border-b hover:bg-blue-50/40"><td className="p-4"><div className="flex items-start gap-3"><button type="button" onClick={() => toggleDetails(volume._id)} className="mt-0.5 rounded-lg border p-2">{expanded ? <FiChevronDown /> : <FiChevronRight />}</button><div><div className="font-semibold">{volume.volumeName}</div><div className="mt-1 space-y-0.5 text-xs text-gray-500">{normalized.dateRanges.map((range, i) => <div key={i} className="flex items-center gap-1"><FiCalendar />{formatRange({ fromDate: range.fromDate || "", toDate: range.toDate || "" })}</div>)}</div></div></div></td><td className="p-4"><button type="button" onClick={() => toggleDetails(volume._id)} className="rounded-lg bg-purple-50 px-3 py-1.5 text-sm font-semibold text-purple-700">{normalized.hotelRates.length} hotel(s)</button></td><td className="p-4"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${volume.isActive !== false ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>{volume.isActive !== false ? "Active" : "Inactive"}</span></td><td className="p-4"><div className="flex gap-2"><button onClick={() => handleEdit(volume)} className="rounded-lg bg-yellow-50 p-2 text-yellow-700"><FiEdit2 /></button><button onClick={() => handleDelete(volume._id)} className="rounded-lg bg-red-50 p-2 text-red-700"><FiTrash2 /></button></div></td></tr>
+          {expanded && <tr className="border-b bg-blue-50/30"><td colSpan={4} className="p-4"><div className="space-y-4">{normalized.hotelRates.map((rate, hotelIndex) => <div key={hotelIndex} className="overflow-hidden rounded-xl border bg-white"><div className="flex items-center gap-2 bg-gray-50 px-4 py-3"><FiHome className="text-blue-500" /><span className="font-semibold">{hotels.find((hotel) => hotel._id === rate.hotelId)?.hotelName || "Unknown hotel"}</span><FiMapPin className="ml-2 text-gray-400" /><span className="text-sm text-gray-500">{rate.city || "-"}</span></div><div className="overflow-x-auto"><table className="w-full min-w-160 text-sm"><thead><tr className="border-y bg-gray-50 text-left text-xs uppercase text-gray-500"><th className="p-3">Date band</th><th className="p-3">(Room) Buy / Sell</th><th className="p-3">(Sharing) Buy / Sell</th></tr></thead><tbody>{rate.dateRates.map((band, bandIndex) => <tr key={bandIndex} className="border-b last:border-0"><td className="p-3 font-medium">{formatRange(band)}</td><td className="p-3">{band.buyingPrice.toLocaleString()} / {band.sellingPrice.toLocaleString()} {band.sellingCurrency}</td><td className="p-3">{band.sharedRoomBuyingPrice.toLocaleString()} / {band.sharedRoomSellingPrice.toLocaleString()} {band.sharedRoomSellingCurrency}</td></tr>)}</tbody></table></div></div>)}</div></td></tr>}
+        </React.Fragment>;
+      }) : <tr><td colSpan={4}><div className="flex flex-col items-center py-16 text-gray-400"><FiAlertCircle className="mb-3 h-10 w-10" /><p>No volumes found</p></div></td></tr>}
+    </tbody></table></div></div>
+  </div></div>;
 }

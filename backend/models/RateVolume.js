@@ -2,6 +2,30 @@
 
 import mongoose from "mongoose";
 
+const pricingFields = {
+  buyingPrice: { type: Number, required: true, default: 0 },
+  buyingRoe: { type: Number, default: 1 },
+  buyingCurrency: { type: String, default: "PKR", trim: true },
+  sellingPrice: { type: Number, required: true, default: 0 },
+  sellingRoe: { type: Number, default: 1 },
+  sellingCurrency: { type: String, default: "PKR", trim: true },
+  sharedRoomBuyingPrice: { type: Number, default: 0 },
+  sharedRoomBuyingRoe: { type: Number, default: 1 },
+  sharedRoomBuyingCurrency: { type: String, default: "PKR", trim: true },
+  sharedRoomSellingPrice: { type: Number, default: 0 },
+  sharedRoomSellingRoe: { type: Number, default: 1 },
+  sharedRoomSellingCurrency: { type: String, default: "PKR", trim: true },
+};
+
+const dateRateSchema = new mongoose.Schema(
+  {
+    fromDate: { type: Date, required: true },
+    toDate: { type: Date, required: true },
+    ...pricingFields,
+  },
+  { _id: false },
+);
+
 const hotelRateSchema = new mongoose.Schema(
   {
     hotel: {
@@ -14,18 +38,10 @@ const hotelRateSchema = new mongoose.Schema(
     // remain readable. New writes keep one date range at the volume root.
     fromDate: { type: Date },
     toDate: { type: Date },
-    buyingPrice: { type: Number, required: true, default: 0 },
-    buyingRoe: { type: Number, default: 1 },
-    buyingCurrency: { type: String, default: "PKR", trim: true },
-    sellingPrice: { type: Number, required: true, default: 0 },
-    sellingRoe: { type: Number, default: 1 },
-    sellingCurrency: { type: String, default: "PKR", trim: true },
-    sharedRoomBuyingPrice: { type: Number, default: 0 },
-    sharedRoomBuyingRoe: { type: Number, default: 1 },
-    sharedRoomBuyingCurrency: { type: String, default: "PKR", trim: true },
-    sharedRoomSellingPrice: { type: Number, default: 0 },
-    sharedRoomSellingRoe: { type: Number, default: 1 },
-    sharedRoomSellingCurrency: { type: String, default: "PKR", trim: true },
+    // The flat fields mirror the first date rate for old clients. New clients use
+    // dateRates so every hotel can carry a different price in every date band.
+    ...pricingFields,
+    dateRates: { type: [dateRateSchema], default: undefined },
   },
   { _id: true },
 );

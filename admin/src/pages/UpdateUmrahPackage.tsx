@@ -14,6 +14,13 @@ import useAccountsList from "../context/useAccountsList";
 import currency_list from "../data/currencies";
 import { useAuth } from "../context/AuthContext";
 import { hasPermission } from "../utils/permissions";
+import {
+  normalizeRateVolume,
+  resolveHotelRateForStay,
+  type RateVolumeData,
+  type RateVolumeHotelRate,
+  type RateVolumeOption,
+} from "../utils/rateVolumePricing";
 
 interface Flight {
   airline: string;
@@ -175,46 +182,6 @@ interface VisaOption {
   };
 }
 
-interface RateVolumeHotelRate {
-  hotelId?: string;
-  city?: string;
-  buyingPrice: number;
-  buyingRoe: number;
-  buyingCurrency: string;
-  sellingPrice: number;
-  sellingRoe: number;
-  sellingCurrency: string;
-  // Shared Room pricing, saved separately on the Rate Volume - applied as-is to
-  // Shared Room instead of splitting the buying/selling rate above across it.
-  sharedRoomBuyingPrice?: number;
-  sharedRoomBuyingRoe?: number;
-  sharedRoomBuyingCurrency?: string;
-  sharedRoomSellingPrice?: number;
-  sharedRoomSellingRoe?: number;
-  sharedRoomSellingCurrency?: string;
-}
-
-interface RateVolumeData {
-  volumeName: string;
-  fromDate?: string;
-  toDate?: string;
-  // Every date range the volume applies to (falls back to fromDate/toDate for old volumes).
-  dateRanges: { fromDate?: string; toDate?: string }[];
-  hotelRates: RateVolumeHotelRate[];
-}
-
-interface RateVolumeApiHotelRate extends Partial<RateVolumeHotelRate> {
-  hotel?: string | { _id?: string };
-  fromDate?: string;
-  toDate?: string;
-}
-
-interface RateVolumeOption {
-  value: string;
-  label: string;
-  data: RateVolumeData;
-}
-
 // ✅ Profit Breakdown Interface
 interface ProfitBreakdown {
   flightCost: number;
@@ -367,43 +334,7 @@ const UpdateUmrahPackage = () => {
 
     axiosInstance.get("/rate-volumes/all", { params: { isActive: true } }).then((res) => {
       if (res.data.success) {
-        setRateVolumeOptions(
-          (res.data.data || []).map((v: any) => {
-            // Normalize new multi-hotel volumes and legacy single-hotel volumes.
-            const rawRates: RateVolumeApiHotelRate[] = Array.isArray(v.hotelRates) && v.hotelRates.length ? v.hotelRates : [v];
-            const fromDate = v.fromDate || rawRates[0]?.fromDate;
-            const toDate = v.toDate || rawRates[0]?.toDate;
-            const dateRanges: { fromDate?: string; toDate?: string }[] =
-              Array.isArray(v.dateRanges) && v.dateRanges.length ? v.dateRanges : [{ fromDate, toDate }];
-            const hotelRates: RateVolumeHotelRate[] = rawRates.map((rate) => ({
-              hotelId: typeof rate.hotel === "string" ? rate.hotel : rate.hotel?._id,
-              city: rate.city,
-              buyingPrice: rate.buyingPrice ?? 0,
-              buyingRoe: rate.buyingRoe ?? 1,
-              buyingCurrency: rate.buyingCurrency || "PKR",
-              sellingPrice: rate.sellingPrice ?? 0,
-              sellingRoe: rate.sellingRoe ?? 1,
-              sellingCurrency: rate.sellingCurrency || "PKR",
-              sharedRoomBuyingPrice: rate.sharedRoomBuyingPrice ?? 0,
-              sharedRoomBuyingRoe: rate.sharedRoomBuyingRoe ?? 1,
-              sharedRoomBuyingCurrency: rate.sharedRoomBuyingCurrency || "PKR",
-              sharedRoomSellingPrice: rate.sharedRoomSellingPrice ?? 0,
-              sharedRoomSellingRoe: rate.sharedRoomSellingRoe ?? 1,
-              sharedRoomSellingCurrency: rate.sharedRoomSellingCurrency || "PKR",
-            }));
-            return {
-              value: v._id,
-              label: `${v.volumeName} (${hotelRates.length} hotel ${hotelRates.length === 1 ? "rate" : "rates"})`,
-              data: {
-                volumeName: v.volumeName,
-                fromDate,
-                toDate,
-                dateRanges,
-                hotelRates,
-              },
-            };
-          })
-        );
+        setRateVolumeOptions((res.data.data || []).map(normalizeRateVolume));
       }
     }).catch((err) => console.error("Error fetching rate volumes:", err));
 
@@ -1071,37 +1002,13 @@ const UpdateUmrahPackage = () => {
     return dateToISO(outDate);
   };
 
-  // True when a volume's [fromDate, toDate] window fully covers the [checkIn, checkOut]
-  // stay. Used both to auto-match a volume as dates change and to validate a manually
-  // picked volume against whatever dates are already selected.
-  const isStayWithinVolumeRange = (
-    checkIn: string,
-    checkOut: string,
-    fromDate?: string,
-    toDate?: string
-  ): boolean => {
-    if (!checkIn || !checkOut || !fromDate || !toDate) return false;
-    const checkInDate = parseISODate(checkIn);
-    const checkOutDate = parseISODate(checkOut);
-    if (!checkInDate || !checkOutDate) return false;
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-    from.setHours(0, 0, 0, 0);
-    to.setHours(0, 0, 0, 0);
-    return from.getTime() <= checkInDate.getTime() && to.getTime() >= checkOutDate.getTime();
-  };
-
   const findHotelRateInVolume = (
     volume: RateVolumeData,
     hotelId: string | undefined,
     checkIn?: string,
     checkOut?: string
   ): RateVolumeHotelRate | undefined => {
-    if (!hotelId) return undefined;
-    if (checkIn && checkOut && !volume.dateRanges.some((range) => isStayWithinVolumeRange(checkIn, checkOut, range.fromDate, range.toDate))) {
-      return undefined;
-    }
-    return volume.hotelRates.find((rate) => rate.hotelId === hotelId);
+    return resolveHotelRateForStay(volume, hotelId, checkIn, checkOut);
   };
 
   // Finds any active root volume containing this hotel and covering the stay.
@@ -1234,7 +1141,7 @@ const UpdateUmrahPackage = () => {
       } else if (selectedOption) {
         Object.assign(row, emptyRateFields());
         toast.error(
-          `"${selectedOption.data.volumeName}" has no rate for this hotel covering ${formatFlightDate(row.checkIn)} - ${formatFlightDate(row.checkOut)}. Rates were cleared; the volume remains selected so you can choose another hotel or date range.`
+          `"${selectedOption.data.volumeName}" has no single date band covering every night from ${formatFlightDate(row.checkIn)} to ${formatFlightDate(row.checkOut)}. Rates were cleared. Split the stay into separate hotel rows for each rate band.`
         );
       }
     }
@@ -1268,7 +1175,7 @@ const UpdateUmrahPackage = () => {
       } else {
         Object.assign(baseFields, emptyRateFields());
         toast.error(
-          `"${selectedOption.data.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "date-matching " : ""}rate for ${selected.label}. The volume remains selected.`
+          `"${selectedOption.data.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "single date band covering the complete stay for " : ""}${selected.label}.${hotel.checkIn && hotel.checkOut ? " Split the stay into separate hotel rows for each rate band." : ""}`
         );
       }
     } else if (hotel.checkIn && hotel.checkOut) {
@@ -1317,7 +1224,7 @@ const UpdateUmrahPackage = () => {
     if (!rate) {
       updateHotel(index, emptyRateFields());
       toast.error(
-        `"${volume.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "date-matching " : ""}rate for this hotel. The volume remains selected.`
+        `"${volume.volumeName}" has no rate for this hotel${hotel.checkIn && hotel.checkOut ? " within one date band covering the complete stay. Split the stay into separate hotel rows for each rate band" : ""}.`
       );
       return;
     }

@@ -19,9 +19,7 @@ const RATE_FIELDS = [
   "sharedRoomSellingCurrency",
 ];
 
-const normalizeHotelRate = (rate = {}) => ({
-  hotel: rate.hotel,
-  city: rate.city || "",
+const normalizePricing = (rate = {}) => ({
   buyingPrice: rate.buyingPrice ?? 0,
   buyingRoe: rate.buyingRoe ?? 1,
   buyingCurrency: rate.buyingCurrency || "PKR",
@@ -36,21 +34,48 @@ const normalizeHotelRate = (rate = {}) => ({
   sharedRoomSellingCurrency: rate.sharedRoomSellingCurrency || "PKR",
 });
 
-const getHotelRatesFromBody = (body) => {
+const normalizeHotelRate = (rate = {}, dateRanges = []) => {
+  const rawDateRates = Array.isArray(rate.dateRates) && rate.dateRates.length
+    ? rate.dateRates
+    : dateRanges.map((range) => ({ ...range, ...normalizePricing(rate) }));
+  const dateRates = rawDateRates.map((dateRate) => ({
+    fromDate: dateRate.fromDate,
+    toDate: dateRate.toDate,
+    ...normalizePricing(dateRate),
+  }));
+  return {
+    hotel: rate.hotel,
+    city: rate.city || "",
+    ...normalizePricing(dateRates[0] || rate),
+    dateRates,
+  };
+};
+
+const getHotelRatesFromBody = (body, dateRanges) => {
   if (Array.isArray(body.hotelRates)) {
-    return body.hotelRates.map(normalizeHotelRate);
+    return body.hotelRates.map((rate) => normalizeHotelRate(rate, dateRanges));
   }
 
   // Backward-compatible support for the original single-hotel request body.
-  return body.hotel ? [normalizeHotelRate(body)] : [];
+  return body.hotel ? [normalizeHotelRate(body, dateRanges)] : [];
 };
 
-const validateHotelRates = (hotelRates) => {
+const validateHotelRates = (hotelRates, dateRanges) => {
   if (!hotelRates.length) return "At least one hotel rate is required";
 
   for (let index = 0; index < hotelRates.length; index += 1) {
     const rate = hotelRates[index];
     if (!rate.hotel) return `Hotel is required for hotel rate ${index + 1}`;
+    if (rate.dateRates.length !== dateRanges.length) {
+      return `Hotel rate ${index + 1} must contain pricing for every date range`;
+    }
+    for (let rangeIndex = 0; rangeIndex < dateRanges.length; rangeIndex += 1) {
+      const expected = dateRanges[rangeIndex];
+      const actual = rate.dateRates[rangeIndex];
+      if (!actual?.fromDate || !actual?.toDate || actual.fromDate !== expected.fromDate || actual.toDate !== expected.toDate) {
+        return `Date pricing ${rangeIndex + 1} in hotel rate ${index + 1} does not match its volume date range`;
+      }
+    }
   }
 
   return null;
@@ -135,19 +160,15 @@ export const createRateVolume = async (req, res) => {
       });
     }
 
-    const hotelRates = getHotelRatesFromBody(req.body);
-    const validationError = validateHotelRates(hotelRates);
-    if (validationError) {
-      return res.status(400).json({
-        success: false,
-        message: validationError,
-      });
-    }
-
     const dateRanges = getDateRangesFromBody(req.body);
     const dateValidationError = validateDateRanges(dateRanges);
     if (dateValidationError) {
       return res.status(400).json({ success: false, message: dateValidationError });
+    }
+    const hotelRates = getHotelRatesFromBody(req.body, dateRanges);
+    const validationError = validateHotelRates(hotelRates, dateRanges);
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
     }
 
     const rateVolume = await RateVolume.create({
@@ -244,8 +265,13 @@ export const updateRateVolume = async (req, res) => {
 
     const hasRatePayload = Array.isArray(req.body.hotelRates) || req.body.hotel !== undefined;
     if (hasRatePayload) {
-      const hotelRates = getHotelRatesFromBody(req.body);
-      const validationError = validateHotelRates(hotelRates);
+      const dateRanges = getDateRangesFromBody(req.body);
+      const dateValidationError = validateDateRanges(dateRanges);
+      if (dateValidationError) {
+        return res.status(400).json({ success: false, message: dateValidationError });
+      }
+      const hotelRates = getHotelRatesFromBody(req.body, dateRanges);
+      const validationError = validateHotelRates(hotelRates, dateRanges);
       if (validationError) {
         return res.status(400).json({ success: false, message: validationError });
       }

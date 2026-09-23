@@ -1812,9 +1812,10 @@ const UpdateUmrahPackage = () => {
                       <input
                         type="number"
                         value={hotel.nights || ""}
-                        readOnly
-                        className="border p-2 w-full rounded text-xs h-9 bg-gray-100"
+                        onChange={(e) => updateHotel(index, { nights: Number(e.target.value) || 0 })}
+                        className="border p-2 w-full rounded text-xs h-9"
                         placeholder="0"
+                        min={0}
                       />
                     </div>
                     <div>

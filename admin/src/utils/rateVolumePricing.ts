@@ -108,10 +108,55 @@ export const normalizeRateVolume = (volume: any): RateVolumeOption => {
 
 const utcDay = (value: string) => new Date(`${dateOnly(value)}T00:00:00.000Z`);
 
-// A rate is valid only when one date band covers every charged hotel night.
-// Checkout is not a charged night, so a band ending on 30 Sep may cover a stay
-// checking out on 01 Oct. Cross-band stays deliberately return undefined; the
-// package form must not blend or average independently configured date rates.
+// Every charged hotel night, as an ISO date string, for a [checkIn, checkOut) stay.
+// Checkout is not a charged night.
+const nightsOf = (start: Date, end: Date): string[] => {
+  const nights: string[] = [];
+  const cursor = new Date(start);
+  while (cursor < end) {
+    nights.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return nights;
+};
+
+// A band covers a night the same way a hotel stay does: [fromDate, toDate) per night, so
+// a night landing exactly on a band's toDate (its checkout day) belongs to the *next*
+// band, not this one - letting adjacent bands share a boundary date.
+const bandForNight = (dateRates: RateVolumeDateRate[], night: string) =>
+  dateRates.find((dateRate) => dateRate.fromDate <= night && night < dateRate.toDate);
+
+const priceRoePairs: { price: keyof RatePricing; roe: keyof RatePricing }[] = [
+  { price: "buyingPrice", roe: "buyingRoe" },
+  { price: "sellingPrice", roe: "sellingRoe" },
+  { price: "sharedRoomBuyingPrice", roe: "sharedRoomBuyingRoe" },
+  { price: "sharedRoomSellingPrice", roe: "sharedRoomSellingRoe" },
+];
+
+// Nights-weighted blend of every band a stay touches. Downstream totals are always
+// `nights * price * roe`, so each field is blended as (price * roe) - its true per-night
+// cost - averaged across the stay and re-expressed with roe = 1 so the blended price
+// alone reproduces the same total regardless of how many currencies/ROEs were involved.
+const blendBands = (bands: RateVolumeDateRate[]): RatePricing => {
+  const blended = emptyRatePricing() as unknown as Record<keyof RatePricing, number | string>;
+  const totalNights = bands.length || 1;
+  for (const { price, roe } of priceRoePairs) {
+    const sum = bands.reduce((acc, band) => acc + (Number(band[price]) || 0) * (Number(band[roe]) || 1), 0);
+    blended[price] = Math.round((sum / totalNights) * 100) / 100;
+    blended[roe] = 1;
+  }
+  blended.buyingCurrency = "PKR";
+  blended.sellingCurrency = "PKR";
+  blended.sharedRoomBuyingCurrency = "PKR";
+  blended.sharedRoomSellingCurrency = "PKR";
+  return blended as unknown as RatePricing;
+};
+
+// Resolves the rate for a hotel's stay. If every night falls in the same date band, that
+// band's rate is used as-is. If the stay crosses band boundaries (e.g. check-in mid one
+// band, check-out mid the next), the price is a nights-weighted average across the bands
+// it actually touches. Returns undefined only when some night of the stay isn't covered
+// by any band at all.
 export const resolveHotelRateForStay = (
   volume: RateVolumeData,
   hotelId: string | undefined,
@@ -126,13 +171,14 @@ export const resolveHotelRateForStay = (
   const start = utcDay(checkIn);
   const end = utcDay(checkOut);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) return undefined;
-  const lastNight = new Date(end);
-  lastNight.setUTCDate(lastNight.getUTCDate() - 1);
-  const firstNightIso = start.toISOString().slice(0, 10);
-  const lastNightIso = lastNight.toISOString().slice(0, 10);
-  const band = hotelRate.dateRates.find(
-    (dateRate) => dateRate.fromDate <= firstNightIso && dateRate.toDate >= lastNightIso,
-  );
 
-  return band ? { ...hotelRate, ...band, dateRates: hotelRate.dateRates } : undefined;
+  const nights = nightsOf(start, end);
+  const perNightBands = nights.map((night) => bandForNight(hotelRate.dateRates, night));
+  if (perNightBands.some((band) => !band)) return undefined;
+
+  const bands = perNightBands as RateVolumeDateRate[];
+  const uniqueBands = Array.from(new Set(bands));
+  const pricing = uniqueBands.length === 1 ? uniqueBands[0] : blendBands(bands);
+
+  return { ...hotelRate, ...pricing, dateRates: hotelRate.dateRates };
 };

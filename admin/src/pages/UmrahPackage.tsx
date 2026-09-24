@@ -1048,16 +1048,18 @@ const UmrahPackage = () => {
   // Builds the hotel-row fields (name/city/rating + buying/selling incl. the
   // per-room-type breakdown) implied by a Rate Volume - pulling the hotel's own details
   // (rating, map URL) from the already-loaded Hotel list via its hotelId.
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+
   const computeVolumeFields = (hotel: HotelForm, volumeName: string, rate: RateVolumeHotelRate): Partial<HotelForm> => {
-    const buying = rate.buyingPrice || 0;
+    const buying = round2(rate.buyingPrice || 0);
     const buyingRoe = rate.buyingRoe ?? 1;
-    const selling = rate.sellingPrice || 0;
+    const selling = round2(rate.sellingPrice || 0);
     const sellingRoe = rate.sellingRoe ?? 1;
     // Shared Room uses its own dedicated rate from the volume (not a split of the
     // buying/selling rate above, which only feeds Double/Triple/Quad).
-    const sharedBuying = rate.sharedRoomBuyingPrice || 0;
+    const sharedBuying = round2(rate.sharedRoomBuyingPrice || 0);
     const sharedBuyingRoe = rate.sharedRoomBuyingRoe ?? 1;
-    const sharedSelling = rate.sharedRoomSellingPrice || 0;
+    const sharedSelling = round2(rate.sharedRoomSellingPrice || 0);
     const sharedSellingRoe = rate.sharedRoomSellingRoe ?? 1;
 
     const fields: Partial<HotelForm> = {
@@ -1164,7 +1166,7 @@ const UmrahPackage = () => {
       } else if (selectedOption) {
         Object.assign(row, emptyRateFields());
         toast.error(
-          `"${selectedOption.data.volumeName}" has no single date band covering every night from ${formatFlightDate(row.checkIn)} to ${formatFlightDate(row.checkOut)}. Rates were cleared. Split the stay into separate hotel rows for each rate band.`
+          `"${selectedOption.data.volumeName}" has no rate band covering every night from ${formatFlightDate(row.checkIn)} to ${formatFlightDate(row.checkOut)}. Rates were cleared. Add a date band for the missing nights.`
         );
       }
     }
@@ -1198,7 +1200,7 @@ const UmrahPackage = () => {
       } else {
         Object.assign(baseFields, emptyRateFields());
         toast.error(
-          `"${selectedOption.data.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "single date band covering the complete stay for " : ""}${selected.label}.${hotel.checkIn && hotel.checkOut ? " Split the stay into separate hotel rows for each rate band." : ""}`
+          `"${selectedOption.data.volumeName}" has no ${hotel.checkIn && hotel.checkOut ? "rate band covering the complete stay for " : ""}${selected.label}.${hotel.checkIn && hotel.checkOut ? " Add a date band for the missing nights." : ""}`
         );
       }
     } else if (hotel.checkIn && hotel.checkOut) {
@@ -1247,7 +1249,7 @@ const UmrahPackage = () => {
     if (!rate) {
       updateHotel(index, emptyRateFields());
       toast.error(
-        `"${volume.volumeName}" has no rate for this hotel${hotel.checkIn && hotel.checkOut ? " within one date band covering the complete stay. Split the stay into separate hotel rows for each rate band" : ""}.`
+        `"${volume.volumeName}" has no rate for this hotel${hotel.checkIn && hotel.checkOut ? " covering the complete stay. Add a date band for the missing nights" : ""}.`
       );
       return;
     }

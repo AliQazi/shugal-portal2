@@ -30,9 +30,13 @@ const validateDateRanges = (ranges: DateRangeForm[]): string | null => {
     if (!range.fromDate || !range.toDate) return `Please select both dates in Date Range ${index + 1}`;
     if (range.fromDate > range.toDate) return `From date cannot be after to date in Date Range ${index + 1}`;
   }
+  // Bands are half-open per night: [fromDate, toDate). A checkout date equal to the next
+  // band's check-in date (e.g. Range 1 ... to 30 Oct, Range 2 30 Oct to ...) is allowed -
+  // the night of 30 Oct belongs to Range 2, not both. Only flag it when nights actually
+  // overlap, i.e. the ranges' interiors intersect (strict inequality on both ends).
   for (let i = 0; i < ranges.length; i += 1) {
     for (let j = i + 1; j < ranges.length; j += 1) {
-      if (ranges[i].fromDate <= ranges[j].toDate && ranges[j].fromDate <= ranges[i].toDate) return `Date Range ${i + 1} overlaps with Date Range ${j + 1}. Each night may belong to only one pricing band.`;
+      if (ranges[i].fromDate < ranges[j].toDate && ranges[j].fromDate < ranges[i].toDate) return `Date Range ${i + 1} overlaps with Date Range ${j + 1}. Each night may belong to only one pricing band.`;
     }
   }
   return null;

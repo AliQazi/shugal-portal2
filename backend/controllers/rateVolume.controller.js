@@ -116,10 +116,12 @@ const validateDateRanges = (dateRanges) => {
     parsed.push({ index, from, to });
   }
 
-  // Ranges are inclusive, so sharing even a single day counts as an overlap.
+  // Each band covers nights [fromDate, toDate) - checkout isn't a charged night, so one
+  // band's toDate may equal the next band's fromDate (e.g. ... to 30 Sep / 30 Sep to ...)
+  // without overlapping. Only flag it when the ranges' interiors actually intersect.
   for (let i = 0; i < parsed.length; i += 1) {
     for (let j = i + 1; j < parsed.length; j += 1) {
-      if (parsed[i].from <= parsed[j].to && parsed[j].from <= parsed[i].to) {
+      if (parsed[i].from < parsed[j].to && parsed[j].from < parsed[i].to) {
         return `Date range ${i + 1} (${formatDate(parsed[i].from)} to ${formatDate(parsed[i].to)}) overlaps with date range ${j + 1} (${formatDate(parsed[j].from)} to ${formatDate(parsed[j].to)})`;
       }
     }

@@ -976,6 +976,78 @@ export default function UmrahBooking() {
   const selectedPaymentHistory =
     selectedBooking?.paymentStatus?.paymentHistory || [];
 
+  // Per-category unit prices for the pricing breakdown / passengers table.
+  const selectedPackageTotals = selectedPackageDetails?.packageTotals || {};
+  const selectedAdultPrice = selectedBooking?.pricing?.pricePerPerson || 0;
+  const selectedChildWithoutBedPrice =
+    selectedPackageTotals.childWithoutBed ||
+    selectedPackageDetails?.rooms?.childWithoutPackage ||
+    0;
+  const selectedChildWithBedPrice = selectedPackageTotals.childWithBed || 0;
+  const selectedInfantPrice =
+    selectedPackageTotals.infant ||
+    selectedPackageDetails?.rooms?.InfantWithoutPackage ||
+    0;
+  const selectedIncentivePerPax =
+    Number(
+      selectedPackageTotals.incentive ||
+      selectedPackageDetails?.rooms?.IncentiveWithoutPackage,
+    ) || 0;
+  const getPassengerPrice = (passenger) => {
+    if (passenger.type === "Adult") return selectedAdultPrice;
+    if (passenger.type === "Infant") return selectedInfantPrice;
+    if (passenger.type === "Child") {
+      return passenger.childType === "withBed"
+        ? selectedChildWithBedPrice
+        : selectedChildWithoutBedPrice;
+    }
+    return 0;
+  };
+  const selectedPassengers = selectedBooking?.passengers || [];
+  const selectedAdultCount =
+    selectedBooking?.passengerCount?.adults ??
+    selectedPassengers.filter((p) => p.type === "Adult").length;
+  const selectedChildWithBedCount = selectedPassengers.filter(
+    (p) => p.type === "Child" && p.childType === "withBed",
+  ).length;
+  const selectedChildWithoutBedCount = selectedPassengers.filter(
+    (p) => p.type === "Child" && p.childType !== "withBed",
+  ).length;
+  const selectedInfantCount =
+    selectedBooking?.passengerCount?.infants ||
+    selectedPassengers.filter((p) => p.type === "Infant").length;
+  // One row per passenger category: "<count> × <unit price> = <line total>".
+  const selectedPricingLines = [
+    {
+      label: "Adults",
+      count: selectedAdultCount,
+      unit: selectedAdultPrice,
+    },
+    {
+      label: "Child (w/ Bed)",
+      count: selectedChildWithBedCount,
+      unit: selectedChildWithBedPrice,
+    },
+    {
+      label: "Child (w/o Bed)",
+      count: selectedChildWithoutBedCount,
+      unit: selectedChildWithoutBedPrice,
+    },
+    {
+      label: "Infants",
+      count: selectedInfantCount,
+      unit: selectedInfantPrice,
+    },
+  ]
+    .filter((line) => line.count > 0)
+    .map((line) => ({ ...line, total: line.count * line.unit }));
+  const selectedSubtotal = selectedPricingLines.reduce(
+    (sum, line) => sum + line.total,
+    0,
+  );
+  const selectedIncentiveCount = selectedAdultCount + selectedChildWithBedCount;
+  const selectedTotalIncentive = selectedIncentivePerPax * selectedIncentiveCount;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -2214,52 +2286,37 @@ export default function UmrahBooking() {
                 {/* Left column */}
                 <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
                   {isOnHoldBooking(selectedBooking) && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="flex items-center gap-1.5 text-sm font-bold text-amber-900">
-                          <Clock className="w-4 h-4" />
-                          Booking Expiry
-                        </h3>
-                        {timers[selectedBooking._id]?.expired ? (
-                          <span className="text-sm font-bold text-red-600">
-                            EXPIRED
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            {[
-                              {
-                                label: "H",
-                                value: timers[selectedBooking._id]?.hours || 0,
-                              },
-                              {
-                                label: "M",
-                                value:
-                                  timers[selectedBooking._id]?.minutes || 0,
-                              },
-                              {
-                                label: "S",
-                                value:
-                                  timers[selectedBooking._id]?.seconds || 0,
-                              },
-                            ].map((item) => (
-                              <div
-                                key={item.label}
-                                className="min-w-11 rounded-md bg-white px-2 py-1 text-center shadow-sm"
-                              >
-                                <div className="text-sm font-black leading-none text-gray-900">
-                                  {String(item.value).padStart(2, "0")}
-                                </div>
-                                <div className="mt-0.5 text-[9px] font-bold text-amber-700">
-                                  {item.label}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <p className="mt-1.5 text-[11px] font-medium text-amber-800">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                      <h3 className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                        <Clock className="w-3.5 h-3.5" />
+                        Booking Expiry
+                      </h3>
+                      {timers[selectedBooking._id]?.expired ? (
+                        <span className="text-sm font-bold text-red-600">
+                          EXPIRED
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: "h", value: timers[selectedBooking._id]?.hours || 0 },
+                            { label: "m", value: timers[selectedBooking._id]?.minutes || 0 },
+                            { label: "s", value: timers[selectedBooking._id]?.seconds || 0 },
+                          ].map((item) => (
+                            <span
+                              key={item.label}
+                              className="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-sm font-black tabular-nums text-gray-900"
+                            >
+                              {String(item.value).padStart(2, "0")}
+                              <span className="ml-0.5 text-[9px] font-bold text-amber-700">
+                                {item.label}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <span className="ml-auto text-[11px] font-medium text-amber-800">
                         Expires at: {formatDateTime(selectedBooking.expiresAt)}
-                      </p>
+                      </span>
                     </div>
                   )}
 
@@ -2354,85 +2411,74 @@ export default function UmrahBooking() {
                         {selectedBooking.passengerCount?.infants || 0}
                       </span>
                     </h3>
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                      {(selectedBooking.passengers || []).map(
-                        (passenger, idx) => (
-                          <div
-                            key={`${passenger.passport || passenger.givenName}-${idx}`}
-                            className="rounded-lg border border-gray-100 bg-gray-50 p-2.5"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-xs font-bold text-gray-900">
-                                  {[
-                                    passenger.title,
-                                    passenger.givenName,
-                                    passenger.surName,
-                                  ]
+                    <div className="overflow-auto rounded-lg border border-slate-200">
+                      <table className="w-full border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-blue-100 text-left text-[10px] font-extrabold uppercase tracking-wide text-blue-700">
+                            <th className="px-2.5 py-1.5">#</th>
+                            <th className="px-2.5 py-1.5">Passenger</th>
+                            <th className="px-2.5 py-1.5">Type</th>
+                            <th className="px-2.5 py-1.5">Passport</th>
+                            <th className="px-2.5 py-1.5">DOB</th>
+                            <th className="px-2.5 py-1.5">Nationality</th>
+                            <th className="px-2.5 py-1.5 text-right">Discount</th>
+                            <th className="px-2.5 py-1.5 text-right">Price</th>
+                            <th className="px-2.5 py-1.5 text-center">Doc</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-blue-50">
+                          {(selectedBooking.passengers || []).map(
+                            (passenger, idx) => (
+                              <tr
+                                key={`${passenger.passport || passenger.givenName}-${idx}`}
+                                className="whitespace-nowrap text-gray-600"
+                              >
+                                <td className="px-2.5 py-1.5 font-bold text-gray-400">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-2.5 py-1.5 font-bold text-gray-900">
+                                  {[passenger.title, passenger.givenName, passenger.surName]
                                     .filter(Boolean)
                                     .join(" ") || "Passenger"}
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-gray-500">
-                                  {[
-                                    passenger.type === "Child"
+                                </td>
+                                <td className="px-2.5 py-1.5">
+                                  <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                                    {passenger.type === "Child"
                                       ? `Child (${passenger.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
-                                      : passenger.type,
-                                    passenger.nationality,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" | ")}
-                                </p>
-                              </div>
-                              <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
-                                {passenger.type === "Child"
-                                  ? passenger.childType === "withBed"
-                                    ? "Child+Bed"
-                                    : "Child"
-                                  : passenger.type || "N/A"}
-                              </span>
-                            </div>
-                            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
-                              <div>
-                                <p className="font-semibold uppercase text-gray-400">
-                                  Passport
-                                </p>
-                                <p className="font-semibold text-gray-800">
-                                  {passenger.passport || "N/A"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="font-semibold uppercase text-gray-400">
-                                  DOB
-                                </p>
-                                <p className="font-semibold text-gray-800">
-                                  {formatCalendarDate(passenger.dateOfBirth)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="font-semibold uppercase text-gray-400">
-                                  Discount
-                                </p>
-                                <p className="font-semibold text-emerald-700">
-                                  {formatMoney(
-                                    passenger.discount,
-                                    selectedBooking.pricing?.currency,
+                                      : passenger.type || "N/A"}
+                                  </span>
+                                </td>
+                                <td className="px-2.5 py-1.5">{passenger.passport || "N/A"}</td>
+                                <td className="px-2.5 py-1.5">{formatCalendarDate(passenger.dateOfBirth)}</td>
+                                <td className="px-2.5 py-1.5">{passenger.nationality || "N/A"}</td>
+                                <td className="px-2.5 py-1.5 text-right font-semibold text-emerald-700">
+                                  {Number(passenger.discount) > 0
+                                    ? formatMoney(passenger.discount, selectedBooking.pricing?.currency)
+                                    : "—"}
+                                </td>
+                                <td className="px-2.5 py-1.5 text-right font-bold text-blue-600">
+                                  {formatMoney(getPassengerPrice(passenger), selectedBooking.pricing?.currency)}
+                                </td>
+                                <td className="px-2.5 py-1.5 text-center">
+                                  {passenger.documentUrl ? (
+                                    <a
+                                      href={passenger.documentUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-semibold text-blue-600 hover:text-blue-800"
+                                      title="View Document"
+                                    >
+                                      View
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-300">—</span>
                                   )}
-                                </p>
-                              </div>
-                              {passenger.documentUrl && (
-                                <a
-                                  href={passenger.documentUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="self-end font-semibold text-blue-600 hover:text-blue-800"
-                                >
-                                  View Document
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ),
-                      )}
+                                </td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
@@ -2596,52 +2642,64 @@ export default function UmrahBooking() {
                   <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                     <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-900">
                       <CalendarDays className="h-4 w-4 text-emerald-600" />
-                      Pricing Summary
+                      Pricing Breakdown
                     </h3>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Original
-                        </p>
-                        <p className="font-bold text-gray-900">
-                          {formatMoney(
-                            selectedBooking.pricing?.totalPrice,
-                            selectedBooking.pricing?.currency,
-                          )}
-                        </p>
+                    <div className="space-y-2 text-xs">
+                      {selectedPricingLines.map(({ label, count, unit, total }) => (
+                        <div key={label} className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-gray-900">{label}</p>
+                            <p className="text-[11px] text-gray-500">
+                              {count} × {formatMoney(unit, selectedBooking.pricing?.currency)}
+                            </p>
+                          </div>
+                          <p className="whitespace-nowrap font-bold text-gray-700">
+                            {formatMoney(total, selectedBooking.pricing?.currency)}
+                          </p>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-2 font-bold text-gray-900">
+                        <span>Subtotal</span>
+                        <span>{formatMoney(selectedSubtotal, selectedBooking.pricing?.currency)}</span>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Discount
-                        </p>
-                        <p className="font-bold text-amber-700">
-                          {formatMoney(
-                            selectedBookingDiscountTotal,
-                            selectedBooking.pricing?.currency,
+                      {selectedTotalIncentive > 0 && (
+                        <div className="flex items-start justify-between gap-2 text-emerald-700">
+                          <div>
+                            <p className="font-semibold">Incentive (Adults + Child W/ Bed)</p>
+                            <p className="text-[11px] opacity-85">
+                              {selectedIncentiveCount} × {formatMoney(selectedIncentivePerPax, selectedBooking.pricing?.currency)}
+                            </p>
+                          </div>
+                          <p className="whitespace-nowrap font-bold">
+                            -{formatMoney(selectedTotalIncentive, selectedBooking.pricing?.currency)}
+                          </p>
+                        </div>
+                      )}
+                      {selectedBookingDiscountTotal > 0 && (
+                        <div className="text-emerald-700">
+                          <div className="flex items-center justify-between font-semibold">
+                            <span>Discount</span>
+                            <span className="font-bold">
+                              -{formatMoney(selectedBookingDiscountTotal, selectedBooking.pricing?.currency)}
+                            </span>
+                          </div>
+                          {selectedPassengers.map((p, i) =>
+                            Number(p.discount) > 0 ? (
+                              <div key={i} className="mt-0.5 flex justify-between text-[11px] opacity-85">
+                                <span>{[p.title, p.givenName, p.surName].filter(Boolean).join(" ")}</span>
+                                <span>-{formatMoney(p.discount, selectedBooking.pricing?.currency)}</span>
+                              </div>
+                            ) : null,
                           )}
-                        </p>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-sm font-extrabold text-emerald-700">
+                        <span>Payable</span>
+                        <span>{formatMoney(selectedBookingAfterDiscountTotal, selectedBooking.pricing?.currency)}</span>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Payable
-                        </p>
-                        <p className="font-bold text-emerald-700">
-                          {formatMoney(
-                            selectedBookingAfterDiscountTotal,
-                            selectedBooking.pricing?.currency,
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Remaining
-                        </p>
-                        <p className="font-bold text-red-700">
-                          {formatMoney(
-                            getPayableRemainingAmount(selectedBooking),
-                            selectedBooking.pricing?.currency,
-                          )}
-                        </p>
+                      <div className="flex items-center justify-between font-bold text-red-700">
+                        <span>Remaining</span>
+                        <span>{formatMoney(getPayableRemainingAmount(selectedBooking), selectedBooking.pricing?.currency)}</span>
                       </div>
                     </div>
                   </div>

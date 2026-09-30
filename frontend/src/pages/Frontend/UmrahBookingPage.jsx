@@ -457,6 +457,38 @@ export default function UmrahBookingPage({ user }) {
   const totalIncentive = incentive * incentiveEligiblePassengerCount;
   const totalPrice = () => Math.max(0, subtotalPrice() - totalIncentive);
 
+  // One row per passenger category: "<count> × <unit price> = <line total>".
+  const childWithBedCount = formData.children.filter(
+    (c) => c.childType === "withBed",
+  ).length;
+  const childWithoutBedCount = formData.children.length - childWithBedCount;
+  const pricingLines = [
+    {
+      label: "Adults",
+      count: formData.adults.length,
+      unit: pricePerPerson || 0,
+      total: adultTotal,
+    },
+    {
+      label: "Child (w/ Bed)",
+      count: childWithBedCount,
+      unit: childWithBedPrice,
+      total: childWithBedCount * childWithBedPrice,
+    },
+    {
+      label: "Child (w/o Bed)",
+      count: childWithoutBedCount,
+      unit: childPrice,
+      total: childWithoutBedCount * childPrice,
+    },
+    {
+      label: "Infants",
+      count: formData.infants.length,
+      unit: infantPrice,
+      total: infantTotal,
+    },
+  ].filter((line) => line.count > 0);
+
   const getAllPassengers = () => [
     ...formData.adults,
     ...formData.children,
@@ -1761,7 +1793,7 @@ export default function UmrahBookingPage({ user }) {
                 alignItems: "start",
               }}
             >
-              {/* Left side: totals stacked vertically */}
+              {/* Left side: itemised price breakdown */}
               <div
                 style={{
                   display: "flex",
@@ -1769,83 +1801,37 @@ export default function UmrahBookingPage({ user }) {
                   gap: "6px",
                 }}
               >
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    padding: "8px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
-                    Adults
-                  </div>
+                {pricingLines.map(({ label, count, unit, total }) => (
                   <div
+                    key={label}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: "3px",
-                      fontWeight: 700,
-                      fontSize: "0.78rem",
-                      color: "#1f2937",
+                      background: "#f8fafc",
+                      padding: "8px",
+                      borderRadius: "8px",
                     }}
                   >
-                    <span>{formData.adults.length}</span>
-                    <span>PKR {adultTotal.toLocaleString()}</span>
+                    <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "8px",
+                        marginTop: "3px",
+                        fontWeight: 700,
+                        fontSize: "0.78rem",
+                        color: "#1f2937",
+                      }}
+                    >
+                      <span>
+                        {count} × PKR {unit.toLocaleString()}
+                      </span>
+                      <span>PKR {total.toLocaleString()}</span>
+                    </div>
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    padding: "8px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
-                    Children
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: "3px",
-                      fontWeight: 700,
-                      fontSize: "0.78rem",
-                      color: "#1f2937",
-                    }}
-                  >
-                    <span>{formData.children.length}</span>
-                    <span>PKR {childrenTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    padding: "8px",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div style={{ color: "#4a5568", fontSize: "0.65rem" }}>
-                    Infants
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: "3px",
-                      fontWeight: 700,
-                      fontSize: "0.78rem",
-                      color: "#1f2937",
-                    }}
-                  >
-                    <span>{formData.infants.length}</span>
-                    <span>PKR {infantTotal.toLocaleString()}</span>
-                  </div>
-                </div>
+                ))}
               </div>
 
               {/* Right side: passenger breakdown, one row per passenger top to bottom */}
@@ -2029,7 +2015,10 @@ export default function UmrahBookingPage({ user }) {
                 fontWeight: 700,
               }}
             >
-              <span>Incentive Deduction:</span>
+              <span>
+                Incentive Deduction ({incentiveEligiblePassengerCount} × PKR{" "}
+                {incentive.toLocaleString()}):
+              </span>
               <strong>-PKR {totalIncentive.toLocaleString()}</strong>
             </div>
 
@@ -2267,11 +2256,31 @@ export default function UmrahBookingPage({ user }) {
                     {")"}
                   </strong>
                 </div>
+                {pricingLines.map(({ label, count, unit, total }) => (
+                  <div
+                    key={label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "8px",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    <span style={{ color: "#718096" }}>
+                      {label}: {count} × PKR {unit.toLocaleString()}
+                    </span>
+                    <strong style={{ color: "#2d3748" }}>
+                      PKR {total.toLocaleString()}
+                    </strong>
+                  </div>
+                ))}
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     marginBottom: "8px",
+                    paddingTop: "8px",
+                    borderTop: "1px solid #e2e8f0",
                   }}
                 >
                   <span style={{ color: "#718096" }}>Subtotal:</span>
@@ -2287,7 +2296,10 @@ export default function UmrahBookingPage({ user }) {
                     color: theme.colors.success,
                   }}
                 >
-                  <span>Incentive Deduction:</span>
+                  <span>
+                    Incentive Deduction ({incentiveEligiblePassengerCount} × PKR{" "}
+                    {incentive.toLocaleString()}):
+                  </span>
                   <strong>-PKR {totalIncentive.toLocaleString()}</strong>
                 </div>
                 <div

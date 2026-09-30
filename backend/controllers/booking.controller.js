@@ -1852,6 +1852,100 @@ export const updatePassengerDiscounts = async (req, res) => {
 };
 
 // -------------------------
+// UPDATE PASSENGER DETAILS (AGENT)
+// Identity fields only - allowed for on hold / partially confirmed / confirmed
+// bookings. Deliberately does NOT touch status, pricing, seats, expiry or the
+// ZIP voucher: a confirmed booking's ledger entry is already posted and must
+// stay as is, while a not-yet-confirmed booking will pick up the corrected
+// passenger data when it is confirmed (ledgerHiting reads the saved passengers).
+// -------------------------
+const PASSENGER_EDITABLE_STATUSES = [
+  "on hold",
+  "pending",
+  "partially confirmed",
+  "confirmed",
+];
+
+export const updateBookingPassengerDetails = async (req, res) => {
+  try {
+    const { passengers } = req.body;
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Passengers array is required" });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    const isAdmin = ["Super Admin", "Admin"].includes(req.user.role);
+    if (!isAdmin && booking.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only edit passengers for your own bookings",
+      });
+    }
+
+    if (!PASSENGER_EDITABLE_STATUSES.includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Passenger details cannot be edited for a ${booking.status} booking`,
+      });
+    }
+
+    if (passengers.length !== booking.passengers.length) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Passenger count mismatch" });
+    }
+
+    const editableFields = [
+      "title",
+      "givenName",
+      "surName",
+      "passport",
+      "dateOfBirth",
+      "passportExpiry",
+      "passportIssue",
+      "nationality",
+      "documentUrl",
+    ];
+
+    booking.passengers.forEach((existingPassenger, index) => {
+      const updated = passengers[index];
+      if (!updated) return;
+      editableFields.forEach((field) => {
+        if (updated[field] !== undefined && updated[field] !== "") {
+          existingPassenger[field] = updated[field];
+        }
+      });
+    });
+
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "Ticket Booking",
+      refModel: "Booking",
+      refId: booking._id,
+      description: `Passenger details updated for booking "${booking.bookingReference}" (status: ${booking.status})`,
+    });
+
+    res.json({
+      success: true,
+      message: "Passenger details updated successfully",
+      data: { _id: booking._id, passengers: booking.passengers },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// -------------------------
 // EXTEND BOOKING HOLD
 // -------------------------
 export const extendBookingHold = async (req, res) => {

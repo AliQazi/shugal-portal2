@@ -1170,7 +1170,17 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
     const childTotal = booking.passengers
         .filter((p: any) => p.type === "Child")
         .reduce((sum: number, p: any) => sum + getChildPrice(p), 0);
-    const infantTotal = (booking.passengerCount?.infants || booking.passengers.filter((p: any) => p.type === "Infant").length) * infantPrice;
+    const childWithBedCount = booking.passengers.filter((p: any) => p.type === "Child" && p.childType === "withBed").length;
+    const childWithoutBedCount = booking.passengers.filter((p: any) => p.type === "Child" && p.childType !== "withBed").length;
+    const infantCount = booking.passengerCount?.infants || booking.passengers.filter((p: any) => p.type === "Infant").length;
+    const infantTotal = infantCount * infantPrice;
+    // One row per passenger category: "<count> × <unit price> = <line total>".
+    const pricingLines = [
+        { label: "Adults", count: adultCount, unit: adultPrice, total: adultTotal },
+        { label: "Child (w/ Bed)", count: childWithBedCount, unit: childWithBedPrice, total: childWithBedCount * childWithBedPrice },
+        { label: "Child (w/o Bed)", count: childWithoutBedCount, unit: childPrice, total: childWithoutBedCount * childPrice },
+        { label: "Infants", count: infantCount, unit: infantPrice, total: infantTotal },
+    ].filter((line) => line.count > 0);
     const incentivePerPassenger = Number(packageTotals?.incentive) || 0;
     const incentiveEligiblePassengerCount =
         adultCount +
@@ -1357,17 +1367,18 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                     <div style={{ minHeight: 0, overflowY: "auto", paddingRight: "6px" }}>
                         {/* Timer for Hold */}
                         {["On Hold", "Pending"].includes(booking.overallStatus) && (
-                            <div style={{ ...sectionCard, background: "#FFFBEB", border: "1px solid #FDE68A" }}>
-                                {sectionTitle(<ClockIcon style={{ width: 15, height: 15 }} />, "Hold Timer", "#92400E")}
+                            <div style={{ ...sectionCard, padding: "8px 12px", background: "#FFFBEB", border: "1px solid #FDE68A", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, fontSize: "0.78rem", color: "#92400E" }}>
+                                    <ClockIcon style={{ width: 14, height: 14 }} /> Hold Timer
+                                </div>
                                 {timer.expired ? (
-                                    <div style={{ color: "#EF4444", fontWeight: 700, fontSize: "0.9rem" }}>EXPIRED</div>
+                                    <div style={{ color: "#EF4444", fontWeight: 700, fontSize: "0.82rem" }}>EXPIRED</div>
                                 ) : (
-                                    <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
-                                        {[{ val: timer.hours, label: "HRS" }, { val: timer.minutes, label: "MIN" }, { val: timer.seconds, label: "SEC" }].map(({ val, label }) => (
-                                            <div key={label} style={{ background: "white", padding: "12px 16px", borderRadius: "10px", textAlign: "center", minWidth: "58px", border: "1px solid #FCD34D", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                                                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{String(val).padStart(2, "0")}</div>
-                                                <div style={{ fontSize: "0.6rem", color: "#92400E", fontWeight: 700, marginTop: "4px", letterSpacing: "0.5px" }}>{label}</div>
-                                            </div>
+                                    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                                        {[{ val: timer.hours, label: "h" }, { val: timer.minutes, label: "m" }, { val: timer.seconds, label: "s" }].map(({ val, label }) => (
+                                            <span key={label} style={{ background: "white", padding: "3px 8px", borderRadius: "6px", border: "1px solid #FCD34D", fontSize: "0.85rem", fontWeight: 800, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>
+                                                {String(val).padStart(2, "0")}<span style={{ fontSize: "0.6rem", color: "#92400E", fontWeight: 700, marginLeft: "2px" }}>{label}</span>
+                                            </span>
                                         ))}
                                     </div>
                                 )}
@@ -1375,7 +1386,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                     <select
                                         onChange={(e) => { const mins = Number(e.target.value); if (mins) onExtendHold(booking._id, mins); }}
                                         disabled={extendingHoldId === booking._id}
-                                        style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #FCD34D", width: "100%", fontSize: "0.8rem", background: "white", color: "#78350F", fontWeight: 600, cursor: "pointer", outline: "none" }}
+                                        style={{ marginLeft: "auto", padding: "4px 8px", borderRadius: "6px", border: "1px solid #FCD34D", fontSize: "0.72rem", background: "white", color: "#78350F", fontWeight: 600, cursor: "pointer", outline: "none" }}
                                     >
                                         <option value="">Extend hold time</option>
                                         <option value="30">+30 minutes</option><option value="60">+1 hour</option>
@@ -1387,7 +1398,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
 
                         {/* Hotels & Transport */}
                         <div style={{ ...sectionCard, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-                            {sectionTitle(<HomeIcon style={{ width: 15, height: 15, color: "#2563EB" }} />, "Hotels & Transport", "#1D4ED8")}
+                            {/* {sectionTitle(<HomeIcon style={{ width: 15, height: 15, color: "#2563EB" }} />, "Hotels & Transport", "#1D4ED8")} */}
 
                             {isExternalSource && !isEditingPackage && !packageHotels.length && !packageTransports.length && (
                                 <div style={{ padding: "10px", background: "#E0F2FE", border: "1px solid #BAE6FD", borderRadius: "9px", color: "#0369A1", fontSize: "0.78rem", fontWeight: 700, marginBottom: "12px" }}>
@@ -1562,44 +1573,56 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                 <UserGroupIcon style={{ width: 15, height: 15, color: "#2563EB" }} />,
                                 `Passengers (${booking.passengers.length}) • A:${booking.passengerCount?.adults} C:${booking.passengerCount?.children} I:${booking.passengerCount?.infants}`
                             )}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                                {booking.passengers.map((p: any, i: number) => {
-                                    let price = 0;
-                                    if (p.type === "Adult") price = adultPrice;
-                                    else if (p.type === "Child") price = getChildPrice(p);
-                                    else if (p.type === "Infant") price = infantPrice;
-                                    const typeLabel =
-                                        p.type === "Child"
-                                            ? `Child (${p.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
-                                            : p.type;
-                                    return (
-                                        <div key={i} style={{ padding: "12px", background: "white", borderRadius: "9px", border: "1px solid #E2E8F0", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
-                                            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0F172A", marginBottom: "6px" }}>{p.title} {p.givenName} {p.surName}</div>
-                                            <div style={{ display: "flex", gap: "10px", fontSize: "0.72rem", color: "#64748B", marginBottom: "10px", flexWrap: "wrap" }}>
-                                                <span style={{ background: "#EFF6FF", padding: "2px 7px", borderRadius: "5px", fontWeight: 700, color: "#2563EB" }}>{typeLabel}</span>
-                                                <span>{p.passport}</span>
-                                                <span>{p.nationality}</span>
-                                            </div>
-                                            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "12px", alignItems: "flex-end" }}>
-                                                <div>
-                                                    <div style={{ ...labelStyle, marginBottom: "5px" }}>Discount (PKR)</div>
-                                                    <input
-                                                        type="number" min="0" value={discounts[i] ?? 0}
-                                                        onChange={(e) => { const next = [...discounts]; next[i] = Number(e.target.value) || 0; setDiscounts(next); }}
-                                                        disabled={!canManage}
-                                                        style={{ ...inputStyle, marginTop: 0 }}
-                                                    />
-                                                </div>
-                                                <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#2563EB", whiteSpace: "nowrap" }}>PKR {price.toLocaleString()}</div>
-                                            </div>
-                                            {p.documentUrl && (
-                                                <a href={p.documentUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.72rem", color: "#2563EB", fontWeight: 600, textDecoration: "none", marginTop: "9px" }}>
-                                                    <PaperClipIcon style={{ width: 12, height: 12 }} /> View Passport
-                                                </a>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                            <div style={{ border: "1px solid #E2E8F0", borderRadius: "9px", overflow: "auto", background: "white" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                    <thead>
+                                        <tr style={{ background: "#DBEAFE" }}>
+                                            {["#", "Passenger", "Type", "Passport", "Nationality", "Discount (PKR)", "Price", "Doc"].map((h, idx) => (
+                                                <th key={h} style={{ ...({ padding: "7px 10px", textAlign: "left", fontSize: "0.66rem", fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }), textAlign: h === "Price" ? "right" : "left", ...(idx === 7 ? { textAlign: "center" } : {}) }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {booking.passengers.map((p: any, i: number) => {
+                                            let price = 0;
+                                            if (p.type === "Adult") price = adultPrice;
+                                            else if (p.type === "Child") price = getChildPrice(p);
+                                            else if (p.type === "Infant") price = infantPrice;
+                                            const typeLabel =
+                                                p.type === "Child"
+                                                    ? `Child (${p.childType === "withBed" ? "w/ Bed" : "w/o Bed"})`
+                                                    : p.type;
+                                            const cell: React.CSSProperties = { padding: "6px 10px", fontSize: "0.76rem", color: "#475569", whiteSpace: "nowrap" };
+                                            return (
+                                                <tr key={i} style={{ borderTop: i === 0 ? "none" : "1px solid #EFF6FF" }}>
+                                                    <td style={{ ...cell, color: "#94A3B8", fontWeight: 700 }}>{i + 1}</td>
+                                                    <td style={{ ...cell, fontWeight: 700, color: "#0F172A" }}>{p.title} {p.givenName} {p.surName}</td>
+                                                    <td style={cell}>
+                                                        <span style={{ background: "#EFF6FF", padding: "2px 7px", borderRadius: "5px", fontWeight: 700, color: "#2563EB", fontSize: "0.7rem" }}>{typeLabel}</span>
+                                                    </td>
+                                                    <td style={cell}>{p.passport || "N/A"}</td>
+                                                    <td style={cell}>{p.nationality || "N/A"}</td>
+                                                    <td style={{ ...cell, width: "130px" }}>
+                                                        <input
+                                                            type="number" min="0" placeholder="0" value={discounts[i] || ""}
+                                                            onChange={(e) => { const next = [...discounts]; next[i] = Number(e.target.value) || 0; setDiscounts(next); }}
+                                                            disabled={!canManage}
+                                                            style={{ ...inputStyle, marginTop: 0, padding: "4px 8px", fontSize: "0.75rem" }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ ...cell, textAlign: "right", fontWeight: 700, color: "#2563EB" }}>PKR {price.toLocaleString()}</td>
+                                                    <td style={{ ...cell, textAlign: "center" }}>
+                                                        {p.documentUrl ? (
+                                                            <a href={p.documentUrl} target="_blank" rel="noopener noreferrer" title="View Passport" style={{ display: "inline-flex", color: "#2563EB" }}>
+                                                                <PaperClipIcon style={{ width: 14, height: 14 }} />
+                                                            </a>
+                                                        ) : <span style={{ color: "#CBD5E1" }}>—</span>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                             {canManage && (
                                 <button
@@ -1620,22 +1643,41 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                     <div style={{ minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                         <div style={sectionCard}>
                             {sectionTitle(<BanknotesIcon style={{ width: 15, height: 15, color: "#059669" }} />, "Pricing Breakdown")}
-                            {[["Adult Total", adultTotal], ["Child Total", childTotal], ["Infant Total", infantTotal]].map(([label, val]) => (
-                                <div key={label as string} style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", marginBottom: "6px", color: "#4a5568" }}>
-                                    <span>{label}</span><strong>PKR {(val as number).toLocaleString()}</strong>
+                            {pricingLines.map(({ label, count, unit, total }) => (
+                                <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "9px" }}>
+                                    <div>
+                                        <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#0F172A" }}>{label}</div>
+                                        <div style={{ fontSize: "0.72rem", color: "#64748B", marginTop: "2px" }}>
+                                            {count} × PKR {unit.toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <strong style={{ fontSize: "0.8rem", color: "#4a5568", whiteSpace: "nowrap" }}>PKR {total.toLocaleString()}</strong>
                                 </div>
                             ))}
                             <div style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", paddingTop: "9px", borderTop: "1px solid #E2E8F0", marginTop: "6px", fontWeight: 700, color: "#0F172A" }}>
                                 <span>Subtotal</span><strong>PKR {(adultTotal + childTotal + infantTotal).toLocaleString()}</strong>
                             </div>
                             {totalIncentive > 0 && (
-                                <div style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", marginTop: "6px", color: "#059669", fontWeight: 600 }}>
-                                    <span>Incentive (Adults + Child W/ Bed)</span><strong>-PKR {totalIncentive.toLocaleString()}</strong>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginTop: "8px", color: "#059669" }}>
+                                    <div>
+                                        <div style={{ fontSize: "0.8rem", fontWeight: 600 }}>Incentive (Adults + Child W/ Bed)</div>
+                                        <div style={{ fontSize: "0.72rem", marginTop: "2px", opacity: 0.85 }}>
+                                            {incentiveEligiblePassengerCount} × PKR {incentivePerPassenger.toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <strong style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>-PKR {totalIncentive.toLocaleString()}</strong>
                                 </div>
                             )}
                             {totalDiscount > 0 && (
-                                <div style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", marginTop: "6px", color: "#059669", fontWeight: 600 }}>
-                                    <span>Discount</span><strong>-PKR {totalDiscount.toLocaleString()}</strong>
+                                <div style={{ marginTop: "8px", color: "#059669" }}>
+                                    <div style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                                        <span>Discount</span><strong>-PKR {totalDiscount.toLocaleString()}</strong>
+                                    </div>
+                                    {booking.passengers.map((p: any, i: number) => (discounts[i] > 0 ? (
+                                        <div key={i} style={{ fontSize: "0.72rem", display: "flex", justifyContent: "space-between", marginTop: "2px", opacity: 0.85 }}>
+                                            <span>{p.title} {p.givenName} {p.surName}</span><span>-PKR {discounts[i].toLocaleString()}</span>
+                                        </div>
+                                    ) : null))}
                                 </div>
                             )}
                             {isExternalSource && (booking.supplierDiscount ?? 0) > 0 && (

@@ -114,6 +114,19 @@ interface GroupTicketSeatsData {
   airline?: string;
   sector?: string;
   pnr?: string;
+  price?: {
+    sellingCurrencyB2B?: string;
+    sellingAdultPriceB2B?: number;
+    sellingChildPriceB2B?: number;
+    sellingInfantPriceB2B?: number;
+  };
+}
+
+interface GroupTicketDetails {
+  airline?: string;
+  sector?: string;
+  pnr?: string;
+  price?: GroupTicketSeatsData["price"];
 }
 
 interface AirlineData {
@@ -542,7 +555,7 @@ const ManageUmrahPackage = () => {
     Map<string, number>
   >(new Map());
   const [groupTicketDetails, setGroupTicketDetails] = useState<
-    Map<string, { airline?: string; sector?: string; pnr?: string }>
+    Map<string, GroupTicketDetails>
   >(new Map());
   const [airlineShortCodeMap, setAirlineShortCodeMap] = useState<
     Map<string, string>
@@ -752,10 +765,7 @@ const ManageUmrahPackage = () => {
           groupTicketRes.value.data?.success
         ) {
           const seatsMap = new Map<string, number>();
-          const detailsMap = new Map<
-            string,
-            { airline?: string; sector?: string; pnr?: string }
-          >();
+          const detailsMap = new Map<string, GroupTicketDetails>();
           (groupTicketRes.value.data.data || []).forEach(
             (ticket: GroupTicketSeatsData) => {
               const ticketId = getId(ticket._id || ticket.id);
@@ -765,6 +775,7 @@ const ManageUmrahPackage = () => {
                 airline: ticket.airline,
                 sector: ticket.sector,
                 pnr: ticket.pnr,
+                price: ticket.price,
               });
             }
           );
@@ -1254,7 +1265,7 @@ const ManageUmrahPackage = () => {
 
     const pnr = ticketInfo?.pnr || "N/A";
 
-    return { airlineShortCode, sector, pnr };
+    return { airlineShortCode, sector, pnr, price: ticketInfo?.price };
   };
 
   return (
@@ -1467,6 +1478,40 @@ const ManageUmrahPackage = () => {
                           <p className="text-xs text-gray-700 dark:text-gray-300">
                             Created At: {formatDate(pkg.createdAt)}
                           </p>
+
+                          {groupTicketInfo.price && (
+                            <div className="w-36 mt-2 overflow-hidden rounded-lg border border-gray-200 text-xs dark:border-gray-700">
+                              <table className="w-full border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                    <th className="px-2 py-1.5 text-left font-bold">
+                                      Ticket
+                                    </th>
+                                    <th className="px-2 py-1.5 pr-6 text-left font-bold">
+                                      Selling
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {[
+                                    { label: "Adult", value: groupTicketInfo.price.sellingAdultPriceB2B },
+                                    { label: "Child", value: groupTicketInfo.price.sellingChildPriceB2B },
+                                    { label: "Infant", value: groupTicketInfo.price.sellingInfantPriceB2B },
+                                  ].map((row) => (
+                                    <tr
+                                      key={row.label}
+                                      className="bg-white dark:bg-gray-900 border-t border-gray-100 text-green-600 dark:border-gray-800 dark:text-green-300"
+                                    >
+                                      <td className="px-2 py-1.5 font-bold">{row.label}</td>
+                                      <td className="px-2 py-1.5 font-semibold">
+                                        {formatMoney(row.value)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       </TableCell>
 
@@ -1502,7 +1547,7 @@ const ManageUmrahPackage = () => {
                               ].map((row) => (
                                 <tr
                                   key={row.label}
-                                  className="border-t border-gray-100 dark:border-gray-800"
+                                  className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800"
                                 >
                                   <td className={`px-2 py-1.5 font-bold ${row.className}`}>
                                     {row.label}

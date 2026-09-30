@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { format } from "date-fns";
 import MaskedDatePicker from "../../components/MaskedDatePicker";
 import { printGDSBooking } from "../../utils/bookingPDFService";
-import { Check } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 // import { generateClientPDF } from "../../utils/genrateclientpdf";
 import TopBar from "../../components/TopBar/TopBar";
 import FlipClockCountdown from "@leenguyen/react-flip-clock-countdown";
@@ -14,6 +14,7 @@ import "@leenguyen/react-flip-clock-countdown/dist/index.css";
 import { theme } from "../../theme/theme";
 import UmrahPackageBookings from "../Frontend/UmrahPackagebooking/UmrahPackageBooking";
 import Select from "react-select";
+import EditPassengersModal from "./EditPassengersModal";
 
 const EMPTY_BOOKING_STATUS_COUNTS = {
   "on hold": 0,
@@ -163,6 +164,18 @@ export default function MyBookings() {
 
   // --- MODAL STATE ---
   const [successModalData, setSuccessModalData] = useState(null);
+  const [editPassengersBooking, setEditPassengersBooking] = useState(null);
+
+  // Passenger details can be edited until a booking is cancelled.
+  const canEditPassengers = (booking) =>
+    ["on hold", "pending", "partially confirmed", "confirmed"].includes(
+      booking.status,
+    );
+
+  const handlePassengersSaved = (bookingId, passengers) =>
+    setBookings((prev) =>
+      prev.map((b) => (b._id === bookingId ? { ...b, passengers } : b)),
+    );
 
   // Get status from URL params
   const activeStatus = searchParams.get("status") || "";
@@ -805,6 +818,16 @@ export default function MyBookings() {
                                     />
                                   </svg>
                                 </button>
+                                {/* Passenger details edit - any status except cancelled */}
+                                {canEditPassengers(booking) && (
+                                  <button
+                                    onClick={() => setEditPassengersBooking(booking)}
+                                    className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
+                                    title="Edit Passenger Details"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                )}
                                 {/* Edit and Delete only for on hold/pending */}
                                 {(booking.status === "on hold" ||
                                   booking.status === "pending") && (
@@ -925,6 +948,14 @@ export default function MyBookings() {
       )}
 
       {activeTab === "umrah" && <UmrahPackageBookings />}
+
+      {editPassengersBooking && (
+        <EditPassengersModal
+          booking={editPassengersBooking}
+          onClose={() => setEditPassengersBooking(null)}
+          onSaved={handlePassengersSaved}
+        />
+      )}
 
       {/* --- BOOKING SUCCESS MODAL --- */}
       {successModalData && (

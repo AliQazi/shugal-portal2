@@ -7,6 +7,7 @@ import {
   updateBookingStatus,
   updateBooking,
   updatePassengerDiscounts,
+  updateBookingPassengerDetails,
   extendBookingHold,
   cancelBooking,
   deleteBooking,
@@ -57,6 +58,9 @@ router.patch("/:id/status", updateBookingStatus);
 
 // Update passenger discounts (manage_bookings permission)
 router.patch("/:id/discounts", updatePassengerDiscounts);
+
+// Edit passenger details (owner/admin; on hold, partially confirmed or confirmed)
+router.patch("/:id/passengers", updateBookingPassengerDetails);
 
 // Extend on-hold booking expiry
 router.patch("/:id/extend-hold", extendBookingHold);

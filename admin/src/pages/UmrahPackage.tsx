@@ -55,6 +55,7 @@ interface GroupTicketing {
   sector?: string;
   totalSeats: number;
   groupType: string;
+  internalStatus?: string;
   flights: Flight[];
   pnr?: string;
   user: {
@@ -1552,7 +1553,19 @@ const UmrahPackage = () => {
                       disabled={loadingGroups}
                     >
                       <option value="">{loadingGroups ? "Loading Umrah groups..." : "Select Umrah group"}</option>
-                      {umrahGroups.map((group) => {
+                      {umrahGroups
+                        // Only Public groups departing today or later are selectable; a copied
+                        // package's already-selected group stays listed so the dropdown doesn't
+                        // render blank.
+                        .filter((group) => {
+                          if (group._id === formik.values.selectedGroupTicketId) return true;
+                          if (group.internalStatus !== "Public") return false;
+                          const depDate = group.flights?.[0]?.depDate;
+                          if (!depDate) return false;
+                          const departure = new Date(depDate);
+                          return !Number.isNaN(departure.getTime()) && departure >= getTodayDate();
+                        })
+                        .map((group) => {
                         const firstFlight = group.flights?.[0];
                         const lastFlight = group.flights?.[group.flights.length - 1];
                         const depLabel = formatFlightDate(firstFlight?.depDate);
@@ -1606,6 +1619,44 @@ const UmrahPackage = () => {
                           )}
                         </div>
                       </div> */}
+
+                      {/* Flight ticket selling fares (B2B) of the selected group - the same
+                          Adult/Child/Infant prices that feed into Package Totals. */}
+                      {(() => {
+                        const price = selectedGroup.price;
+                        const sellingCurrency = price?.sellingCurrencyB2B || "PKR";
+                        const fares = [
+                          { label: "Adult", value: price?.sellingAdultPriceB2B },
+                          { label: "Child", value: price?.sellingChildPriceB2B },
+                          { label: "Infant", value: price?.sellingInfantPriceB2B },
+                        ];
+                        return (
+                          <div className="mb-4">
+                            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-700">
+                              Ticket Pricing (Per Pax)
+                            </p>
+                            {price ? (
+                              <div className="grid grid-cols-3 divide-x divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                {fares.map((fare) => (
+                                  <div
+                                    key={fare.label}
+                                    className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-center sm:flex-row sm:justify-between sm:gap-2 sm:px-3 sm:text-left"
+                                  >
+                                    <span className="text-[11px] font-semibold text-gray-500 sm:text-xs">{fare.label}</span>
+                                    <span className="text-xs font-bold text-green-700 sm:text-sm">
+                                      {sellingCurrency} {Number(fare.value || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs italic text-gray-400">
+                                No pricing set for this group ticket.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div>
                         <p className="text-xs font-bold mb-3 text-gray-700 uppercase tracking-wide flex items-center gap-2">

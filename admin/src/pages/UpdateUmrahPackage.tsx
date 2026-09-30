@@ -45,6 +45,7 @@ interface GroupTicketing {
   sector?: string;
   totalSeats: number;
   groupType: string;
+  internalStatus?: string;
   flights: Flight[];
   pnr?: string;
   user?: { name: string; _id: string };
@@ -1424,7 +1425,20 @@ const UpdateUmrahPackage = () => {
                 disabled={loadingGroups}
               >
                 <option value="">{loadingGroups ? "Loading Umrah groups..." : "Select Umrah group"}</option>
-                {umrahGroups.map((group) => {
+                {umrahGroups
+                  // Only Public groups departing today or later are selectable; the package's
+                  // currently-selected group stays listed so the dropdown doesn't render blank.
+                  .filter((group) => {
+                    if (group._id === formik.values.selectedGroupTicketId) return true;
+                    if (group.internalStatus !== "Public") return false;
+                    const depDate = group.flights?.[0]?.depDate;
+                    if (!depDate) return false;
+                    const departure = new Date(depDate);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return !Number.isNaN(departure.getTime()) && departure >= today;
+                  })
+                  .map((group) => {
                   const firstFlight = group.flights?.[0];
                   const lastFlight = group.flights?.[group.flights.length - 1];
                   const depLabel = formatFlightDate(firstFlight?.depDate);

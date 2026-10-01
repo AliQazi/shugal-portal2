@@ -36,6 +36,46 @@ export const getRecentBookings = async (limit: number = 5) => {
   }
 };
 
+export type TopAgentsRange = "all" | "month" | "30d" | "90d";
+
+export interface AgentSalesBucket {
+  bookings: number;
+  pax: number;
+  revenue: number;
+}
+
+export interface TopAgentRow {
+  agentId: string;
+  companyName: string;
+  name: string;
+  contactName: string;
+  agencyCode: string;
+  status: string;
+  group: AgentSalesBucket;
+  umrah: AgentSalesBucket;
+  total: AgentSalesBucket;
+}
+
+// Top performing agents across Group Ticket + Umrah Package bookings
+export const getTopAgentsReport = async (
+  params: {
+    range?: TopAgentsRange;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+  } = {},
+): Promise<{ success: boolean; data: TopAgentRow[] }> => {
+  try {
+    const response = await axiosInstance.get("/bookings/reports/top-agents", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching top agents report:", error);
+    throw error;
+  }
+};
+
 // Get XO Report data (confirmed Group Ticket bookings)
 export const getXOReport = async (
   params: {

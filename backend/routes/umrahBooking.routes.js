@@ -19,6 +19,8 @@ import {
   updatePassengersLock,
   updatePassengerDetails,
   updateBookingPackageDetails,
+  previewBookingRoomTypeChange,
+  changeBookingRoomType,
 } from "../controllers/umrahBooking.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { uploadUmrahDoc } from "../config/cloudinary.js";
@@ -84,6 +86,8 @@ router.patch(
   updatePassengerDetails,
 );
 router.patch("/:id/package-details", protect, updateBookingPackageDetails);
+router.get("/:id/room-type-change", protect, previewBookingRoomTypeChange);
+router.patch("/:id/room-type", protect, changeBookingRoomType);
 
 router.patch("/savePassengerDiscounts", protect, savePassengerDiscounts);
 

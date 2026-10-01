@@ -188,6 +188,7 @@ const CREATE_EDIT_PERMISSIONS = [
   "dashboard_group_category",
   "dashboard_recent_bookings",
   "dashboard_agent_status_graph",
+  "dashboard_top_agents_report",
   "dashboard_apply_margin",
   "dashboard_copy_sector_data",
   "register_agencies",

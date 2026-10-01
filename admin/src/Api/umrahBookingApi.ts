@@ -218,3 +218,56 @@ export const updateBookingPackageDetails = async (
     throw error;
   }
 };
+
+export type ShiftRoomType = "double" | "triple" | "quad";
+
+export interface RoomTypeChangePreview {
+  bookingNumber: string;
+  currentRoomType: string;
+  newRoomType: ShiftRoomType;
+  passengerCount: number;
+  current: { pricePerPerson: number; totalPrice: number; finalTotal: number };
+  updated: {
+    pricePerPerson: number;
+    lines: { label: string; count: number; unit: number; total: number }[];
+    subtotal: number;
+    incentivePerPassenger: number;
+    incentiveEligibleCount: number;
+    totalIncentive: number;
+    totalDiscount: number;
+    totalPrice: number;
+    finalTotal: number;
+  };
+  difference: number;
+  payment: {
+    paidAmount: number;
+    currentTotalAmount: number;
+    newTotalAmount: number;
+    newRemainingAmount: number;
+  };
+}
+
+// Preview what shifting a Sharing booking to Double/Triple/Quad would change
+// (re-priced breakdown). Read-only - nothing is saved.
+export const previewRoomTypeChange = async (
+  id: string,
+  roomType: ShiftRoomType,
+) => {
+  const response = await axiosInstance.get(
+    `/umrah-bookings/${id}/room-type-change`,
+    { params: { roomType } },
+  );
+  return response.data as { success: boolean; data: RoomTypeChangePreview };
+};
+
+// Shift a Sharing booking to Double/Triple/Quad (admin only, On Hold only).
+// Re-prices the booking and updates the payment total.
+export const changeBookingRoomType = async (
+  id: string,
+  roomType: ShiftRoomType,
+) => {
+  const response = await axiosInstance.patch(`/umrah-bookings/${id}/room-type`, {
+    roomType,
+  });
+  return response.data;
+};

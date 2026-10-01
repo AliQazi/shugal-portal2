@@ -3,6 +3,7 @@ import { ArrowRightIcon, ArrowTopRightOnSquareIcon, Squares2X2Icon, HomeIcon, Us
 import { Link } from "react-router";
 import dayjs from "dayjs";
 import AgentStatusChart from "../../components/charts/AgentStatusChart";
+import TopAgentsReport from "../../components/charts/TopAgentsReport";
 import { useEffect, useState } from "react";
 import axiosInstance from "../../Api/axios";
 import { Modal } from "../../components/ui/modal";
@@ -370,6 +371,9 @@ export default function Home() {
               urgency: getDueUrgency(daysLeft),
             };
           })
+          // Only upcoming dates (today onwards) - dates that have already passed are hidden.
+          .filter((item) => item.daysLeft >= 0)
+          // Nearest due date first.
           .sort((a, b) => dayjs(a.dueDate).valueOf() - dayjs(b.dueDate).valueOf())
           .slice(0, 5);
         setUpcomingDueDates(items);
@@ -757,19 +761,34 @@ export default function Home() {
             </div>
           )}
 
-          {/* Agent Status Chart - MODERN CONTAINER */}
-          {hasPermission(user, "dashboard_agent_status_graph") && (
-            <div className="mb-8">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-8 w-1 rounded-full bg-linear-to-b from-blue-500 to-indigo-600" />
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Agent Performance</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Real-time agent status overview</p>
+          {/* Top Performing Agents (left) + Agent Status (right) */}
+          {(hasPermission(user, "dashboard_top_agents_report") || hasPermission(user, "dashboard_agent_status_graph")) && (
+            <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {hasPermission(user, "dashboard_top_agents_report") && (
+                <div className={`${hasPermission(user, "dashboard_agent_status_graph") ? "lg:col-span-2" : "lg:col-span-3"} bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 border border-gray-100 dark:border-gray-700`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-8 w-1 rounded-full bg-linear-to-b from-emerald-500 to-teal-600" />
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">Top Performing Agents</h2>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Top 10 by sales — Group Ticket + Umrah Package</p>
+                    </div>
                   </div>
+                  <TopAgentsReport />
                 </div>
-                <AgentStatusChart />
-              </div>
+              )}
+
+              {hasPermission(user, "dashboard_agent_status_graph") && (
+                <div className={`${hasPermission(user, "dashboard_top_agents_report") ? "" : "lg:col-span-3"} bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 border border-gray-100 dark:border-gray-700`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-8 w-1 rounded-full bg-linear-to-b from-blue-500 to-indigo-600" />
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-white">Agent Status</h2>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Active vs inactive agents</p>
+                    </div>
+                  </div>
+                  <AgentStatusChart />
+                </div>
+              )}
             </div>
           )}
 

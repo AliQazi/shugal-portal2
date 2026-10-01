@@ -587,6 +587,42 @@ export const getAllBookingsAdmin = async (req, res) => {
 };
 
 /* ===========================
+   SHARED BUYING-COST HELPERS (XO report + ledger voucher)
+   Visa and hotel buying rates are PER PERSON and must scale with the number of
+   passengers, exactly like the per-person selling price in packageTotals.
+   Hotels are charged to adults (booked room type) and children with bed (shared
+   room rate); children without bed and infants only carry ticket + visa.
+=========================== */
+const HOTEL_ROOM_FIELD_BY_ROOM_TYPE = {
+  double: "doubleRoom",
+  triple: "tripleRoom",
+  quad: "quadRoom",
+  sharing: "sharedRoom",
+};
+
+// Buying cost of ONE hotel for ONE person for the whole stay (PKR, rounded)
+const getHotelBuyingPerPax = (hotel, roomField) => {
+  const roomPricing = roomField ? hotel?.[roomField] : null;
+  if (!roomPricing) return 0;
+  const nightCount = hotel.nightCount || hotel.nights || 0;
+  return Math.round(
+    (roomPricing.buyingPrice || 0) * (roomPricing.buyingRoe || 1) * nightCount,
+  );
+};
+
+// Which hotel room rate applies to a passenger (null = no hotel charged)
+const getPaxHotelRoomField = (pax, bookingRoomType) => {
+  if (pax.type === "Infant") return null;
+  if (pax.type === "Child") {
+    return pax.childType === "withBed" ? "sharedRoom" : null;
+  }
+  return HOTEL_ROOM_FIELD_BY_ROOM_TYPE[bookingRoomType] || null;
+};
+
+const getVisaBuyingPerPax = (visa) =>
+  visa ? Math.round((visa.buyingPrice || 0) * (visa.buyingRoe || 1)) : 0;
+
+/* ===========================
    XO REPORT — CONFIRMED UMRAH PACKAGE BOOKINGS
    Reports buying (supplier cost) vs selling (customer price) for confirmed
    Umrah Package bookings, mirroring the cost breakdown used to generate the
@@ -714,12 +750,12 @@ export const getUmrahPackageXOReportData = async (req, res) => {
         const pricePerPerson = Math.round(booking.pricing?.pricePerPerson || 0);
         passengers.forEach((pax) => {
           totalSelling += pricePerPerson;
-          totalDiscount += Number(pax.discount) || 0;
+          totalDiscount += Math.min(Math.max(0, Number(pax.discount) || 0), pricePerPerson);
         });
         const netSellingExternal = totalSelling - totalDiscount;
         totalBuying = Math.max(
           0,
-          netSellingExternal - (Number(booking.supplierDiscount) || 0),
+          netSellingExternal - Math.max(0, Number(booking.supplierDiscount) || 0),
         );
       } else if (pkg) {
         const packageTotals = pkg.packageTotals || {};
@@ -742,55 +778,68 @@ export const getUmrahPackageXOReportData = async (req, res) => {
         };
 
         passengers.forEach((pax) => {
-          totalSelling += getSellingPrice(pax);
-          totalDiscount += Number(pax.discount) || 0;
+          const baseSelling = getSellingPrice(pax);
+          // Discount can never exceed what the passenger was charged
+          const discount = Math.min(Math.max(0, Number(pax.discount) || 0), baseSelling);
+          totalSelling += baseSelling;
+          totalDiscount += discount;
         });
 
-        // BUYING — visa + hotels (by room type & night count) + transports + group ticket (per pax)
+        // BUYING — built per passenger, mirroring exactly what the selling price
+        // (packageTotals) charges that passenger:
+        //   Adult              -> ticket + hotels (booked room type) + visa
+        //   Child with bed     -> child ticket + hotels (shared room rate) + visa
+        //   Child without bed  -> child ticket + visa
+        //   Infant             -> infant ticket + visa
+        // Visa and hotel rates are per person (hotel room rates are already the
+        // per-person share of the room), so they must scale with passenger count.
+        // Transports carry no price in the package schema and are not part of the
+        // selling price, so they contribute no cost here (supplier name only).
         const supplierNames = new Set();
 
-        if (pkg.visa?.buyingPrice) {
-          totalBuying += Math.round((pkg.visa.buyingPrice || 0) * (pkg.visa.buyingRoe || 1));
-          if (pkg.visa.supplier?.name) supplierNames.add(pkg.visa.supplier.name);
-        }
+        const visaBuyingPerPax = getVisaBuyingPerPax(pkg.visa);
+        if (pkg.visa?.supplier?.name) supplierNames.add(pkg.visa.supplier.name);
 
+        const hotelBuyingPerPax = (roomField) =>
+          (pkg.hotels || []).reduce(
+            (sum, hotel) => sum + getHotelBuyingPerPax(hotel, roomField),
+            0,
+          );
         (pkg.hotels || []).forEach((hotel) => {
-          const nightCount = hotel.nightCount || hotel.nights || 0;
-          const roomPricing =
-            {
-              double: hotel.doubleRoom,
-              triple: hotel.tripleRoom,
-              quad: hotel.quadRoom,
-              sharing: hotel.sharedRoom,
-            }[booking.roomType] || null;
-          if (roomPricing) {
-            totalBuying += Math.round(
-              (roomPricing.buyingPrice || 0) * (roomPricing.buyingRoe || 1) * nightCount,
-            );
-          }
           if (hotel.supplier?.name) supplierNames.add(hotel.supplier.name);
         });
-
         (pkg.transports || []).forEach((transport) => {
-          totalBuying += Math.round((transport.buyingPrice || 0) * (transport.buyingRoe || 1));
           if (transport.supplier?.name) supplierNames.add(transport.supplier.name);
         });
+
+        const adultHotelBuying = hotelBuyingPerPax(
+          HOTEL_ROOM_FIELD_BY_ROOM_TYPE[booking.roomType],
+        );
+        const childWithBedHotelBuying = hotelBuyingPerPax("sharedRoom");
 
         const ticket = pkg.selectedGroupTicketId
           ? ticketMap[pkg.selectedGroupTicketId.toString()]
           : null;
+        const buyingAdult = ticket?.price?.buyingAdultPrice || 0;
+        const buyingChild = ticket?.price?.buyingChildPrice || 0;
+        const buyingInfant = ticket?.price?.buyingInfantPrice || 0;
         if (ticket) {
-          const buyingAdult = ticket.price?.buyingAdultPrice || 0;
-          const buyingChild = ticket.price?.buyingChildPrice || 0;
-          const buyingInfant = ticket.price?.buyingInfantPrice || 0;
-          const getTicketBuyingPrice = (type) =>
-            type === "Child" ? buyingChild : type === "Infant" ? buyingInfant : buyingAdult;
-          passengers.forEach((pax) => {
-            totalBuying += getTicketBuyingPrice(pax.type);
-          });
           if (ticket.user?.name) supplierNames.add(ticket.user.name);
           if (ticket.pnr) pnr = ticket.pnr;
         }
+
+        passengers.forEach((pax) => {
+          if (pax.type === "Child") {
+            totalBuying +=
+              buyingChild +
+              visaBuyingPerPax +
+              (pax.childType === "withBed" ? childWithBedHotelBuying : 0);
+          } else if (pax.type === "Infant") {
+            totalBuying += buyingInfant + visaBuyingPerPax;
+          } else {
+            totalBuying += buyingAdult + visaBuyingPerPax + adultHotelBuying;
+          }
+        });
 
         supplierName = supplierNames.size
           ? supplierNames.size <= 2
@@ -1910,13 +1959,11 @@ export const updateOverallStatus = async (req, res) => {
         });
       });
 
-      // VISA CREDIT ENTRY
-      if (linkedPackage.visa) {
+      // VISA CREDIT ENTRY — visa buying rate is per person, so charge every pax
+      if (linkedPackage.visa && passengers.length > 0) {
         const visaSupplierId = linkedPackage.visa?.supplier?._id;
-        const visaCost = Math.round(
-          (linkedPackage.visa.buyingPrice || 0) *
-            (linkedPackage.visa.buyingRoe || 1),
-        );
+        const visaCostPerPax = getVisaBuyingPerPax(linkedPackage.visa);
+        const visaCost = visaCostPerPax * passengers.length;
 
         if (visaSupplierId && visaCost > 0) {
           totalCost += visaCost;
@@ -1924,50 +1971,29 @@ export const updateOverallStatus = async (req, res) => {
             account: visaSupplierId,
             debit: 0,
             credit: visaCost,
-            description: `Visa Expense - ${booking.bookingNumber}`,
+            description: `Visa Expense (${passengers.length} pax x ${visaCostPerPax}) - ${booking.bookingNumber}`,
           });
         }
       }
 
-      // HOTEL CREDIT ENTRIES
+      // HOTEL CREDIT ENTRIES — hotel buying rates are per person (per-person share
+      // of the room), so charge every pax that gets a hotel: adults at the booked
+      // room type and children with bed at the shared rate. Children without bed
+      // and infants carry no hotel (their selling price has none either).
       if (Array.isArray(linkedPackage.hotels)) {
         linkedPackage.hotels.forEach((hotel) => {
           const supplierId = hotel?.supplier?._id;
           let hotelCost = 0;
-          const nightCount = hotel.nightCount || hotel.nights || 0;
+          let hotelPaxCount = 0;
 
-          switch (booking.roomType) {
-            case "double":
-              hotelCost = Math.round(
-                (hotel.doubleRoom?.buyingPrice || 0) *
-                  (hotel.doubleRoom?.buyingRoe || 1) *
-                  nightCount,
-              );
-              break;
-            case "triple":
-              hotelCost = Math.round(
-                (hotel.tripleRoom?.buyingPrice || 0) *
-                  (hotel.tripleRoom?.buyingRoe || 1) *
-                  nightCount,
-              );
-              break;
-            case "quad":
-              hotelCost = Math.round(
-                (hotel.quadRoom?.buyingPrice || 0) *
-                  (hotel.quadRoom?.buyingRoe || 1) *
-                  nightCount,
-              );
-              break;
-            case "sharing":
-              hotelCost = Math.round(
-                (hotel.sharedRoom?.buyingPrice || 0) *
-                  (hotel.sharedRoom?.buyingRoe || 1) *
-                  nightCount,
-              );
-              break;
-            default:
-              hotelCost = 0;
-          }
+          passengers.forEach((pax) => {
+            const roomField = getPaxHotelRoomField(pax, booking.roomType);
+            const paxHotelCost = getHotelBuyingPerPax(hotel, roomField);
+            if (paxHotelCost > 0) {
+              hotelCost += paxHotelCost;
+              hotelPaxCount += 1;
+            }
+          });
 
           if (supplierId && hotelCost > 0) {
             totalCost += hotelCost;
@@ -1975,7 +2001,7 @@ export const updateOverallStatus = async (req, res) => {
               account: supplierId,
               debit: 0,
               credit: hotelCost,
-              description: `Hotel Expense - ${hotel.name} - ${booking.bookingNumber}`,
+              description: `Hotel Expense (${hotelPaxCount} pax) - ${hotel.name} - ${booking.bookingNumber}`,
             });
           }
         });
@@ -2269,6 +2295,247 @@ export const savePassengerDiscounts = async (req, res) => {
    TOGGLE PASSENGERS EDIT LOCK (ADMIN ONLY)
    Admin locks/unlocks whether the agent can edit passenger details
 =========================== */
+/* ===========================
+   SHIFT BOOKING ROOM TYPE (ADMIN ONLY)
+   Sharing -> Double / Triple / Quad, only while the booking is On Hold and only
+   when the passenger count exactly fills the target room (2 / 3 / 4).
+   The booking is re-priced from the linked package's packageTotals using the
+   same selling-price rules as the ledger voucher and XO report, and the payment
+   total is updated to match. The preview and the real change share
+   buildRoomTypeChange so what the admin confirms is exactly what gets saved.
+=========================== */
+const ROOM_TYPE_SHIFT_PAX_COUNT = { double: 2, triple: 3, quad: 4 };
+const ROOM_TYPE_LABELS = {
+  sharing: "Sharing",
+  double: "Double",
+  triple: "Triple",
+  quad: "Quad",
+};
+
+const roomTypeChangeError = (status, message) => {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+};
+
+const buildRoomTypeChange = async (booking, newRoomType, user) => {
+  if (!user?.permissions?.includes("manage_umrah_package_booking")) {
+    throw roomTypeChangeError(
+      403,
+      "You do not have permission to change the room type of a booking",
+    );
+  }
+
+  if (!ROOM_TYPE_SHIFT_PAX_COUNT[newRoomType]) {
+    throw roomTypeChangeError(
+      400,
+      "Room type must be one of: double, triple, quad",
+    );
+  }
+  if ((booking.packageSource || "local-db") !== "local-db") {
+    throw roomTypeChangeError(
+      400,
+      "Room type can only be changed for local package bookings",
+    );
+  }
+  if (booking.overallStatus !== "On Hold") {
+    throw roomTypeChangeError(
+      400,
+      "Room type can only be changed while the booking is On Hold",
+    );
+  }
+  if (booking.roomType !== "sharing") {
+    throw roomTypeChangeError(
+      400,
+      `Only Sharing bookings can be shifted (this booking is ${ROOM_TYPE_LABELS[booking.roomType] || booking.roomType})`,
+    );
+  }
+
+  const passengers = booking.passengers || [];
+  const requiredPax = ROOM_TYPE_SHIFT_PAX_COUNT[newRoomType];
+  if (passengers.length !== requiredPax) {
+    throw roomTypeChangeError(
+      400,
+      `A ${ROOM_TYPE_LABELS[newRoomType]} room needs exactly ${requiredPax} passengers, but this booking has ${passengers.length}`,
+    );
+  }
+
+  const linkedPackage = await GroupTicketing.findById(booking.packageId)
+    .select("packageTotals")
+    .lean();
+  if (!linkedPackage) {
+    throw roomTypeChangeError(404, "Linked package not found");
+  }
+
+  const packageTotals = linkedPackage.packageTotals || {};
+  const incentive = Number(packageTotals.incentive) || 0;
+  const newRoomPrice = Math.round(Number(packageTotals[newRoomType]) || 0);
+  if (newRoomPrice <= 0) {
+    throw roomTypeChangeError(
+      400,
+      `The package has no ${ROOM_TYPE_LABELS[newRoomType]} price set`,
+    );
+  }
+
+  // Gross (pre-incentive) unit prices, as stored on a portal booking
+  const childWithBedGross = Math.round(packageTotals.childWithBed || 0);
+  const childWithoutBedGross = Math.round(packageTotals.childWithoutBed || 0);
+  const infantGross = Math.round(packageTotals.infant || 0);
+
+  const adults = passengers.filter((p) => p.type === "Adult");
+  const children = passengers.filter((p) => p.type === "Child");
+  const childrenWithBed = children.filter((p) => p.childType === "withBed");
+  const childrenWithoutBed = children.filter((p) => p.childType !== "withBed");
+  const infants = passengers.filter((p) => p.type === "Infant");
+
+  const adultTotal = adults.length * newRoomPrice;
+  const childTotal =
+    childrenWithBed.length * childWithBedGross +
+    childrenWithoutBed.length * childWithoutBedGross;
+  const infantTotal = infants.length * infantGross;
+  const subtotal = adultTotal + childTotal + infantTotal;
+
+  // Incentive applies only to adults and children with a bed
+  const incentiveEligibleCount = adults.length + childrenWithBed.length;
+  const totalIncentive = incentive * incentiveEligibleCount;
+  const totalPrice = Math.max(0, subtotal - totalIncentive);
+
+  const totalDiscount = passengers.reduce(
+    (sum, p) => sum + Math.max(0, Number(p.discount) || 0),
+    0,
+  );
+  const finalTotal = Math.max(0, totalPrice - totalDiscount);
+
+  const currentTotalPrice = Number(booking.pricing?.totalPrice) || 0;
+  const currentFinalTotal = Math.max(0, currentTotalPrice - totalDiscount);
+  const paidAmount = Number(booking.paymentStatus?.paidAmount) || 0;
+
+  const lines = [
+    { label: "Adults", count: adults.length, unit: newRoomPrice, total: adultTotal },
+    {
+      label: "Child (w/ Bed)",
+      count: childrenWithBed.length,
+      unit: childWithBedGross,
+      total: childrenWithBed.length * childWithBedGross,
+    },
+    {
+      label: "Child (w/o Bed)",
+      count: childrenWithoutBed.length,
+      unit: childWithoutBedGross,
+      total: childrenWithoutBed.length * childWithoutBedGross,
+    },
+    { label: "Infants", count: infants.length, unit: infantGross, total: infantTotal },
+  ].filter((line) => line.count > 0);
+
+  return {
+    bookingNumber: booking.bookingNumber,
+    currentRoomType: booking.roomType,
+    newRoomType,
+    passengerCount: passengers.length,
+    current: {
+      pricePerPerson: Number(booking.pricing?.pricePerPerson) || 0,
+      totalPrice: currentTotalPrice,
+      finalTotal: currentFinalTotal,
+    },
+    updated: {
+      pricePerPerson: newRoomPrice,
+      lines,
+      subtotal,
+      incentivePerPassenger: incentive,
+      incentiveEligibleCount,
+      totalIncentive,
+      totalDiscount,
+      totalPrice,
+      finalTotal,
+      adultTotal,
+      childTotal,
+      infantTotal,
+    },
+    difference: totalPrice - currentTotalPrice,
+    payment: {
+      paidAmount,
+      currentTotalAmount: Number(booking.paymentStatus?.totalAmount) || 0,
+      newTotalAmount: totalPrice,
+      newRemainingAmount: totalPrice - paidAmount,
+    },
+  };
+};
+
+export const previewBookingRoomTypeChange = async (req, res) => {
+  try {
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Umrah booking not found" });
+    }
+
+    const change = await buildRoomTypeChange(
+      booking,
+      req.query.roomType,
+      req.user,
+    );
+    res.status(200).json({ success: true, data: change });
+  } catch (error) {
+    console.error("Preview Room Type Change Error:", error);
+    res
+      .status(error.status || 400)
+      .json({ success: false, message: error.message });
+  }
+};
+
+export const changeBookingRoomType = async (req, res) => {
+  try {
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Umrah booking not found" });
+    }
+
+    const change = await buildRoomTypeChange(
+      booking,
+      req.body.roomType,
+      req.user,
+    );
+    const { updated } = change;
+
+    booking.roomType = change.newRoomType;
+    booking.pricing.pricePerPerson = updated.pricePerPerson;
+    booking.pricing.adultTotal = updated.adultTotal;
+    booking.pricing.childTotal = updated.childTotal;
+    booking.pricing.infantTotal = updated.infantTotal;
+    booking.pricing.totalPrice = updated.totalPrice;
+    // remainingAmount is recalculated by the model's pre-save hook
+    booking.paymentStatus.totalAmount = updated.totalPrice;
+
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Room type of Umrah booking "${booking.bookingNumber}" changed from ${ROOM_TYPE_LABELS[change.currentRoomType]} to ${ROOM_TYPE_LABELS[change.newRoomType]} (${change.passengerCount} pax); total PKR ${change.current.totalPrice} -> PKR ${updated.totalPrice}`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Room type changed to ${ROOM_TYPE_LABELS[change.newRoomType]}`,
+      data: {
+        roomType: booking.roomType,
+        pricing: booking.pricing,
+        paymentStatus: booking.paymentStatus,
+      },
+    });
+  } catch (error) {
+    console.error("Change Room Type Error:", error);
+    res
+      .status(error.status || 400)
+      .json({ success: false, message: error.message });
+  }
+};
+
 export const updatePassengersLock = async (req, res) => {
   try {
     const { locked } = req.body;

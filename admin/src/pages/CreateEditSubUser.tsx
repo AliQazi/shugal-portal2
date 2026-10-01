@@ -28,6 +28,7 @@ const AVAILABLE_PERMISSIONS: PermissionItem[] = [
   { key: "dashboard_group_category", label: "Dashboard Group Category" },
   { key: "dashboard_recent_bookings", label: "Dashboard Recent Bookings" },
   { key: "dashboard_agent_status_graph", label: "Dashboard Agent Status Graph" },
+  { key: "dashboard_top_agents_report", label: "Dashboard Top Performing Agents Report" },
   { key: "dashboard_apply_margin", label: "Dashboard Apply Margin" },
   { key: "dashboard_copy_sector_data", label: "Dashboard Copy Sector Data" },
 
@@ -118,6 +119,7 @@ const PERMISSION_GROUPS = [
       "dashboard_group_category",
       "dashboard_recent_bookings",
       "dashboard_agent_status_graph",
+      "dashboard_top_agents_report",
       "dashboard_apply_margin",
       "dashboard_copy_sector_data",
       "global_settings",

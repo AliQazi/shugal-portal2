@@ -72,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     dashboard_group_category: true,
     dashboard_recent_bookings: true,
     dashboard_agent_status_graph: true,
+    dashboard_top_agents_report: true,
     dashboard_apply_margin: true,
     dashboard_copy_sector_data: true,
 
@@ -161,6 +162,7 @@ export const ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     dashboard_group_category: true,
     dashboard_recent_bookings: true,
     dashboard_agent_status_graph: true,
+    dashboard_top_agents_report: true,
     dashboard_apply_margin: true,
     dashboard_copy_sector_data: true,
 

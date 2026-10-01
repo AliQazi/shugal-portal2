@@ -21,6 +21,7 @@ import {
 import { protect } from "../middleware/auth.middleware.js";
 import { uploadPassengerDoc } from "../config/cloudinary.js";
 import { getBookedSeats } from "../controllers/umrahBooking.controller.js";
+import { getTopAgentsReport } from "../controllers/agentPerformance.controller.js";
 
 const router = express.Router();
 
@@ -36,6 +37,9 @@ router.get("/statistics", getBookingStatistics);
 
 // XO Report — confirmed Group Ticket bookings (view_bookings permission)
 router.get("/reports/xo", getXOReportData);
+
+// Top performing agents — Group Ticket + Umrah Package (dashboard)
+router.get("/reports/top-agents", getTopAgentsReport);
 
 // Get booking by reference number (view_bookings permission)
 router.get("/reference/:reference", getBookingByReference);

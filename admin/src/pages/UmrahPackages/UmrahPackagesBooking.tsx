@@ -12,6 +12,10 @@ import {
     savePassengerDiscounts,
     updatePassengersLock,
     updateBookingPackageDetails,
+    previewRoomTypeChange,
+    changeBookingRoomType,
+    type ShiftRoomType,
+    type RoomTypeChangePreview,
 } from "../../Api/umrahBookingApi";
 import axiosInstance from "../../Api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -25,6 +29,7 @@ import {
     MagnifyingGlassIcon, ChartBarIcon, CurrencyDollarIcon,
     IdentificationIcon, BuildingLibraryIcon, PrinterIcon,
     LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon, TrashIcon,
+    ArrowsRightLeftIcon,
 } from "@heroicons/react/24/outline";
 
 interface Passenger {
@@ -348,6 +353,27 @@ export default function UmrahPackagesBooking() {
         if (!canManage) { toast.error("No permission"); return; }
         try { const res = await savePassengerDiscounts(bookingId, passengers); setBookings(prev => prev.map(b => { if (b._id !== bookingId) return b; return { ...b, passengers: b.passengers.map(p => { const match = res.data.find((up: any) => up.passport === p.passport); return match ? { ...p, discount: match.discount } : p; }) }; })); toast.success("Discounts saved"); }
         catch (error: any) { toast.error(error.response?.data?.message); throw error; }
+    };
+
+    // Shifts a Sharing booking to Double/Triple/Quad. The server re-prices the
+    // booking and updates the payment total; merge those back into the list and
+    // into the open Details modal so everything on screen reflects the change.
+    const handleChangeRoomType = async (bookingId: string, roomType: ShiftRoomType) => {
+        if (!canManage) { toast.error("No permission"); return; }
+        try {
+            const res = await changeBookingRoomType(bookingId, roomType);
+            const patch = {
+                roomType: res.data.roomType,
+                pricing: res.data.pricing,
+                paymentStatus: res.data.paymentStatus,
+            };
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, ...patch } : b));
+            setDetailsModal(prev => prev && prev._id === bookingId ? { ...prev, ...patch } : prev);
+            toast.success(res.message || "Room type updated");
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to change room type");
+            throw error;
+        }
     };
 
     const handleSavePackageDetails = async (
@@ -934,7 +960,7 @@ export default function UmrahPackagesBooking() {
                 </>
             )}
 
-            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} onSavePackageDetails={handleSavePackageDetails} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
+            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} onSavePackageDetails={handleSavePackageDetails} onChangeRoomType={handleChangeRoomType} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
             {paymentHistoryBooking && <PaymentHistoryModal booking={paymentHistoryBooking} onClose={() => setPaymentHistoryBooking(null)} />}
             {modalData && <StatusModal modalData={modalData} onClose={() => setModalData(null)} onSuccess={() => { fetchBookings(); setModalData(null); }} />}
         </div>
@@ -942,8 +968,10 @@ export default function UmrahPackagesBooking() {
 }
 
 // Details Modal with ALL functionality
-function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, onSavePackageDetails, extendingHoldId, timers, onUpdate }: any) {
+function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, onSavePackageDetails, onChangeRoomType, extendingHoldId, timers, onUpdate }: any) {
     const [discounts, setDiscounts] = useState<number[]>(booking.passengers.map((p: any) => p.discount ?? 0));
+    // Target room type of the "Shift Room Type" confirmation dialog (null = closed)
+    const [shiftRoomType, setShiftRoomType] = useState<ShiftRoomType | null>(null);
     const [savingDiscounts, setSavingDiscounts] = useState(false);
     const timer = timers[booking._id] || calculateTimer(booking.expiresAt);
     const packageDetails: UmrahPackageDetails | null =
@@ -1155,6 +1183,12 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
 
     const isExternalSource = booking.packageSource && booking.packageSource !== "local-db";
     const sourceLabel = supplierSourceLabel(booking.packageSource);
+    // Room type shift (Sharing -> Double/Triple/Quad): admin only, On Hold only, and
+    // the passenger count must exactly fill the target room (2 / 3 / 4).
+    const showRoomTypeShift =
+        canManage && !isExternalSource && booking.roomType === "sharing" && booking.overallStatus === "On Hold";
+    const shiftTargetRoomType: ShiftRoomType | null =
+        ({ 2: "double", 3: "triple", 4: "quad" } as Record<number, ShiftRoomType>)[booking.passengers.length] || null;
     const travelNetworkBookingId =
         booking.travelNetworkBookingId || booking.travelNetworkBookingData?.data?.id || booking.zipBookingId || booking.zipBookingData?.data?.id;
     const upskyBookingId =
@@ -1392,6 +1426,30 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                         <option value="30">+30 minutes</option><option value="60">+1 hour</option>
                                         <option value="120">+2 hours</option><option value="180">+3 hours</option>
                                     </select>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Room type shift (Sharing -> Double / Triple / Quad) */}
+                        {showRoomTypeShift && (
+                            <div style={{ ...sectionCard, padding: "10px 14px", background: "#F5F3FF", border: "1px solid #DDD6FE", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, fontSize: "0.78rem", color: "#5B21B6" }}>
+                                    <ArrowsRightLeftIcon style={{ width: 14, height: 14 }} /> Room Type
+                                </div>
+                                <span style={{ background: "white", padding: "3px 10px", borderRadius: "6px", border: "1px solid #DDD6FE", fontSize: "0.76rem", fontWeight: 700, color: "#0F172A" }}>Sharing</span>
+                                {shiftTargetRoomType ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShiftRoomType(shiftTargetRoomType)}
+                                        style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#7C3AED", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "0.76rem", fontWeight: 700 }}
+                                    >
+                                        <ArrowsRightLeftIcon style={{ width: 13, height: 13 }} />
+                                        Shift to {shiftTargetRoomType.charAt(0).toUpperCase() + shiftTargetRoomType.slice(1)} ({booking.passengers.length} pax)
+                                    </button>
+                                ) : (
+                                    <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#6D28D9" }}>
+                                        Shifting needs exactly 2 (Double), 3 (Triple) or 4 (Quad) passengers — this booking has {booking.passengers.length}.
+                                    </span>
                                 )}
                             </div>
                         )}
@@ -1737,6 +1795,196 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {shiftRoomType && (
+                <RoomTypeShiftModal
+                    booking={booking}
+                    roomType={shiftRoomType}
+                    onClose={() => setShiftRoomType(null)}
+                    onConfirm={async () => {
+                        await onChangeRoomType(booking._id, shiftRoomType);
+                        setShiftRoomType(null);
+                    }}
+                />
+            )}
+        </>
+    );
+}
+
+const roomTypeLabel = (roomType: string) => roomType.charAt(0).toUpperCase() + roomType.slice(1);
+
+// Confirmation dialog for shifting a Sharing booking to Double / Triple / Quad.
+// Loads the server-computed re-pricing so the admin sees the complete before/after
+// (passengers, line items, incentive, discounts, payment impact) before saving.
+function RoomTypeShiftModal({ booking, roomType, onClose, onConfirm }: {
+    booking: UmrahBooking;
+    roomType: ShiftRoomType;
+    onClose: () => void;
+    onConfirm: () => Promise<void>;
+}) {
+    const [preview, setPreview] = useState<RoomTypeChangePreview | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError("");
+        previewRoomTypeChange(booking._id, roomType)
+            .then((res) => { if (!cancelled) setPreview(res.data); })
+            .catch((err: { response?: { data?: { message?: string } } }) => {
+                if (!cancelled) setError(err.response?.data?.message || "Failed to load the price preview");
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [booking._id, roomType]);
+
+    const handleConfirm = async () => {
+        setSubmitting(true);
+        try { await onConfirm(); }
+        catch { /* error toast already shown by the caller */ }
+        finally { setSubmitting(false); }
+    };
+
+    const money = (n: number) => `PKR ${Math.round(n || 0).toLocaleString()}`;
+    const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", fontSize: "0.8rem", marginBottom: "8px" };
+    const card: React.CSSProperties = { border: "1px solid #E2E8F0", borderRadius: "10px", padding: "12px 14px", marginBottom: "10px" };
+    const cardTitle: React.CSSProperties = { fontSize: "0.68rem", fontWeight: 800, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" };
+    const diff = preview?.difference ?? 0;
+    const diffColor = diff > 0 ? "#B45309" : diff < 0 ? "#059669" : "#475569";
+
+    return (
+        <>
+            <div onClick={submitting ? undefined : onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999998, backdropFilter: "blur(2px)" }} />
+            <div style={{
+                position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                width: "min(620px, 94vw)", maxHeight: "92vh", display: "flex", flexDirection: "column",
+                background: "white", borderRadius: "16px", zIndex: 9999999, boxShadow: "0 24px 48px rgba(0,0,0,0.25)", overflow: "hidden",
+            }}>
+                <div style={{ padding: "16px 20px", background: "linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                    <div>
+                        <h3 style={{ margin: 0, color: "white", fontSize: "1rem", fontWeight: 700 }}>
+                            Shift Room Type • #{booking.bookingNumber}
+                        </h3>
+                        <div style={{ marginTop: "4px", fontSize: "0.78rem", color: "rgba(255,255,255,0.85)", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ background: "rgba(255,255,255,0.18)", padding: "2px 10px", borderRadius: "999px", fontWeight: 700 }}>Sharing</span>
+                            <ArrowsRightLeftIcon style={{ width: 14, height: 14 }} />
+                            <span style={{ background: "white", color: "#5B21B6", padding: "2px 10px", borderRadius: "999px", fontWeight: 800 }}>{roomTypeLabel(roomType)}</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} disabled={submitting} style={{ border: "none", background: "rgba(255,255,255,0.15)", borderRadius: "8px", padding: "7px", cursor: "pointer", display: "flex" }}>
+                        <XMarkIcon style={{ width: 16, height: 16, color: "white" }} />
+                    </button>
+                </div>
+
+                <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+                    {loading && (
+                        <div style={{ padding: "30px", textAlign: "center", color: "#64748B", fontSize: "0.85rem" }}>Calculating new pricing...</div>
+                    )}
+
+                    {!loading && error && (
+                        <div style={{ padding: "12px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "9px", color: "#B91C1C", fontSize: "0.82rem", fontWeight: 600 }}>{error}</div>
+                    )}
+
+                    {!loading && preview && (
+                        <>
+                            <div style={card}>
+                                <div style={cardTitle}>Passengers ({preview.passengerCount})</div>
+                                {booking.passengers.map((p, i) => (
+                                    <div key={i} style={{ ...row, marginBottom: "4px" }}>
+                                        <span style={{ fontWeight: 600, color: "#0F172A" }}>{i + 1}. {p.title} {p.givenName} {p.surName}</span>
+                                        <span style={{ color: "#64748B", fontSize: "0.74rem" }}>
+                                            {p.type === "Child" ? `Child (${p.childType === "withBed" ? "w/ Bed" : "w/o Bed"})` : p.type}
+                                            {(p.discount || 0) > 0 ? ` • disc ${money(p.discount || 0)}` : ""}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div style={card}>
+                                <div style={cardTitle}>New Pricing — {roomTypeLabel(roomType)}</div>
+                                {preview.updated.lines.map((line) => (
+                                    <div key={line.label} style={row}>
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: "#0F172A" }}>{line.label}</div>
+                                            <div style={{ fontSize: "0.72rem", color: "#64748B", marginTop: "2px" }}>{line.count} × {money(line.unit)}</div>
+                                        </div>
+                                        <strong style={{ color: "#4a5568", whiteSpace: "nowrap" }}>{money(line.total)}</strong>
+                                    </div>
+                                ))}
+                                <div style={{ ...row, paddingTop: "8px", borderTop: "1px solid #E2E8F0", fontWeight: 700 }}>
+                                    <span>Subtotal</span><strong>{money(preview.updated.subtotal)}</strong>
+                                </div>
+                                {preview.updated.totalIncentive > 0 && (
+                                    <div style={{ ...row, color: "#059669" }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>Incentive (Adults + Child W/ Bed)</div>
+                                            <div style={{ fontSize: "0.72rem", opacity: 0.85, marginTop: "2px" }}>
+                                                {preview.updated.incentiveEligibleCount} × {money(preview.updated.incentivePerPassenger)}
+                                            </div>
+                                        </div>
+                                        <strong style={{ whiteSpace: "nowrap" }}>-{money(preview.updated.totalIncentive)}</strong>
+                                    </div>
+                                )}
+                                <div style={{ ...row, paddingTop: "8px", borderTop: "1px solid #E2E8F0", fontWeight: 700 }}>
+                                    <span>Booking Total</span><strong>{money(preview.updated.totalPrice)}</strong>
+                                </div>
+                                {preview.updated.totalDiscount > 0 && (
+                                    <>
+                                        <div style={{ ...row, color: "#059669" }}>
+                                            <span style={{ fontWeight: 600 }}>Discount (already applied)</span>
+                                            <strong>-{money(preview.updated.totalDiscount)}</strong>
+                                        </div>
+                                        <div style={{ ...row, fontWeight: 800, color: "#0F172A", marginBottom: 0 }}>
+                                            <span>Final Total</span><strong>{money(preview.updated.finalTotal)}</strong>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div style={{ ...card, background: "#F8FAFC" }}>
+                                <div style={cardTitle}>Change Summary</div>
+                                <div style={row}>
+                                    <span style={{ color: "#64748B" }}>Current total (Sharing)</span>
+                                    <strong>{money(preview.current.totalPrice)}</strong>
+                                </div>
+                                <div style={row}>
+                                    <span style={{ color: "#64748B" }}>New total ({roomTypeLabel(roomType)})</span>
+                                    <strong>{money(preview.updated.totalPrice)}</strong>
+                                </div>
+                                <div style={{ ...row, paddingTop: "8px", borderTop: "1px solid #E2E8F0", fontWeight: 800, color: diffColor, marginBottom: "8px" }}>
+                                    <span>{diff > 0 ? "Increase" : diff < 0 ? "Decrease" : "No price change"}</span>
+                                    <strong>{diff > 0 ? "+" : diff < 0 ? "-" : ""}{money(Math.abs(diff))}</strong>
+                                </div>
+                                <div style={row}>
+                                    <span style={{ color: "#64748B" }}>Payment received so far</span>
+                                    <strong>{money(preview.payment.paidAmount)}</strong>
+                                </div>
+                                <div style={{ ...row, marginBottom: 0 }}>
+                                    <span style={{ color: "#64748B" }}>Remaining after shift</span>
+                                    <strong>{money(preview.payment.newRemainingAmount)}</strong>
+                                </div>
+                            </div>
+
+                            <div style={{ fontSize: "0.72rem", color: "#92400E", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "8px", padding: "8px 10px" }}>
+                                This updates the room type, the booking total and the payment amount due. It cannot be undone from here.
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div style={{ padding: "12px 20px", borderTop: "1px solid #E2E8F0", display: "flex", gap: "10px" }}>
+                    <button
+                        type="button" onClick={onClose} disabled={submitting}
+                        style={{ flex: 1, padding: "10px", borderRadius: "9px", border: "1px solid #E2E8F0", background: "white", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, color: "#475569" }}
+                    >Cancel</button>
+                    <button
+                        type="button" onClick={handleConfirm} disabled={submitting || loading || !preview}
+                        style={{ flex: 2, padding: "10px", borderRadius: "9px", border: "none", background: "#7C3AED", color: "white", fontSize: "0.82rem", fontWeight: 700, cursor: submitting || loading || !preview ? "not-allowed" : "pointer", opacity: submitting || loading || !preview ? 0.6 : 1 }}
+                    >{submitting ? "Shifting..." : `Confirm Shift to ${roomTypeLabel(roomType)}`}</button>
                 </div>
             </div>
         </>

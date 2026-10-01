@@ -65,7 +65,7 @@ export default function AgentStatusChart() {
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "donut",
-      height: 280,
+      height: 260,
     },
     colors: ["#10b981", "#ef4444"],
     labels: ["Active Agents", "Inactive Agents"],
@@ -124,7 +124,7 @@ export default function AgentStatusChart() {
         breakpoint: 640,
         options: {
           chart: {
-            height: 250,
+            height: 240,
           },
           legend: {
             position: "bottom",
@@ -146,27 +146,15 @@ export default function AgentStatusChart() {
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-        <div className="flex justify-center items-center h-[280px]">
-          <div className="text-gray-500 dark:text-gray-400">Loading agent statistics...</div>
-        </div>
+      <div className="flex justify-center items-center h-65">
+        <div className="text-gray-500 dark:text-gray-400 text-sm">Loading agent statistics...</div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-      <div className="mb-4">
-        <h4 className="text-xl font-semibold text-black dark:text-white">
-          Agent Status Overview
-        </h4>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Distribution of active and inactive agents
-        </p>
-      </div>
-      <div className="flex justify-center">
-        <Chart options={options} series={series} type="donut" height={280} />
-      </div>
+    <div className="flex justify-center">
+      <Chart options={options} series={series} type="donut" height={260} />
     </div>
   );
 }

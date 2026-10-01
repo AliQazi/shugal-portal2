@@ -893,36 +893,9 @@ const UmrahPackage = () => {
       toast.success("Package successfully submitted and copied!");
       console.log("Package created:", res.data.package);
 
-      // Partial reset - reset package name, logo, hotels, and room pricing
-      formik.setFieldValue("packageName", "");
-      formik.setFieldValue("logo", "");
-      formik.setFieldValue("hotels", [{
-        name: "",
-        supplier: { name: "", _id: "" },
-        location: { city: "", mapUrl: "" },
-        rating: 0,
-        checkIn: "",
-        checkOut: "",
-        nights: 0,
-        nightCount: 0,
-        buyingPrice: undefined,
-        buyingRoe: 1,
-        buyingCurrency: "PKR",
-        sellingPrice: undefined,
-        sellingRoe: 1,
-        sellingCurrency: "PKR",
-        currency: "PKR",
-        doubleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-        tripleRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-        quadRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-        sharedRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
-      }]);
-      formik.setFieldValue("rooms", { sharing: "", quad: "", quint: "", triple: "", double: "", childWithoutPackage: "", InfantWithoutPackage: "" });
-
-      const logoInput = document.getElementById("logoInput") as HTMLInputElement;
-      if (logoInput) logoInput.value = "";
-
-      // Keep flight logo, flights, transports, availableRooms, days as they are
+      // Save and Copy deliberately leaves the whole form exactly as it is (group
+      // ticket, package name, hotels, transports, visa, totals, status) so the admin
+      // can tweak a few fields and save the next, similar package.
     } catch (error: any) {
       console.error(error);
       const errorMessage = error.response?.data?.error ||
@@ -1113,8 +1086,78 @@ const UmrahPackage = () => {
     sharedRoom: { buyingPrice: 0, buyingRoe: 1, sellingPrice: 0, sellingRoe: 1 },
   });
 
+  // Chains hotel stays together: whenever hotel N's check-out changes, hotel N+1's
+  // check-in becomes that date. Hotel N+1 keeps its own check-out and its nights are
+  // recalculated (so nights shrink/grow); if the new check-in leaves no valid stay
+  // before that check-out, its previous nights are kept and the check-out shifts
+  // instead. A row with no check-out yet but with nights gets its check-out derived.
+  // The cascade continues down the list only while a row's check-out actually moved.
+  // Mutates `hotels` in place (rows it touches are replaced with copies) and returns
+  // the indexes of the rows it changed.
+  const cascadeHotelDates = (hotels: HotelForm[], fromIndex: number): number[] => {
+    const changedIndexes: number[] = [];
+    for (let j = fromIndex + 1; j < hotels.length; j++) {
+      const previousCheckOut = hotels[j - 1].checkOut;
+      if (!previousCheckOut) break;
+
+      const next = { ...hotels[j] };
+      const oldCheckOut = next.checkOut;
+      const oldNights = Number(next.nights) || 0;
+      next.checkIn = previousCheckOut;
+
+      if (next.checkOut) {
+        const nights = calculateNights(next.checkIn, next.checkOut);
+        if (nights > 0) {
+          next.nights = nights;
+          next.nightCount = nights;
+        } else if (oldNights > 0) {
+          next.checkOut = calculateCheckOut(next.checkIn, oldNights);
+        } else {
+          next.checkOut = "";
+          next.nights = 0;
+          next.nightCount = 0;
+        }
+      } else if (oldNights > 0) {
+        next.checkOut = calculateCheckOut(next.checkIn, oldNights);
+      }
+
+      hotels[j] = next;
+      changedIndexes.push(j);
+      if (next.checkOut === oldCheckOut) break;
+    }
+    return changedIndexes;
+  };
+
+  // Auto-applies (or re-validates) the Rate Volume for a hotel row whose stay dates
+  // just changed. Mutates `row`.
+  const reapplyRateVolumeForDates = (row: HotelForm, index: number) => {
+    const resolvedHotelIdForDates = resolveHotelId(row);
+    if (resolvedHotelIdForDates && row.checkIn && row.checkOut) {
+      const selectedVolumeId = selectedRateVolumeByHotel[index];
+      const selectedOption = selectedVolumeId
+        ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
+        : undefined;
+      const selectedRate = selectedOption
+        ? findHotelRateInVolume(selectedOption.data, resolvedHotelIdForDates, row.checkIn, row.checkOut)
+        : undefined;
+      const match = selectedOption
+        ? selectedRate ? { option: selectedOption, rate: selectedRate } : undefined
+        : findMatchingRateVolume(resolvedHotelIdForDates, row.checkIn, row.checkOut);
+      if (match) {
+        Object.assign(row, computeVolumeFields(row, match.option.data.volumeName, match.rate));
+        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
+      } else if (selectedOption) {
+        Object.assign(row, emptyRateFields());
+        toast.error(
+          `"${selectedOption.data.volumeName}" has no rate band covering every night from ${formatFlightDate(row.checkIn)} to ${formatFlightDate(row.checkOut)}. Rates were cleared. Add a date band for the missing nights.`
+        );
+      }
+    }
+  };
+
   const updateHotel = (index: number, fields: Partial<HotelForm>) => {
     const updated = [...formik.values.hotels];
+    const previousCheckOut = updated[index].checkOut;
     updated[index] = { ...updated[index], ...fields };
 
     const row = updated[index];
@@ -1149,30 +1192,22 @@ const UmrahPackage = () => {
       Object.prototype.hasOwnProperty.call(fields, "checkIn") ||
       Object.prototype.hasOwnProperty.call(fields, "checkOut") ||
       Object.prototype.hasOwnProperty.call(fields, "nights");
-    const resolvedHotelIdForDates = datesChanged ? resolveHotelId(row) : undefined;
-    if (datesChanged && resolvedHotelIdForDates && row.checkIn && row.checkOut) {
-      const selectedVolumeId = selectedRateVolumeByHotel[index];
-      const selectedOption = selectedVolumeId
-        ? rateVolumeOptions.find((option) => option.value === selectedVolumeId)
-        : undefined;
-      const selectedRate = selectedOption
-        ? findHotelRateInVolume(selectedOption.data, resolvedHotelIdForDates, row.checkIn, row.checkOut)
-        : undefined;
-      const match = selectedOption
-        ? selectedRate ? { option: selectedOption, rate: selectedRate } : undefined
-        : findMatchingRateVolume(resolvedHotelIdForDates, row.checkIn, row.checkOut);
-      if (match) {
-        Object.assign(row, computeVolumeFields(row, match.option.data.volumeName, match.rate));
-        setSelectedRateVolumeByHotel((prev) => ({ ...prev, [index]: match.option.value }));
-      } else if (selectedOption) {
-        Object.assign(row, emptyRateFields());
-        toast.error(
-          `"${selectedOption.data.volumeName}" has no rate band covering every night from ${formatFlightDate(row.checkIn)} to ${formatFlightDate(row.checkOut)}. Rates were cleared. Add a date band for the missing nights.`
-        );
-      }
+    if (datesChanged) {
+      reapplyRateVolumeForDates(row, index);
     }
 
     updated[index] = row;
+
+    // If this hotel's check-out moved, carry the change down to the following hotels
+    // (check-in/check-out/nights), re-checking their Rate Volumes for the new dates.
+    if (datesChanged && row.checkOut !== previousCheckOut) {
+      cascadeHotelDates(updated, index).forEach((changedIndex) => {
+        const changedRow = { ...updated[changedIndex] };
+        reapplyRateVolumeForDates(changedRow, changedIndex);
+        updated[changedIndex] = changedRow;
+      });
+    }
+
     formik.setFieldValue("hotels", updated);
   };
 
@@ -1545,6 +1580,8 @@ const UmrahPackage = () => {
                               firstHotel.checkOut = calculateCheckOut(isoCheckIn, firstHotel.nights);
                             }
                             updatedHotels[0] = firstHotel;
+                            // Keep later hotels chained to the first hotel's new check-out.
+                            cascadeHotelDates(updatedHotels, 0);
                             formik.setFieldValue("hotels", updatedHotels);
                           }
                         }
@@ -2297,11 +2334,20 @@ const UmrahPackage = () => {
                           // chain together instead of both defaulting to blank.
                           const hotels = formik.values.hotels;
                           const previousHotel = hotels[hotels.length - 1];
+                          // The new hotel's Rate Volume dropdown starts on the previous
+                          // hotel's selection (still changeable).
+                          const previousVolumeId = selectedRateVolumeByHotel[hotels.length - 1];
+                          if (previousVolumeId) {
+                            setSelectedRateVolumeByHotel((prev) => ({ ...prev, [hotels.length]: previousVolumeId }));
+                          }
                           formik.setFieldValue("hotels", [
                             ...hotels,
                             {
                               name: "",
-                              supplier: { name: "", _id: "" },
+                              // Starts with the previous hotel's supplier (still changeable).
+                              supplier: previousHotel?.supplier
+                                ? { ...previousHotel.supplier }
+                                : { name: "", _id: "" },
                               location: { city: "", mapUrl: "" },
                               rating: 0,
                               checkIn: previousHotel?.checkOut || "",
@@ -2471,10 +2517,16 @@ const UmrahPackage = () => {
                             isClearable
                             isSearchable
                             className="text-xs"
+                            // The Visa card has overflow-hidden, so render the menu in a portal
+                            // to stop it being clipped (same as the Supplier dropdown beside it).
+                            menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                            menuPosition="fixed"
                             styles={{
                               control: (base) => ({ ...base, minHeight: "36px", fontSize: "0.75rem" }),
                               valueContainer: (base) => ({ ...base, padding: "0 8px" }),
                               input: (base) => ({ ...base, margin: "0", padding: "0" }),
+                              menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+                              menu: (base) => ({ ...base, zIndex: 99999 }),
                             }}
                           />
                           {formik.errors.visa && formik.touched.visa && (

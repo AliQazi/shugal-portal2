@@ -19,6 +19,13 @@ import {
   acquireGroupSeatLock,
   assertGroupSeatsAvailable,
 } from "../utils/groupSeatLock.js";
+import {
+  REFUND_COUNTS_STAGE,
+  ACTIVE_SEATS,
+  ACTIVE_ADULTS,
+  ACTIVE_CHILDREN,
+  ACTIVE_INFANTS,
+} from "../utils/bookingSeatStats.js";
 
 /* ===========================
    HELPER: Parse FormData fields with bracket notation
@@ -2812,22 +2819,17 @@ export const getBookedSeats = async (req, res) => {
           status: { $nin: ["cancelled"] },
         },
       },
+      // Refunded passengers no longer hold a seat
+      REFUND_COUNTS_STAGE,
       {
         $group: {
           _id: "$groupId",
           groupId: { $first: "$groupId" },
           groupType: { $first: "$groupType" },
-          totalSeats: {
-            $sum: {
-              $add: [
-                { $ifNull: ["$adultsCount", 0] },
-                { $ifNull: ["$childrenCount", 0] },
-              ],
-            },
-          },
-          totalAdults: { $sum: "$adultsCount" },
-          totalChildren: { $sum: "$childrenCount" },
-          totalInfants: { $sum: "$infantsCount" },
+          totalSeats: { $sum: ACTIVE_SEATS },
+          totalAdults: { $sum: ACTIVE_ADULTS },
+          totalChildren: { $sum: ACTIVE_CHILDREN },
+          totalInfants: { $sum: ACTIVE_INFANTS },
           bookings: { $sum: 1 },
         },
       },

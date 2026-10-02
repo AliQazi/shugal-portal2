@@ -4,6 +4,7 @@ import GroupTicketing from "../models/GroupTicketing.js";
 import UmrahPackage from "../models/umrahPackgemodel.js";
 import UmrahPackageBooking from "../models/UmrahPackageBooking.js";
 import SeatLock from "../models/SeatLock.js";
+import { REFUND_COUNTS_STAGE, ACTIVE_SEATS } from "./bookingSeatStats.js";
 
 const LOCK_TTL_MS = 20 * 1000;
 const LOCK_WAIT_MS = 15 * 1000;
@@ -70,19 +71,8 @@ export const getGroupBookedSeats = async (groupId) => {
   const [directRows, linkedPackages] = await Promise.all([
     Booking.aggregate([
       { $match: { groupId: gid, status: { $nin: ["cancelled"] } } },
-      {
-        $group: {
-          _id: null,
-          seats: {
-            $sum: {
-              $add: [
-                { $ifNull: ["$adultsCount", 0] },
-                { $ifNull: ["$childrenCount", 0] },
-              ],
-            },
-          },
-        },
-      },
+      REFUND_COUNTS_STAGE, // refunded passengers no longer hold a seat
+      { $group: { _id: null, seats: { $sum: ACTIVE_SEATS } } },
     ]),
     UmrahPackage.find({ selectedGroupTicketId: gid }).select("_id").lean(),
   ]);

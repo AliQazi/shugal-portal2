@@ -196,12 +196,10 @@ export default function GroupPassengerList() {
           filtered.forEach((booking) => {
             const agency = getAgencyName(booking);
             const refundedIndices = booking.refundedPassengerIndices || [];
-            const isConfirmed = (booking.status || "").toLowerCase() === "confirmed";
 
             (booking.passengers || []).forEach((passenger, idx) => {
-              // Preserve the refund record, but include passengers
-              // reactivated by the booking's latest Confirmed status.
-              if (!isConfirmed && isPassengerRefunded(idx, refundedIndices)) return;
+              // Refunded passengers no longer travel, whatever the booking status
+              if (isPassengerRefunded(idx, refundedIndices)) return;
 
               masterList.push({
                 title: passenger.title || "",

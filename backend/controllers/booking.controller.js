@@ -2607,7 +2607,9 @@ export const refundBookingVoucher = async (req, res) => {
       transactions,
     };
 
-    const response = await zipAccountsService.createVoucher(voucherData);
+    // Unposted, like the confirmation voucher — reviewed/posted manually in
+    // ZIP Accounts before it hits the ledger
+    const response = await zipAccountsService.createUnpostedVoucher(voucherData);
 
     // Persist refunded passenger index
     await Booking.findByIdAndUpdate(req.params.id, {

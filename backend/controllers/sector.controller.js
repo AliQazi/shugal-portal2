@@ -14,6 +14,7 @@ import {
 import { fetchNormalisedMCTGroups } from "../utils/mct.js";
 import { fetchNormalisedUpSkyGroups } from "../utils/upsky.js";
 import { applyPricingRules } from "../utils/applyPricingRules.js";
+import { getActiveSeatCounts } from "../utils/bookingSeatStats.js";
 import { fetchNormalisedALSABOORGroups } from "../utils/Al-Saboor.js";
 import { fetchNormalisedAmaarShoaibGroups } from "../utils/Amaar-Shoaib.js";
 
@@ -423,7 +424,8 @@ const buildAdminGroupsChunk = async () => {
     const totalHeldSeatsMap = {};
     for (const booking of bookings) {
       const gid = booking.groupId;
-      const seatsHeld = booking.adultsCount + booking.childrenCount;
+      // Refunded passengers no longer hold a seat
+      const seatsHeld = getActiveSeatCounts(booking).seats;
       totalHeldSeatsMap[gid] = (totalHeldSeatsMap[gid] || 0) + seatsHeld;
     }
 
@@ -448,8 +450,7 @@ const buildAdminGroupsChunk = async () => {
           const depDateStr = new Date(depDate).toISOString().split("T")[0];
           const key = flightNo + "|" + depDateStr;
           bookedMap[gid][key] =
-            (bookedMap[gid][key] || 0) +
-            (booking.adultsCount + booking.childrenCount || 0);
+            (bookedMap[gid][key] || 0) + getActiveSeatCounts(booking).seats;
         }
       }
     }

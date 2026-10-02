@@ -11,6 +11,7 @@ import {
 } from "../utils/umrahPackageInventory.js";
 import { bookUmrahTNT, getTNTUser } from "../utils/Travel-Network.js";
 import { createUpSkyUmrahBooking, buildUpSkyUmrahBookingPayload } from "../utils/upskyUmrah.js";
+import crypto from "crypto";
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import BookingCounter from "../models/BookingCounter.js";
@@ -416,6 +417,31 @@ export const createUmrahBooking = async (req, res) => {
   }
 };
 
+// Admins (and sub-users allowed to manage Umrah bookings) run the voucher tools.
+const canManageUmrahVouchers = (user) =>
+  user?.role === "Super Admin" ||
+  user?.role === "Admin" ||
+  Boolean(user?.permissions?.includes("manage_umrah_package_booking"));
+
+// The public, scannable page of a voucher (opened from the QR on the printed voucher).
+const voucherPublicUrl = (token) =>
+  token
+    ? `${(process.env.FRONTEND_URL || "https://abidairtravels.com").replace(/\/+$/, "")}/umrah-voucher/${token}`
+    : null;
+
+const withVoucherPublicUrl = (booking) => {
+  const plain = typeof booking?.toObject === "function" ? booking.toObject() : booking;
+  return { ...plain, voucherPublicUrl: voucherPublicUrl(plain?.voucherPublicToken) };
+};
+
+// An agent only receives the voucher (and its public link) once admin has unlocked it for them.
+const withoutLockedVoucher = (booking) => {
+  const plain = typeof booking?.toObject === "function" ? booking.toObject() : booking;
+  return plain?.voucherLocked === false
+    ? withVoucherPublicUrl(plain)
+    : { ...plain, voucherData: null, voucherPublicToken: undefined };
+};
+
 /* ===========================
    GET ALL UMRAH BOOKINGS
 =========================== */
@@ -441,7 +467,9 @@ export const getAllUmrahBookings = async (req, res) => {
     res.status(200).json({
       success: true,
       count: bookings.length,
-      data: bookings,
+      data: bookings.map(
+        canManageUmrahVouchers(req.user) ? withVoucherPublicUrl : withoutLockedVoucher,
+      ),
     });
   } catch (error) {
     console.error("Get All Umrah Bookings Error:", error);
@@ -516,7 +544,7 @@ export const getMyBookings = async (req, res) => {
         booking.externalSource = booking.packageSource;
       }
 
-      return booking;
+      return withoutLockedVoucher(booking);
     });
 
     res.status(200).json({
@@ -610,7 +638,9 @@ export const getAllBookingsAdmin = async (req, res) => {
           "This package is from an external source. Please fetch details from external API.";
       }
 
-      return booking;
+      return canManageUmrahVouchers(req.user)
+        ? withVoucherPublicUrl(booking)
+        : withoutLockedVoucher(booking);
     });
 
     res.status(200).json({
@@ -988,7 +1018,9 @@ export const getUmrahBookingById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: booking,
+      data: (canManageUmrahVouchers(req.user)
+        ? withVoucherPublicUrl
+        : withoutLockedVoucher)(booking),
     });
   } catch (error) {
     console.error("Get Umrah Booking Error:", error);
@@ -2799,6 +2831,312 @@ export const updateBookingPackageDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("Update Booking Package Details Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/* ===========================
+   SAVE BOOKING VOUCHER (ADMIN ONLY)
+   Creates or edits the Umrah hotel voucher for THIS booking. The voucher is a
+   snapshot (header, mutamers, hotels, transport legs, flights), and its group
+   ticket / flights / hotels / transport are also written to the booking's
+   packageDetailsOverride. Pricing, payments, the booking's passengers and the
+   shared package are never touched.
+=========================== */
+const cleanVoucherText = (value, max = 300) =>
+  value == null ? "" : String(value).trim().slice(0, max);
+
+const isPlainObject = (value) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+// The original package record a voucher row came from. Only kept when it is a
+// plain, reasonably small object.
+const cleanVoucherExtra = (value) => {
+  if (!isPlainObject(value)) return undefined;
+  try {
+    return JSON.stringify(value).length <= 5000 ? value : undefined;
+  } catch (_) {
+    return undefined;
+  }
+};
+
+const cleanVoucherRows = (
+  rows,
+  textFields,
+  { boolFields = [], numFields = [], keepExtra = false } = {},
+) => {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .slice(0, 100)
+    .filter(isPlainObject)
+    .map((row) => {
+      const clean = {};
+      if (keepExtra) {
+        const extra = cleanVoucherExtra(row.extra);
+        if (extra) clean.extra = extra;
+      }
+      textFields.forEach((field) => {
+        clean[field] = cleanVoucherText(row[field]);
+      });
+      boolFields.forEach((field) => {
+        clean[field] = Boolean(row[field]);
+      });
+      numFields.forEach((field) => {
+        const number = Number(row[field]);
+        clean[field] = Number.isFinite(number) && number >= 0 ? number : null;
+      });
+      return clean;
+    });
+};
+
+export const saveBookingVoucher = async (req, res) => {
+  try {
+    if (!canManageUmrahVouchers(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to manage Umrah vouchers",
+      });
+    }
+
+    const voucher = req.body?.voucher;
+
+    if (!voucher || typeof voucher !== "object" || Array.isArray(voucher)) {
+      return res.status(400).json({
+        success: false,
+        message: "A voucher object is required",
+      });
+    }
+
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Umrah booking not found",
+      });
+    }
+
+    const days = Number(voucher.days);
+    const now = new Date();
+    const isNewVoucher = !booking.voucherData;
+    // A freshly created voucher stays hidden from the agent until admin unlocks it.
+    if (isNewVoucher) booking.voucherLocked = true;
+    // The secret that makes the voucher's public page reachable from its QR code.
+    if (!booking.voucherPublicToken) {
+      booking.voucherPublicToken = crypto.randomBytes(18).toString("base64url");
+    }
+
+    booking.voucherData = {
+      voucherNo: cleanVoucherText(voucher.voucherNo, 80),
+      voucherDate: cleanVoucherText(voucher.voucherDate, 40),
+      packageName: cleanVoucherText(voucher.packageName),
+      days: Number.isFinite(days) && days > 0 ? days : null,
+      familyHead: cleanVoucherText(voucher.familyHead),
+      manualNumber: cleanVoucherText(voucher.manualNumber, 80),
+      specialInstructions: cleanVoucherText(voucher.specialInstructions, 2000),
+      groupTicketId: cleanVoucherText(voucher.groupTicketId, 80),
+      passengers: cleanVoucherRows(
+        voucher.passengers,
+        ["passport", "name", "gender", "type", "groupNo", "visaNumber", "pnr"],
+        { boolFields: ["bed"] },
+      ),
+      hotels: cleanVoucherRows(
+        voucher.hotels,
+        ["city", "name", "view", "meal", "confirmationNumber", "roomType", "checkIn", "checkOut"],
+        { numFields: ["nights"], keepExtra: true },
+      ),
+      transports: cleanVoucherRows(
+        voucher.transports,
+        ["travelDate", "transporter", "transportType", "description"],
+        { keepExtra: true },
+      ),
+      flights: cleanVoucherRows(
+        voucher.flights,
+        ["airline", "flightNo", "sectorFrom", "sectorTo", "depDate", "depTime", "arrDate", "arrTime"],
+        { keepExtra: true },
+      ),
+      createdAt: booking.voucherData?.createdAt || now,
+      updatedAt: now,
+      updatedBy: req.user._id.toString(),
+    };
+    booking.markModified("voucherData");
+
+    // The voucher is the admin's final say on this booking's group ticket, flights,
+    // hotels and transport, so they are written onto the booking too (the same
+    // booking-scoped override the details screens and ticket print already read).
+    // Pricing, payments and the shared package are deliberately not touched.
+    const details = req.body?.packageDetails;
+    if (isPlainObject(details)) {
+      const overrideRows = (rows) =>
+        Array.isArray(rows) ? rows.slice(0, 100).filter(isPlainObject) : undefined;
+      const flights = overrideRows(details.flights);
+      const hotels = overrideRows(details.hotels);
+      const transports = overrideRows(details.transports);
+      booking.packageDetailsOverride = {
+        ...(booking.packageDetailsOverride || {}),
+        ...(flights ? { flights } : {}),
+        ...(hotels ? { hotels } : {}),
+        ...(transports ? { transports } : {}),
+        ...(typeof details.selectedGroupTicketId === "string" &&
+        details.selectedGroupTicketId
+          ? { selectedGroupTicketId: details.selectedGroupTicketId.slice(0, 80) }
+          : {}),
+        updatedAt: now,
+        updatedBy: req.user._id.toString(),
+      };
+      booking.markModified("packageDetailsOverride");
+    }
+
+    // Mirror onto the legacy voucherStatus so existing views stay consistent.
+    if (!booking.voucherStatus) booking.voucherStatus = {};
+    if (!["Sent", "Printed"].includes(booking.voucherStatus.status)) {
+      booking.voucherStatus.status = "Generated";
+    }
+    if (!booking.voucherStatus.generatedDate) {
+      booking.voucherStatus.generatedDate = now;
+    }
+    if (booking.voucherData.voucherNo) {
+      booking.voucherStatus.voucherNumber = booking.voucherData.voucherNo;
+    }
+
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Voucher ${isNewVoucher ? "created" : "edited"} (group ticket/flights/hotels/transport updated, pricing unchanged) for Umrah booking "${booking.bookingNumber}"`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: isNewVoucher
+        ? "Voucher created successfully"
+        : "Voucher updated successfully",
+      data: {
+        voucherData: booking.voucherData,
+        voucherStatus: booking.voucherStatus,
+        voucherLocked: booking.voucherLocked,
+        voucherPublicUrl: voucherPublicUrl(booking.voucherPublicToken),
+        packageDetailsOverride: booking.packageDetailsOverride,
+      },
+    });
+  } catch (error) {
+    console.error("Save Booking Voucher Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/* ===========================
+   PUBLIC VOUCHER (NO LOGIN) - opened from the QR code on a printed voucher.
+   The unguessable token in the link is the only credential. Only what the
+   voucher itself prints is returned; the lock (which hides the voucher from the
+   agent's own account) deliberately doesn't apply, so an admin-printed voucher
+   always scans.
+=========================== */
+export const getPublicVoucher = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const token = String(req.params.token || "");
+
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) {
+      return res.status(404).json({ success: false, message: "Voucher not found" });
+    }
+
+    const booking = await UmrahPackageBooking.findOne({
+      voucherPublicToken: token,
+      voucherData: { $ne: null },
+    })
+      .select("bookingNumber overallStatus voucherData user")
+      .populate("user", "name companyName")
+      .lean();
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Voucher not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bookingNumber: booking.bookingNumber,
+        overallStatus: booking.overallStatus,
+        user: {
+          name: booking.user?.name || "",
+          companyName: booking.user?.companyName || "",
+        },
+        voucherData: booking.voucherData,
+      },
+    });
+  } catch (error) {
+    console.error("Get Public Voucher Error:", error);
+    res.status(500).json({ success: false, message: "Failed to load voucher" });
+  }
+};
+
+/* ===========================
+   LOCK / UNLOCK VOUCHER FOR THE AGENT (ADMIN ONLY)
+   Locked (default): the agent does not receive the voucher and cannot print it.
+   Unlocked: the agent's booking list includes the voucher and shows Print Voucher.
+=========================== */
+export const updateVoucherLock = async (req, res) => {
+  try {
+    if (!canManageUmrahVouchers(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to manage Umrah vouchers",
+      });
+    }
+
+    const { locked } = req.body;
+
+    if (typeof locked !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "'locked' boolean is required",
+      });
+    }
+
+    const booking = await UmrahPackageBooking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Umrah booking not found",
+      });
+    }
+
+    if (!booking.voucherData) {
+      return res.status(400).json({
+        success: false,
+        message: "Create the voucher before changing its lock",
+      });
+    }
+
+    booking.voucherLocked = locked;
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "UmrahBooking",
+      refModel: "UmrahPackageBooking",
+      refId: booking._id,
+      description: `Voucher ${locked ? "locked" : "unlocked"} for the agent on Umrah booking "${booking.bookingNumber}"`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Voucher ${locked ? "locked" : "unlocked"} successfully`,
+      data: { voucherLocked: booking.voucherLocked },
+    });
+  } catch (error) {
+    console.error("Update Voucher Lock Error:", error);
     res.status(400).json({
       success: false,
       message: error.message,

@@ -19,6 +19,9 @@ import {
   updatePassengersLock,
   updatePassengerDetails,
   updateBookingPackageDetails,
+  saveBookingVoucher,
+  updateVoucherLock,
+  getPublicVoucher,
   previewBookingRoomTypeChange,
   changeBookingRoomType,
 } from "../controllers/umrahBooking.controller.js";
@@ -32,6 +35,8 @@ const router = express.Router();
 =========================== */
 // Handle multiple passport uploads for passengers (max 10 passengers)
 // Using .any() to accept files with dynamic field names like passportFile_0, passportFile_1, etc.
+// Public (no login): the voucher page opened from the QR code. The link's token is the credential.
+router.get("/public-voucher/:token", getPublicVoucher);
 router.post("/", protect, uploadUmrahDoc.any(), createUmrahBooking);
 router.get("/", protect, getAllUmrahBookings);
 router.get("/my-bookings", protect, getMyBookings);
@@ -86,6 +91,8 @@ router.patch(
   updatePassengerDetails,
 );
 router.patch("/:id/package-details", protect, updateBookingPackageDetails);
+router.put("/:id/voucher", protect, saveBookingVoucher);
+router.patch("/:id/voucher-lock", protect, updateVoucherLock);
 router.get("/:id/room-type-change", protect, previewBookingRoomTypeChange);
 router.patch("/:id/room-type", protect, changeBookingRoomType);
 

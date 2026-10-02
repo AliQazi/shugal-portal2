@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "react-toastify";
-import CreatableSelect from "react-select/creatable";
 import {
     getAllBookingsAdmin,
     reviewPayment,
@@ -11,7 +10,8 @@ import {
     extendUmrahBookingHold,
     savePassengerDiscounts,
     updatePassengersLock,
-    updateBookingPackageDetails,
+    saveBookingVoucher,
+    updateVoucherLock,
     previewRoomTypeChange,
     changeBookingRoomType,
     type ShiftRoomType,
@@ -21,6 +21,15 @@ import axiosInstance from "../../Api/axios";
 import { useAuth } from "../../context/AuthContext";
 import { hasPermission } from "../../utils/permissions";
 import { printGDSBooking } from "../../utils/bookingPDFService";
+import {
+    buildVoucherDraft,
+    printUmrahVoucher,
+    voucherToPackageDetails,
+    type UmrahVoucherData,
+    type VoucherGroupTicket,
+    type VoucherPackage,
+} from "../../utils/umrahVoucherPrint";
+import UmrahVoucherModal from "./UmrahVoucherModal";
 import NotFound from "../OtherPage/NotFound";
 import {
     BuildingOffice2Icon, UserGroupIcon, CreditCardIcon, DocumentCheckIcon,
@@ -28,7 +37,7 @@ import {
     BanknotesIcon, ClockIcon, EyeIcon, HomeIcon,
     MagnifyingGlassIcon, ChartBarIcon, CurrencyDollarIcon,
     IdentificationIcon, BuildingLibraryIcon, PrinterIcon,
-    LockClosedIcon, LockOpenIcon, PencilSquareIcon, PlusIcon, TrashIcon,
+    LockClosedIcon, LockOpenIcon, PencilSquareIcon, DocumentPlusIcon,
     ArrowsRightLeftIcon,
 } from "@heroicons/react/24/outline";
 
@@ -138,18 +147,25 @@ interface UmrahBooking {
     supplierDiscount?: number;
     // Admin-controlled lock for agent-side passenger detail edits (false = editable).
     passengersLocked?: boolean;
+    // The Umrah hotel voucher once admin has created it (null/absent = not created yet).
+    voucherData?: UmrahVoucherData | null;
+    voucherStatus?: { status?: string; voucherNumber?: string; generatedDate?: string };
+    // true (default once a voucher exists) = the agent can't see or print the voucher.
+    voucherLocked?: boolean;
+    // The public page the voucher's QR code opens.
+    voucherPublicUrl?: string | null;
     // Admin edit of this booking's own Flights/Hotels/Transport display - scoped to
     // this booking only, never written back to the shared package.
     packageDetailsOverride?: {
         flights?: UmrahPackageDetails["flights"];
         hotels?: UmrahPackageDetails["hotels"];
         transports?: UmrahPackageDetails["transports"];
+        // Group ticket re-picked for this booking only (the package keeps its own).
+        selectedGroupTicketId?: string;
     } | null;
 }
 
 interface Timer { hours: number; minutes: number; seconds: number; expired: boolean; }
-
-const TRANSPORT_TYPES = ["Bus", "Van", "Car", "Coaster", "Hiace", "Mini Bus", "Other"];
 
 const SUPPLIER_SOURCE_LABELS: Record<string, string> = {
     "travel-network": "Travel Network",
@@ -164,6 +180,48 @@ const statusColors: Record<string, string> = {
     "Not Applied": "#94A3B8", Applied: "#3B82F6", "In Process": "#F59E0B", Rejected: "#F43F5E",
     "Not Booked": "#94A3B8", Booked: "#3B82F6", Confirmed: "#22C55E", Cancelled: "#F43F5E",
 };
+
+// Switch-style lock toggle shared by "Can Edit / Can't Edit" and the voucher lock.
+// Green = unlocked (the agent is allowed), red = locked.
+const LockToggle = ({ locked, busy, lockedLabel, unlockedLabel, lockedTitle, unlockedTitle, onToggle }: {
+    locked: boolean; busy: boolean; lockedLabel: string; unlockedLabel: string;
+    lockedTitle: string; unlockedTitle: string; onToggle: () => void;
+}) => (
+    <button
+        onClick={onToggle}
+        disabled={busy}
+        title={locked ? lockedTitle : unlockedTitle}
+        style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            padding: "4px 8px 4px 4px", borderRadius: "7px", border: "1px solid",
+            borderColor: locked ? "#FCA5A5" : "#A7F3D0",
+            background: locked ? "#FEF2F2" : "#ECFDF5",
+            cursor: busy ? "not-allowed" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            transition: "all 0.15s",
+        }}
+    >
+        <span style={{
+            position: "relative", width: "26px", height: "15px", borderRadius: "999px",
+            background: locked ? "#EF4444" : "#10B981",
+            transition: "background 0.15s", flexShrink: 0,
+        }}>
+            <span style={{
+                position: "absolute", top: "2px",
+                left: locked ? "2px" : "13px",
+                width: "11px", height: "11px", borderRadius: "50%",
+                background: "white", transition: "left 0.15s",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+            }} />
+        </span>
+        {locked
+            ? <LockClosedIcon style={{ width: 12, height: 12, color: "#B91C1C" }} />
+            : <LockOpenIcon style={{ width: 12, height: 12, color: "#047857" }} />}
+        <span style={{ fontSize: "0.68rem", fontWeight: 700, color: locked ? "#B91C1C" : "#047857" }}>
+            {locked ? lockedLabel : unlockedLabel}
+        </span>
+    </button>
+);
 
 const StatusBadge = ({ status }: { status: string }) => (
     <span style={{
@@ -190,6 +248,7 @@ const applyPackageDetailsOverride = (
 ): UmrahPackageDetails | null => {
     if (!override) return base;
     const merged: UmrahPackageDetails = { ...(base || {}) };
+    if (override.selectedGroupTicketId) merged.selectedGroupTicketId = override.selectedGroupTicketId;
     if (override.flights?.length) merged.flights = override.flights;
     if (override.hotels?.length) merged.hotels = override.hotels;
     if (override.transports?.length) {
@@ -238,7 +297,15 @@ export default function UmrahPackagesBooking() {
     const [timers, setTimers] = useState<Record<string, Timer>>({});
     const [extendingHoldId, setExtendingHoldId] = useState<string | null>(null);
     const [printingTicketId, setPrintingTicketId] = useState<string | null>(null);
+    const [printingVoucherId, setPrintingVoucherId] = useState<string | null>(null);
     const [togglingLockId, setTogglingLockId] = useState<string | null>(null);
+    const [openingVoucherId, setOpeningVoucherId] = useState<string | null>(null);
+    const [togglingVoucherLockId, setTogglingVoucherLockId] = useState<string | null>(null);
+    // The Create/Edit Voucher modal: the booking it belongs to, its starting contents,
+    // and the package details used to rebuild transport legs.
+    const [voucherEditor, setVoucherEditor] = useState<{
+        booking: UmrahBooking; initialVoucher: UmrahVoucherData; packageData: VoucherPackage | null;
+    } | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [openedBookingId, setOpenedBookingId] = useState<string | null>(null);
     // Group tickets referenced by a package's selectedGroupTicketId, fetched in
@@ -349,6 +416,21 @@ export default function UmrahPackagesBooking() {
         }
     };
 
+    const handleToggleVoucherLock = async (bookingId: string, nextLocked: boolean) => {
+        if (!canManage) { toast.error("No permission"); return; }
+        try {
+            setTogglingVoucherLockId(bookingId);
+            const res = await updateVoucherLock(bookingId, nextLocked);
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, voucherLocked: res.data.voucherLocked } : b));
+            setDetailsModal(prev => prev && prev._id === bookingId ? { ...prev, voucherLocked: res.data.voucherLocked } : prev);
+            toast.success(nextLocked ? "Voucher locked — hidden from the agent" : "Voucher unlocked — the agent can print it");
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to update voucher lock");
+        } finally {
+            setTogglingVoucherLockId(null);
+        }
+    };
+
     const handleSaveDiscounts = async (bookingId: string, passengers: { passport: string; discount: number }[]) => {
         if (!canManage) { toast.error("No permission"); return; }
         try { const res = await savePassengerDiscounts(bookingId, passengers); setBookings(prev => prev.map(b => { if (b._id !== bookingId) return b; return { ...b, passengers: b.passengers.map(p => { const match = res.data.find((up: any) => up.passport === p.passport); return match ? { ...p, discount: match.discount } : p; }) }; })); toast.success("Discounts saved"); }
@@ -376,21 +458,26 @@ export default function UmrahPackagesBooking() {
         }
     };
 
-    const handleSavePackageDetails = async (
-        bookingId: string,
-        payload: {
-            flights: NonNullable<UmrahPackageDetails["flights"]>;
-            hotels: NonNullable<UmrahPackageDetails["hotels"]>;
-            transports: NonNullable<UmrahPackageDetails["transports"]>;
-        },
-    ) => {
+    // Creates the booking's voucher on first save, edits it afterwards. Alongside the voucher, the
+    // booking's own group ticket / flights / hotels / transport are updated to match; pricing is
+    // not part of this call.
+    const handleSaveVoucher = async (bookingId: string, voucher: UmrahVoucherData) => {
         if (!canManage) { toast.error("No permission"); return; }
         try {
-            const res = await updateBookingPackageDetails(bookingId, payload);
-            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, packageDetailsOverride: res.data.packageDetailsOverride } : b));
-            toast.success("Booking details updated");
+            const res = await saveBookingVoucher(bookingId, voucher, voucherToPackageDetails(voucher));
+            const patch = {
+                voucherData: res.data.voucherData,
+                voucherStatus: res.data.voucherStatus,
+                voucherLocked: res.data.voucherLocked,
+                voucherPublicUrl: res.data.voucherPublicUrl,
+                packageDetailsOverride: res.data.packageDetailsOverride,
+            };
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, ...patch } : b));
+            setDetailsModal(prev => prev && prev._id === bookingId ? { ...prev, ...patch } : prev);
+            setVoucherEditor(null);
+            toast.success(res.message || "Voucher saved");
         } catch (error: any) {
-            toast.error(error.response?.data?.message || "Failed to update booking details");
+            toast.error(error.response?.data?.message || "Failed to save voucher");
             throw error;
         }
     };
@@ -511,7 +598,89 @@ export default function UmrahPackagesBooking() {
         }));
     };
 
+    // Gathers what the voucher draft is pre-filled from: the package (with the booking's own
+    // edits merged in) and the linked group ticket / supplier booking for PNR and group no.
+    const resolveVoucherSources = async (booking: UmrahBooking): Promise<{
+        packageData: VoucherPackage | null; groupTicket: VoucherGroupTicket | null;
+    }> => {
+        let packageData: UmrahPackageDetails | null =
+            booking.packageId && typeof booking.packageId === "object"
+                ? booking.packageId
+                : booking.packageData || null;
+        packageData = applyPackageDetailsOverride(packageData, booking.packageDetailsOverride);
+
+        if (booking.packageSource === "travel-network") {
+            const tntData = booking.travelNetworkBookingData?.data || booking.travelNetworkBookingData;
+            let flights: PrintFlight[] = normalizeTNTFlights(tntData);
+            if (!flights.length && packageData?.flights?.length) flights = packageData.flights as PrintFlight[];
+            if (booking.packageDetailsOverride?.flights?.length) flights = booking.packageDetailsOverride.flights as PrintFlight[];
+            return {
+                packageData: { ...(packageData || {}), flights } as VoucherPackage,
+                groupTicket: { pnr: tntData?.group?.pnr || "" },
+            };
+        }
+
+        const packageId = getId(booking.packageId || packageData?._id);
+        const hasPackageDetails =
+            packageData?.hotels?.length &&
+            ((packageData as any)?.transport?.length || packageData?.transports?.length);
+        if (packageId && (!booking.packageSource || booking.packageSource === "local-db") && !hasPackageDetails) {
+            try {
+                const packageRes = await axiosInstance.get(`/umrahpackages/${packageId}`);
+                packageData = packageRes.data?.package || packageRes.data?.data || packageData;
+                packageData = applyPackageDetailsOverride(packageData, booking.packageDetailsOverride);
+            } catch (error) {
+                console.warn("Umrah package fetch failed, using populated package data", error);
+            }
+        }
+
+        const groupTicketId = getId(packageData?.selectedGroupTicketId);
+        let groupTicket: VoucherGroupTicket | null = null;
+        if (groupTicketId) {
+            try {
+                const groupRes = await axiosInstance.get(`/group-ticketing/${groupTicketId}`);
+                groupTicket = groupRes.data?.data || null;
+            } catch (error) {
+                groupTicket = groupTicketsMap[groupTicketId] || null;
+                console.warn("Group ticket fetch failed, using saved group ticket details", error);
+            }
+        }
+        return { packageData: packageData as VoucherPackage | null, groupTicket };
+    };
+
+    const openVoucherEditor = async (booking: UmrahBooking) => {
+        if (!canManage) { toast.error("No permission"); return; }
+        try {
+            setOpeningVoucherId(booking._id);
+            const { packageData, groupTicket } = await resolveVoucherSources(booking);
+            setVoucherEditor({
+                booking,
+                packageData,
+                initialVoucher: booking.voucherData || buildVoucherDraft(booking, packageData, groupTicket),
+            });
+        } catch (error: any) {
+            console.error("Error opening Umrah voucher:", error);
+            toast.error(error.response?.data?.message || "Failed to open voucher");
+        } finally {
+            setOpeningVoucherId(null);
+        }
+    };
+
+    const handlePrintVoucher = async (booking: UmrahBooking) => {
+        if (!booking.voucherData || ["cancelled", "canceled"].includes((booking.overallStatus || "").toLowerCase())) return;
+        try {
+            setPrintingVoucherId(booking._id);
+            await printUmrahVoucher(booking, booking.voucherData);
+        } catch (error) {
+            console.error("Error printing Umrah voucher:", error);
+            toast.error("Failed to print voucher");
+        } finally {
+            setPrintingVoucherId(null);
+        }
+    };
+
     const handlePrintTicket = async (booking: UmrahBooking) => {
+        if (["cancelled", "canceled"].includes((booking.overallStatus || "").toLowerCase())) return;
         try {
             setPrintingTicketId(booking._id);
 
@@ -528,9 +697,8 @@ export default function UmrahPackagesBooking() {
 
             // Travel Network booking: TNT stored/live data se flights lo
             if (booking.packageSource === "travel-network") {
-                const tntBookingId = booking.travelNetworkBookingId || booking.travelNetworkBookingData?.data?.id;
-                console.log(tntBookingId)
-                let tntFlights = normalizeTNTFlights(booking.travelNetworkBookingData?.data || booking.travelNetworkBookingData);
+                const tntData = booking.travelNetworkBookingData?.data || booking.travelNetworkBookingData;
+                let tntFlights = normalizeTNTFlights(tntData);
 
                 // Note: fallback to packageData.flights if stored tnt data has no group.details
 
@@ -549,7 +717,7 @@ export default function UmrahPackagesBooking() {
                     sector: packageData?.packageName || "",
                     airline: (packageData as any)?.airlineName || "",
                     airlineLogo: (packageData as any)?.airline?.logo_url || (packageData as any)?.logo || "",
-                    pnr: booking.travelNetworkBookingData?.data?.group?.pnr || "",
+                    pnr: tntData?.group?.pnr || "",
                 } as PrintSource;
 
                 const printBooking = buildUmrahTicketPrintBooking(booking, packageData, tntSource as GroupTicketPrintData);
@@ -559,7 +727,7 @@ export default function UmrahPackagesBooking() {
                     return;
                 }
 
-                printGDSBooking(printBooking);
+                await printGDSBooking(printBooking);
                 return;
             }
 
@@ -567,7 +735,8 @@ export default function UmrahPackagesBooking() {
                 packageData?.hotels?.length &&
                 ((packageData as any)?.transport?.length || packageData?.transports?.length);
 
-            if (packageId && (!packageData || !hasPackageDetailsForPrint || !packageData.flightLogo)) {
+            if (packageId && (!booking.packageSource || booking.packageSource === "local-db") &&
+                (!packageData || !hasPackageDetailsForPrint || !packageData.flightLogo)) {
                 try {
                     const packageRes = await axiosInstance.get(`/umrahpackages/${packageId}`);
                     packageData = packageRes.data?.package || packageRes.data?.data || packageData;
@@ -593,7 +762,7 @@ export default function UmrahPackagesBooking() {
                 return;
             }
 
-            printGDSBooking(printBooking);
+            await printGDSBooking(printBooking);
         } catch (error: any) {
             console.error("Error printing Umrah package ticket:", error);
             toast.error(error.response?.data?.message || "Failed to print ticket");
@@ -715,7 +884,8 @@ export default function UmrahPackagesBooking() {
                                     const isCancelled = ["cancelled", "canceled"].includes(
                                         (b.overallStatus || "").toLowerCase(),
                                     );
-                                    const isPrintDisabled = printingTicketId === b._id || isCancelled;
+                                    const isPrinting = printingTicketId === b._id || printingVoucherId === b._id;
+                                    const isPrintDisabled = isPrinting || isCancelled;
                                     const rowPackageData = applyPackageDetailsOverride(
                                         b.packageId && typeof b.packageId === "object" ? b.packageId : b.packageData || null,
                                         b.packageDetailsOverride,
@@ -847,45 +1017,43 @@ export default function UmrahPackagesBooking() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td style={{ padding: "13px 14px", width: '350px' }}>
+                                            <td style={{ padding: "13px 14px", width: '300px', minWidth: '350px' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                                     <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
                                                         {canManage && (
-                                                            <button
-                                                                onClick={() => handleTogglePassengersLock(b._id, !b.passengersLocked)}
-                                                                disabled={togglingLockId === b._id}
-                                                                title={b.passengersLocked ? "Passenger edits locked — click to unlock" : "Passenger edits unlocked — click to lock"}
-                                                                style={{
-                                                                    display: "flex", alignItems: "center", gap: "6px",
-                                                                    padding: "4px 8px 4px 4px", borderRadius: "7px", border: "1px solid",
-                                                                    borderColor: b.passengersLocked ? "#FCA5A5" : "#A7F3D0",
-                                                                    background: b.passengersLocked ? "#FEF2F2" : "#ECFDF5",
-                                                                    cursor: togglingLockId === b._id ? "not-allowed" : "pointer",
-                                                                    opacity: togglingLockId === b._id ? 0.6 : 1,
-                                                                    transition: "all 0.15s",
-                                                                }}
-                                                            >
-                                                                <span style={{
-                                                                    position: "relative", width: "26px", height: "15px", borderRadius: "999px",
-                                                                    background: b.passengersLocked ? "#EF4444" : "#10B981",
-                                                                    transition: "background 0.15s", flexShrink: 0,
-                                                                }}>
-                                                                    <span style={{
-                                                                        position: "absolute", top: "2px",
-                                                                        left: b.passengersLocked ? "2px" : "13px",
-                                                                        width: "11px", height: "11px", borderRadius: "50%",
-                                                                        background: "white", transition: "left 0.15s",
-                                                                        boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
-                                                                    }} />
-                                                                </span>
-                                                                {b.passengersLocked
-                                                                    ? <LockClosedIcon style={{ width: 12, height: 12, color: "#B91C1C" }} />
-                                                                    : <LockOpenIcon style={{ width: 12, height: 12, color: "#047857" }} />}
-                                                                <span style={{ fontSize: "0.68rem", fontWeight: 700, color: b.passengersLocked ? "#B91C1C" : "#047857" }}>
-                                                                    {b.passengersLocked ? "Can't Edit" : "Can Edit"}
-                                                                </span>
-                                                            </button>
+                                                            <LockToggle
+                                                                locked={Boolean(b.passengersLocked)}
+                                                                busy={togglingLockId === b._id}
+                                                                lockedLabel="Can't Edit"
+                                                                unlockedLabel="Can Edit"
+                                                                lockedTitle="Passenger edits locked — click to unlock"
+                                                                unlockedTitle="Passenger edits unlocked — click to lock"
+                                                                onToggle={() => handleTogglePassengersLock(b._id, !b.passengersLocked)}
+                                                            />
                                                         )}
+                                                        {/* Off by default once the voucher exists: the agent only gets Print Voucher when this is on. */}
+                                                        {canManage && b.voucherData && (
+                                                            <LockToggle
+                                                                locked={b.voucherLocked !== false}
+                                                                busy={togglingVoucherLockId === b._id}
+                                                                lockedLabel="Voucher Locked"
+                                                                unlockedLabel="Voucher Unlocked"
+                                                                lockedTitle="Voucher hidden from the agent — click to unlock it for them"
+                                                                unlockedTitle="Agent can print the voucher — click to lock it"
+                                                                onToggle={() => handleToggleVoucherLock(b._id, b.voucherLocked === false)}
+                                                            />
+                                                        )}
+                                                        <button
+                                                            onClick={() => setDetailsModal(b)}
+                                                            style={{
+                                                                padding: "5px 11px", background: "#EFF6FF", border: "1px solid #BFDBFE",
+                                                                borderRadius: "7px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 600,
+                                                                color: "#2563EB", display: "flex", alignItems: "center", gap: "4px",
+                                                                transition: "all 0.15s",
+                                                            }}
+                                                        >
+                                                            <EyeIcon style={{ width: 12, height: 12 }} /> Details
+                                                        </button>
                                                         <button
                                                             onClick={() => {
                                                                 if (!isCancelled) handlePrintTicket(b);
@@ -911,17 +1079,24 @@ export default function UmrahPackagesBooking() {
                                                             <PrinterIcon style={{ width: 12, height: 12 }} />
                                                             {printingTicketId === b._id ? "Printing..." : "Print Ticket"}
                                                         </button>
-                                                        <button
-                                                            onClick={() => setDetailsModal(b)}
-                                                            style={{
-                                                                padding: "5px 11px", background: "#EFF6FF", border: "1px solid #BFDBFE",
-                                                                borderRadius: "7px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 600,
-                                                                color: "#2563EB", display: "flex", alignItems: "center", gap: "4px",
-                                                                transition: "all 0.15s",
-                                                            }}
-                                                        >
-                                                            <EyeIcon style={{ width: 12, height: 12 }} /> Details
-                                                        </button>
+                                                        {/* Only bookings whose voucher has been created in the Details modal can print one. */}
+                                                        {b.voucherData && (
+                                                            <button
+                                                                onClick={() => handlePrintVoucher(b)}
+                                                                disabled={isPrintDisabled}
+                                                                title="Print Umrah Hotel Voucher"
+                                                                style={{
+                                                                    padding: "5px 11px", background: isCancelled ? "#F1F5F9" : "#ECFDF5",
+                                                                    border: "1px solid #A7F3D0", borderRadius: "7px",
+                                                                    cursor: isPrintDisabled ? "not-allowed" : "pointer",
+                                                                    fontSize: "0.72rem", fontWeight: 600, color: isCancelled ? "#94A3B8" : "#047857",
+                                                                    display: "flex", alignItems: "center", gap: "4px", opacity: isPrintDisabled ? 0.55 : 1,
+                                                                }}
+                                                            >
+                                                                <PrinterIcon style={{ width: 12, height: 12 }} />
+                                                                {printingVoucherId === b._id ? "Printing..." : "Print Voucher"}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -960,7 +1135,17 @@ export default function UmrahPackagesBooking() {
                 </>
             )}
 
-            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} onSavePackageDetails={handleSavePackageDetails} onChangeRoomType={handleChangeRoomType} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
+            {detailsModal && <DetailsModal booking={detailsModal} onClose={closeDetailsModal} canManage={canManage} onExtendHold={handleExtendHold} onSaveDiscounts={handleSaveDiscounts} onOpenVoucher={openVoucherEditor} openingVoucher={openingVoucherId === detailsModal._id} onChangeRoomType={handleChangeRoomType} extendingHoldId={extendingHoldId} timers={timers} onUpdate={(type: string) => { setModalData({ bookingId: detailsModal._id, type, booking: detailsModal }); closeDetailsModal(); }} />}
+            {voucherEditor && (
+                <UmrahVoucherModal
+                    booking={voucherEditor.booking}
+                    initialVoucher={voucherEditor.initialVoucher}
+                    isEdit={Boolean(voucherEditor.booking.voucherData)}
+                    packageData={voucherEditor.packageData}
+                    onClose={() => setVoucherEditor(null)}
+                    onSave={(voucher) => handleSaveVoucher(voucherEditor.booking._id, voucher)}
+                />
+            )}
             {paymentHistoryBooking && <PaymentHistoryModal booking={paymentHistoryBooking} onClose={() => setPaymentHistoryBooking(null)} />}
             {modalData && <StatusModal modalData={modalData} onClose={() => setModalData(null)} onSuccess={() => { fetchBookings(); setModalData(null); }} />}
         </div>
@@ -968,7 +1153,7 @@ export default function UmrahPackagesBooking() {
 }
 
 // Details Modal with ALL functionality
-function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, onSavePackageDetails, onChangeRoomType, extendingHoldId, timers, onUpdate }: any) {
+function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscounts, onOpenVoucher, openingVoucher, onChangeRoomType, extendingHoldId, timers, onUpdate }: any) {
     const [discounts, setDiscounts] = useState<number[]>(booking.passengers.map((p: any) => p.discount ?? 0));
     // Target room type of the "Shift Room Type" confirmation dialog (null = closed)
     const [shiftRoomType, setShiftRoomType] = useState<ShiftRoomType | null>(null);
@@ -980,7 +1165,8 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
 
     const [liveGroupTicket, setLiveGroupTicket] = useState<{ flights?: UmrahPackageDetails["flights"] } | null>(null);
     useEffect(() => {
-        const rawGroupId: unknown = packageDetails?.selectedGroupTicketId;
+        // A group ticket re-picked in this booking's voucher wins over the package's own.
+        const rawGroupId: unknown = booking.packageDetailsOverride?.selectedGroupTicketId || packageDetails?.selectedGroupTicketId;
         const groupTicketId =
             typeof rawGroupId === "string"
                 ? rawGroupId
@@ -993,75 +1179,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
             .catch(() => { });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [booking._id]);
-
-    // Admin's booking-specific edit of Flights/Hotels/Transport (view-mode source of truth).
-    // Saving replaces this in full - it does not touch the shared package.
-    const [packageOverride, setPackageOverride] = useState<UmrahBooking["packageDetailsOverride"]>(booking.packageDetailsOverride || null);
-    const [isEditingPackage, setIsEditingPackage] = useState(false);
-    const [flightsEdit, setFlightsEdit] = useState<any[]>([]);
-    const [hotelsEdit, setHotelsEdit] = useState<any[]>([]);
-    const [transportsEdit, setTransportsEdit] = useState<any[]>([]);
-    const [selectedGroupTicketIdEdit, setSelectedGroupTicketIdEdit] = useState("");
-    const [savingPackage, setSavingPackage] = useState(false);
-
-    // Same pick-from-existing-records selectors used on the Umrah Package create/edit
-    // screens - Umrah Group Ticket (drives Flights), Hotel, Transport.
-    const [groupTicketOptions, setGroupTicketOptions] = useState<{ _id: string; label: string; pnr?: string; supplierName?: string; flights: any[] }[]>([]);
-    const [hotelOptions, setHotelOptions] = useState<{ value: string; label: string; data: { hotelName: string; city?: string; rating?: number } }[]>([]);
-    const [transportOptions, setTransportOptions] = useState<{ value: string; label: string; data: { route: string; transportType?: string } }[]>([]);
-    const [loadingSelectors, setLoadingSelectors] = useState(false);
-
-    useEffect(() => {
-        if (!canManage) return;
-        setLoadingSelectors(true);
-        Promise.all([
-            axiosInstance.get("/group-ticketing"),
-            axiosInstance.get("/hotels/all"),
-            axiosInstance.get("/transports/all"),
-        ]).then(([groupsRes, hotelsRes, transportsRes]) => {
-            if (groupsRes.data?.success) {
-                setGroupTicketOptions(
-                    (groupsRes.data.data || [])
-                        .filter((g: any) => g.groupType === "Umrah Groups")
-                        .map((g: any) => {
-                            const parts = [
-                                (g.groupName || g.groupBookingId || g.sector || "Untitled Group"),
-                                `Seats: ${g.totalSeats || 0}`,
-                                `PNR: ${g.pnr || "N/A"}`,
-                                `Supplier: ${g.user?.name || "N/A"}`,
-                            ];
-                            return {
-                                _id: g._id,
-                                label: parts.join(" | "),
-                                pnr: g.pnr || "",
-                                supplierName: g.user?.name || "",
-                                flights: g.flights || [],
-                            };
-                        })
-                );
-            }
-            if (hotelsRes.data?.success) {
-                setHotelOptions(
-                    (hotelsRes.data.data || []).map((h: any) => ({
-                        value: h._id,
-                        label: h.hotelName,
-                        data: { hotelName: h.hotelName, city: h.city, rating: h.rating },
-                    }))
-                );
-            }
-            if (transportsRes.data?.success) {
-                setTransportOptions(
-                    (transportsRes.data.data || []).map((t: any) => ({
-                        value: t._id,
-                        label: t.route,
-                        data: { route: t.route, transportType: t.transportType },
-                    }))
-                );
-            }
-        }).catch((err) => console.error("Failed to load package selectors:", err))
-            .finally(() => setLoadingSelectors(false));
-    }, [canManage]);
+    }, [booking._id, booking.packageDetailsOverride?.selectedGroupTicketId]);
 
     // Prefer the live group ticket's flights over the package's saved copy, so edits to the group show up.
     const baseFlights = liveGroupTicket?.flights?.length
@@ -1077,109 +1195,11 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                     ? (booking.packageData as any).transport
                     : booking.packageData?.transports || [];
 
-    // What's actually shown in view mode: the admin's edit (if saved) wins over the base data.
+    // What's shown here: an earlier per-booking edit of the package details (if one was saved) wins over the base data.
+    const packageOverride: UmrahBooking["packageDetailsOverride"] = booking.packageDetailsOverride;
     const packageFlights = packageOverride?.flights?.length ? packageOverride.flights : baseFlights;
     const packageHotels = packageOverride?.hotels?.length ? packageOverride.hotels : baseHotels;
     const packageTransports = packageOverride?.transports?.length ? packageOverride.transports : baseTransports;
-
-    const startEditingPackage = () => {
-        setFlightsEdit(packageFlights.map((f: any) => ({ ...f })));
-        setHotelsEdit(packageHotels.map((h: any) => ({ ...h })));
-        setTransportsEdit(packageTransports.map((t: any) => ({ ...t })));
-        setSelectedGroupTicketIdEdit("");
-        setIsEditingPackage(true);
-    };
-
-    const cancelEditingPackage = () => setIsEditingPackage(false);
-
-    // Picking an Umrah Group Ticket replaces Flights wholesale with that ticket's
-    // flights - same as on the package create/edit screens, flights aren't hand-typed.
-    const handleGroupTicketSelect = (groupId: string) => {
-        setSelectedGroupTicketIdEdit(groupId);
-        const group = groupTicketOptions.find((g) => g._id === groupId);
-        setFlightsEdit(group ? group.flights.map((f: any) => ({ ...f })) : []);
-    };
-
-    const applyHotelSelection = (index: number, option: any) =>
-        setHotelsEdit(prev => prev.map((h, i) => {
-            if (i !== index) return h;
-            if (!option) return { ...h, name: "", hotelId: "", city: "", location: { ...h.location, city: "" }, rating: 0 };
-            const city = option.data?.city || "";
-            return {
-                ...h,
-                name: option.data?.hotelName || option.label || "",
-                hotelId: option.value || "",
-                city,
-                location: { ...h.location, city },
-                rating: Number(option.data?.rating || 0),
-            };
-        }));
-    const setHotelName = (index: number, name: string) =>
-        setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, name, hotelId: "" } : h));
-    // const updateHotelNights = (index: number, nights: number) =>
-    //     setHotelsEdit(prev => prev.map((h, i) => i === index ? { ...h, nightCount: nights } : h));
-    const addHotelRow = () =>
-        setHotelsEdit(prev => [...prev, { name: "", hotelId: "", city: "", location: { city: "" }, nightCount: 0, rating: 0 }]);
-    const removeHotelRow = (index: number) =>
-        setHotelsEdit(prev => prev.filter((_, i) => i !== index));
-
-    const applyTransportSelection = (index: number, option: any) =>
-        setTransportsEdit(prev => prev.map((t, i) => {
-            if (i !== index) return t;
-            if (!option) return { ...t, route: "" };
-            return {
-                ...t,
-                route: option.data?.route || option.label || "",
-                transportType: option.data?.transportType || t.transportType || "",
-            };
-        }));
-    const setTransportRoute = (index: number, route: string) =>
-        setTransportsEdit(prev => prev.map((t, i) => i === index ? { ...t, route } : t));
-    const updateTransportType = (index: number, transportType: string) =>
-        setTransportsEdit(prev => prev.map((t, i) => i === index ? { ...t, transportType } : t));
-    const addTransportRow = () =>
-        setTransportsEdit(prev => [...prev, { route: "", transportType: "" }]);
-    const removeTransportRow = (index: number) =>
-        setTransportsEdit(prev => prev.filter((_, i) => i !== index));
-
-    const savePackageDetailsEdit = async () => {
-        setSavingPackage(true);
-        try {
-            await onSavePackageDetails(booking._id, { flights: flightsEdit, hotels: hotelsEdit, transports: transportsEdit });
-            setPackageOverride({ flights: flightsEdit, hotels: hotelsEdit, transports: transportsEdit });
-            setIsEditingPackage(false);
-        } catch (e) { }
-        finally { setSavingPackage(false); }
-    };
-
-    const compactSelectStyles = {
-        control: (base: any) => ({ ...base, minHeight: "32px", fontSize: "0.72rem" }),
-        valueContainer: (base: any) => ({ ...base, padding: "0 8px" }),
-        input: (base: any) => ({ ...base, margin: 0, padding: 0 }),
-        menu: (base: any) => ({ ...base, fontSize: "0.72rem" }),
-        // Rendered in a portal on document.body (see menuPortalTarget below), so this
-        // needs its own sky-high z-index - the modal wrapper's overflow:hidden and the
-        // scrollable body would otherwise clip the dropdown menu.
-        menuPortal: (base: any) => ({ ...base, zIndex: 100000000 }),
-    };
-
-    const rowFieldLabelStyle: React.CSSProperties = {
-        fontSize: "0.6rem", color: "#64748B", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px",
-    };
-
-    // const compactSelectFieldStyle: React.CSSProperties = {
-    //     width: "100%", padding: "6px 8px", border: "1px solid #E2E8F0", borderRadius: "6px",
-    //     fontSize: "0.72rem", outline: "none", boxSizing: "border-box", background: "white",
-    // };
-
-    const editRowCardStyle: React.CSSProperties = {
-        padding: "10px", background: "white", border: "1px solid #DBEAFE", borderRadius: "9px", position: "relative",
-    };
-
-    const removeRowButtonStyle: React.CSSProperties = {
-        position: "absolute", top: "8px", right: "8px", border: "none", background: "#FEF2F2",
-        borderRadius: "6px", padding: "4px", cursor: "pointer", display: "flex",
-    };
 
     const isExternalSource = booking.packageSource && booking.packageSource !== "local-db";
     const sourceLabel = supplierSourceLabel(booking.packageSource);
@@ -1313,16 +1333,18 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
                         {canManage && (
-                            isEditingPackage ? (
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                    <button type="button" onClick={cancelEditingPackage} disabled={savingPackage} style={{ padding: "7px 14px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: savingPackage ? "not-allowed" : "pointer", fontSize: "0.72rem", fontWeight: 700, color: "white" }}>Cancel</button>
-                                    <button type="button" onClick={savePackageDetailsEdit} disabled={savingPackage} style={{ padding: "7px 14px", background: "white", border: "none", borderRadius: "7px", cursor: savingPackage ? "not-allowed" : "pointer", fontSize: "0.72rem", fontWeight: 700, color: "#1D4ED8", opacity: savingPackage ? 0.7 : 1 }}>{savingPackage ? "Saving..." : "Save Package Details"}</button>
-                                </div>
-                            ) : (
-                                <button type="button" onClick={startEditingPackage} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 14px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: "pointer", fontSize: "0.72rem", fontWeight: 700, color: "white" }}>
-                                    <PencilSquareIcon style={{ width: 13, height: 13 }} /> Edit Package Details
-                                </button>
-                            )
+                            <button
+                                type="button"
+                                onClick={() => onOpenVoucher(booking)}
+                                disabled={openingVoucher}
+                                title={booking.voucherData ? "Edit this booking's voucher" : "Create the voucher for this booking"}
+                                style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 14px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "7px", cursor: openingVoucher ? "not-allowed" : "pointer", fontSize: "0.72rem", fontWeight: 700, color: "white", opacity: openingVoucher ? 0.7 : 1 }}
+                            >
+                                {booking.voucherData
+                                    ? <PencilSquareIcon style={{ width: 13, height: 13 }} />
+                                    : <DocumentPlusIcon style={{ width: 13, height: 13 }} />}
+                                {openingVoucher ? "Opening..." : booking.voucherData ? "Edit Voucher" : "Create Voucher"}
+                            </button>
                         )}
                         <button onClick={onClose} style={{ border: "none", background: "rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}>
                             <XMarkIcon style={{ width: 18, height: 18, color: "white" }} />
@@ -1335,44 +1357,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                     <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px", display: "flex", alignItems: "center", gap: "6px" }}>
                         <BuildingOffice2Icon style={{ width: 13, height: 13 }} /> Flights
                     </div>
-                    {isEditingPackage ? (
-                        <>
-                            <div style={{ marginBottom: "10px", maxWidth: "480px" }}>
-                                <div style={rowFieldLabelStyle}>Umrah Group Ticket</div>
-                                <select
-                                    value={selectedGroupTicketIdEdit}
-                                    onChange={(e) => handleGroupTicketSelect(e.target.value)}
-                                    disabled={loadingSelectors}
-                                    className="w-full p-2 bg-white text-xs rounded-md"
-                                >
-                                    <option value="">{loadingSelectors ? "Loading groups..." : "Select a group ticket to replace flights"}</option>
-                                    {groupTicketOptions.map((g) => (
-                                        <option key={g._id} value={g._id}>{g.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {flightsEdit.length > 0 ? (
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                                    {flightsEdit.map((flight, index) => (
-                                        <div key={index} style={flightCardStyle}>
-                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A" }}>
-                                                {flight.flightNo || "Flight N/A"} {flight.airline ? `- ${flight.airline}` : ""}
-                                            </div>
-                                            <div style={{ fontSize: "0.74rem", color: "#475569", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                                <span>{flight.sectorFrom || "N/A"} to {flight.sectorTo || "N/A"}</span>
-                                                <span>Dep: {formatDate(flight.depDate)} {flight.depTime || ""}</span>
-                                                {flight.arrDate && <span>Arr: {formatDate(flight.arrDate)} {flight.arrTime || ""}</span>}
-                                                {flight.baggage && <span>Bag: {flight.baggage}</span>}
-                                                {flight.meal && <span>Meal: {flight.meal}</span>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ fontSize: "0.76rem", color: "#94A3B8" }}>No flights selected yet - pick an Umrah Group Ticket above.</div>
-                            )}
-                        </>
-                    ) : packageFlights.length > 0 ? (
+                    {packageFlights.length > 0 ? (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                             {packageFlights.map((flight: any, index: any) => (
                                 <div key={index} style={flightCardStyle}>
@@ -1458,7 +1443,7 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                         <div style={{ ...sectionCard, background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
                             {/* {sectionTitle(<HomeIcon style={{ width: 15, height: 15, color: "#2563EB" }} />, "Hotels & Transport", "#1D4ED8")} */}
 
-                            {isExternalSource && !isEditingPackage && !packageHotels.length && !packageTransports.length && (
+                            {isExternalSource && !packageHotels.length && !packageTransports.length && (
                                 <div style={{ padding: "10px", background: "#E0F2FE", border: "1px solid #BAE6FD", borderRadius: "9px", color: "#0369A1", fontSize: "0.78rem", fontWeight: 700, marginBottom: "12px" }}>
                                     {sourceLabel} package. Some local package details are not available.
                                 </div>
@@ -1469,56 +1454,8 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                 <div style={{ minWidth: 0 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                                         <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.4px" }}>Hotels</div>
-                                        {isEditingPackage && (
-                                            <button type="button" onClick={addHotelRow} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", background: "white", border: "1px solid #BFDBFE", borderRadius: "6px", cursor: "pointer", fontSize: "0.68rem", fontWeight: 700, color: "#1D4ED8" }}>
-                                                <PlusIcon style={{ width: 11, height: 11 }} /> Add Hotel
-                                            </button>
-                                        )}
                                     </div>
-                                    {isEditingPackage ? (
-                                        <div style={{ display: "grid", gap: "8px" }}>
-                                            {hotelsEdit.map((hotel, index) => (
-                                                <div key={index} style={editRowCardStyle}>
-                                                    <button type="button" onClick={() => removeHotelRow(index)} style={removeRowButtonStyle}>
-                                                        <TrashIcon style={{ width: 12, height: 12, color: "#DC2626" }} />
-                                                    </button>
-                                                    <div style={{ display: "grid", gap: "8px", paddingRight: "28px" }}>
-                                                        <div>
-                                                            <div style={rowFieldLabelStyle}>Hotel</div>
-                                                            <CreatableSelect
-                                                                options={hotelOptions}
-                                                                value={hotel.name ? { value: hotel.hotelId || hotel.name, label: hotel.name } : null}
-                                                                onChange={(option: any) => applyHotelSelection(index, option)}
-                                                                onCreateOption={(inputValue) => setHotelName(index, inputValue)}
-                                                                placeholder={loadingSelectors ? "Loading hotels..." : "Select hotel"}
-                                                                isClearable
-                                                                isSearchable
-                                                                isLoading={loadingSelectors}
-                                                                styles={compactSelectStyles}
-                                                                menuPortalTarget={document.body}
-                                                                menuPosition="fixed"
-                                                            />
-                                                        </div>
-                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.7fr", gap: "8px" }}>
-                                                            <div>
-                                                                <div style={rowFieldLabelStyle}>City</div>
-                                                                <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.city || hotel.location?.city || "—"}</div>
-                                                            </div>
-                                                            {/* <div>
-                                                                <div style={rowFieldLabelStyle}>Nights</div>
-                                                                <input type="number" min="0" value={hotel.nightCount ?? hotel.nights ?? 0} onChange={(e) => updateHotelNights(index, Number(e.target.value) || 0)} style={compactSelectFieldStyle} />
-                                                            </div> */}
-                                                            <div>
-                                                                <div style={rowFieldLabelStyle}>Rating</div>
-                                                                <div style={{ padding: "7px 8px", fontSize: "0.72rem", color: "#475569" }}>{hotel.rating ? `${hotel.rating}★` : "—"}</div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {hotelsEdit.length === 0 && <div style={{ fontSize: "0.76rem", color: "#94A3B8", padding: "4px 0" }}>No hotels added yet - click "Add Hotel" to add one.</div>}
-                                        </div>
-                                    ) : packageHotels.length > 0 ? (
+                                    {packageHotels.length > 0 ? (
                                         <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "auto" }}>
                                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                                 <thead>
@@ -1550,55 +1487,8 @@ function DetailsModal({ booking, onClose, canManage, onExtendHold, onSaveDiscoun
                                 <div style={{ minWidth: 0 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                                         <div style={{ fontSize: "0.72rem", color: "#1D4ED8", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.4px" }}>Transport</div>
-                                        {isEditingPackage && (
-                                            <button type="button" onClick={addTransportRow} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", background: "white", border: "1px solid #BFDBFE", borderRadius: "6px", cursor: "pointer", fontSize: "0.68rem", fontWeight: 700, color: "#1D4ED8" }}>
-                                                <PlusIcon style={{ width: 11, height: 11 }} /> Add Transport
-                                            </button>
-                                        )}
                                     </div>
-                                    {isEditingPackage ? (
-                                        <div style={{ display: "grid", gap: "8px" }}>
-                                            {transportsEdit.map((t, index) => (
-                                                <div key={index} style={editRowCardStyle}>
-                                                    <button type="button" onClick={() => removeTransportRow(index)} style={removeRowButtonStyle}>
-                                                        <TrashIcon style={{ width: 12, height: 12, color: "#DC2626" }} />
-                                                    </button>
-                                                    <div style={{ display: "grid", gap: "8px", paddingRight: "28px" }}>
-                                                        <div>
-                                                            <div style={rowFieldLabelStyle}>Route</div>
-                                                            <CreatableSelect
-                                                                options={transportOptions}
-                                                                value={t.route ? { value: t.route, label: t.route } : null}
-                                                                onChange={(option: any) => applyTransportSelection(index, option)}
-                                                                onCreateOption={(inputValue) => setTransportRoute(index, inputValue)}
-                                                                placeholder={loadingSelectors ? "Loading transports..." : "Select route"}
-                                                                isClearable
-                                                                isSearchable
-                                                                isLoading={loadingSelectors}
-                                                                styles={compactSelectStyles}
-                                                                menuPortalTarget={document.body}
-                                                                menuPosition="fixed"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <div style={rowFieldLabelStyle}>Type</div>
-                                                            <select
-                                                                value={t.transportType || ""}
-                                                                onChange={(e) => updateTransportType(index, e.target.value)}
-                                                                className="w-full p-2.5 bg-white text-xs border border-neutral-200 rounded-sm"
-                                                            >
-                                                                <option value="">Select type</option>
-                                                                {TRANSPORT_TYPES.map((tt) => (
-                                                                    <option key={tt} value={tt}>{tt}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {transportsEdit.length === 0 && <div style={{ fontSize: "0.76rem", color: "#94A3B8", padding: "4px 0" }}>No transport added yet - click "Add Transport" to add one.</div>}
-                                        </div>
-                                    ) : packageTransports.length > 0 ? (
+                                    {packageTransports.length > 0 ? (
                                         <div style={{ border: "1px solid #DBEAFE", borderRadius: "9px", overflow: "auto" }}>
                                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                                 <thead>

@@ -1,4 +1,5 @@
 import axiosInstance from "./axios";
+import type { BookingPackageDetails, UmrahVoucherData } from "../utils/umrahVoucherPrint";
 
 // Get all Umrah bookings (Admin only)
 export const getAllBookingsAdmin = async (params = {}) => {
@@ -215,6 +216,40 @@ export const updateBookingPackageDetails = async (
     return response.data;
   } catch (error) {
     console.error("Error updating booking package details:", error);
+    throw error;
+  }
+};
+
+// Create or edit this booking's Umrah hotel voucher (admin edit, booking-scoped).
+// packageDetails is the group ticket / flights / hotels / transport the voucher now has;
+// the server writes it onto the booking too. Pricing and the shared package are never touched.
+export const saveBookingVoucher = async (
+  id: string,
+  voucher: UmrahVoucherData,
+  packageDetails: BookingPackageDetails,
+) => {
+  try {
+    const response = await axiosInstance.put(`/umrah-bookings/${id}/voucher`, {
+      voucher,
+      packageDetails,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error saving booking voucher:", error);
+    throw error;
+  }
+};
+
+// Lock / unlock the voucher for the booking's agent (locked = the agent can't see or print it)
+export const updateVoucherLock = async (id: string, locked: boolean) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/umrah-bookings/${id}/voucher-lock`,
+      { locked },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating voucher lock:", error);
     throw error;
   }
 };

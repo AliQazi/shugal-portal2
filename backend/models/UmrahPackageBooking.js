@@ -366,6 +366,28 @@ const UmrahPackageBookingSchema = new mongoose.Schema(
       default: null,
     },
 
+    // The Umrah hotel voucher as created/edited by admin (flights, hotels,
+    // transport legs, mutamers, header fields). A snapshot owned by the voucher:
+    // editing it never touches pricing, passengers or the shared package.
+    // null = no voucher created yet.
+    voucherData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    // Admin-controlled visibility of the voucher to the booking's agent.
+    // true (default) = locked: the agent neither receives the voucher nor can print it.
+    // false = unlocked: the agent can print it.
+    voucherLocked: {
+      type: Boolean,
+      default: true,
+    },
+    // Secret in the voucher's public (QR) link - /umrah-voucher/<token>. Created with the voucher.
+    voucherPublicToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
     // Additional Notes
     specialRequests: String,
     internalNotes: String,

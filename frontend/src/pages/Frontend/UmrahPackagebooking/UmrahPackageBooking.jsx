@@ -6,6 +6,7 @@ import {
 } from "../../../api/umrahBookingApi";
 import axiosInstance from "../../../api/axios";
 import { printGDSBooking } from "../../../utils/bookingPDFService";
+import { printUmrahVoucher } from "../../../utils/umrahVoucherPrint";
 import {
   Search,
   // RefreshCw,
@@ -73,6 +74,7 @@ export default function UmrahBooking() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [timers, setTimers] = useState({});
   const [printingTicketId, setPrintingTicketId] = useState(null);
+  const [printingVoucherId, setPrintingVoucherId] = useState(null);
   const [detailsPackageData, setDetailsPackageData] = useState(null);
   const [detailsGroupTicket, setDetailsGroupTicket] = useState(null);
   const [loadingDetailsData, setLoadingDetailsData] = useState(false);
@@ -168,6 +170,10 @@ export default function UmrahBooking() {
   const applyPackageDetailsOverride = (base, override) => {
     if (!override) return base;
     const merged = { ...(base || {}) };
+    // A group ticket re-picked by admin for this booking only.
+    if (override.selectedGroupTicketId) {
+      merged.selectedGroupTicketId = override.selectedGroupTicketId;
+    }
     if (override.flights?.length) merged.flights = override.flights;
     if (override.hotels?.length) merged.hotels = override.hotels;
     if (override.transports?.length) {
@@ -489,6 +495,20 @@ export default function UmrahBooking() {
       toast.error(error.response?.data?.message || "Failed to print ticket");
     } finally {
       setPrintingTicketId(null);
+    }
+  };
+
+  // The server only sends voucherData once admin has unlocked the voucher for this agent.
+  const handlePrintVoucher = async (booking) => {
+    if (!booking.voucherData) return;
+    try {
+      setPrintingVoucherId(booking._id);
+      await printUmrahVoucher(booking, booking.voucherData);
+    } catch (error) {
+      console.error("Error printing Umrah voucher:", error);
+      toast.error("Failed to print voucher");
+    } finally {
+      setPrintingVoucherId(null);
     }
   };
 
@@ -1572,7 +1592,7 @@ export default function UmrahBooking() {
                         </td>
 
                         {/* Action */}
-                        <td className="border border-slate-300 px-3 py-2.5 text-center whitespace-nowrap">
+                        <td className="border border-slate-300 px-3 py-2.5 text-center whitespace-nowrap w-75 min-w-87.5">
                           <div className="flex flex-wrap items-center justify-center gap-1.5">
                             <button
                               onClick={() => handleOpenDetailsModal(booking)}
@@ -1621,6 +1641,25 @@ export default function UmrahBooking() {
                                   : "Print Ticket"}
                               </button>
                             )}
+
+                            {/* Shown only after admin unlocks the voucher for this booking. */}
+                            {booking.voucherData &&
+                              booking.overallStatus !== "Cancelled" && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePrintVoucher(booking);
+                                  }}
+                                  disabled={printingVoucherId === booking._id}
+                                  className="inline-flex items-center gap-1 px-2! py-1! bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md hover:bg-emerald-100 text-xs! font-medium whitespace-nowrap disabled:opacity-60"
+                                  title="Print Voucher"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  {printingVoucherId === booking._id
+                                    ? "Printing..."
+                                    : "Print Voucher"}
+                                </button>
+                              )}
 
                             {isOnHoldBooking(booking) &&
                               timers[booking._id]?.expired ? (

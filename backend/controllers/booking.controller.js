@@ -1890,6 +1890,15 @@ export const updateBookingPassengerDetails = async (req, res) => {
       });
     }
 
+    // Admin can lock a booking so the agent cannot edit passenger details.
+    if (!isAdmin && booking.passengersLocked) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Passenger editing is locked for this booking. Please contact admin.",
+      });
+    }
+
     if (!PASSENGER_EDITABLE_STATUSES.includes(booking.status)) {
       return res.status(400).json({
         success: false,
@@ -1939,6 +1948,57 @@ export const updateBookingPassengerDetails = async (req, res) => {
       success: true,
       message: "Passenger details updated successfully",
       data: { _id: booking._id, passengers: booking.passengers },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// -------------------------
+// TOGGLE PASSENGERS EDIT LOCK (ADMIN ONLY)
+// Admin locks/unlocks whether the agent can edit passenger details
+// -------------------------
+export const updatePassengersLock = async (req, res) => {
+  try {
+    const canManage =
+      ["Super Admin", "Admin"].includes(req.user.role) ||
+      req.user.permissions?.includes("bookings_action_buttons");
+    if (!canManage) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to manage bookings",
+      });
+    }
+
+    const { locked } = req.body;
+    if (typeof locked !== "boolean") {
+      return res
+        .status(400)
+        .json({ success: false, message: "'locked' boolean is required" });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    booking.passengersLocked = locked;
+    await booking.save();
+
+    await ActivityLog.create({
+      user: req.user._id,
+      type: "Ticket Booking",
+      refModel: "Booking",
+      refId: booking._id,
+      description: `Passenger edits ${locked ? "locked" : "unlocked"} for booking "${booking.bookingReference}"`,
+    });
+
+    res.json({
+      success: true,
+      message: `Passenger edits ${locked ? "locked" : "unlocked"} successfully`,
+      data: { _id: booking._id, passengersLocked: booking.passengersLocked },
     });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

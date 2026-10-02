@@ -8,6 +8,7 @@ import {
   updateBooking,
   updatePassengerDiscounts,
   updateBookingPassengerDetails,
+  updatePassengersLock,
   extendBookingHold,
   cancelBooking,
   deleteBooking,
@@ -65,6 +66,9 @@ router.patch("/:id/discounts", updatePassengerDiscounts);
 
 // Edit passenger details (owner/admin; on hold, partially confirmed or confirmed)
 router.patch("/:id/passengers", updateBookingPassengerDetails);
+
+// Lock/unlock agent-side passenger editing (admin / manage bookings)
+router.patch("/:id/passengers-lock", updatePassengersLock);
 
 // Extend on-hold booking expiry
 router.patch("/:id/extend-hold", extendBookingHold);

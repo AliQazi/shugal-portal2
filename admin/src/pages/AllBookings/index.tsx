@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { format } from "date-fns"
 import axiosInstance from '../../Api/axios'
 import MaskedDatePicker from '../../components/maskedDatePicker'
-// import { toast } from 'react-toastify'
+import { toast } from 'react-toastify'
+import { LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline'
 import { printGDSBooking } from '../../utils/bookingPDFService'
 import { useAuth } from '../../context/AuthContext'
 import { hasPermission } from '../../utils/permissions'
@@ -39,6 +40,7 @@ interface Booking {
     pnr?: string
     pricing: { grandTotal: number }
     status: string,
+    passengersLocked?: boolean
     expiresAt: string | null
     cancelledAt?: string | null
     autoCancelled?: boolean
@@ -217,9 +219,12 @@ interface BookingsTableProps {
     navigate: (path: string) => void
     timers: { [key: string]: { hours: number; minutes: number; seconds: number; expired: boolean } }
     canSeeProfitLoss: boolean,
+    canUseActions: boolean
+    togglingLockId: string | null
+    onTogglePassengersLock: (bookingId: string, nextLocked: boolean) => void
 }
 
-const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, canSeeProfitLoss }: BookingsTableProps) => {
+const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, timers, canSeeProfitLoss, canUseActions, togglingLockId, onTogglePassengersLock }: BookingsTableProps) => {
     // const [deletingId, setDeletingId] = useState<string | null>(null);
     return (
         <table className="min-w-full border-collapse">
@@ -748,6 +753,25 @@ const BookingsTable = memo(({ bookings, getStatusBadge, formatDate, navigate, ti
                                                     </button>
                                                 </div>
                                             )}
+                                        {/* Agent passenger-edit lock (cancelled bookings can't be edited anyway) */}
+                                        {canUseActions && booking.status !== 'cancelled' && (
+                                            <button
+                                                onClick={() => onTogglePassengersLock(booking._id, !booking.passengersLocked)}
+                                                disabled={togglingLockId === booking._id}
+                                                title={booking.passengersLocked ? "Passenger edits locked — click to unlock" : "Passenger edits unlocked — click to lock"}
+                                                className={`flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-md border transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${booking.passengersLocked ? 'border-red-300 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}
+                                            >
+                                                <span className={`relative w-6.5 h-3.75 rounded-full shrink-0 transition-colors ${booking.passengersLocked ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                                                    <span className={`absolute top-0.5 w-2.75 h-2.75 rounded-full bg-white shadow transition-all ${booking.passengersLocked ? 'left-0.5' : 'left-3.25'}`} />
+                                                </span>
+                                                {booking.passengersLocked
+                                                    ? <LockClosedIcon className="w-3 h-3 text-red-700" />
+                                                    : <LockOpenIcon className="w-3 h-3 text-emerald-700" />}
+                                                <span className={`text-[11px] font-bold ${booking.passengersLocked ? 'text-red-700' : 'text-emerald-700'}`}>
+                                                    {booking.passengersLocked ? "Can't Edit" : "Can Edit"}
+                                                </span>
+                                            </button>
+                                        )}
                                         {/* Cancelled bookings only have View Details (already shown above) */}
                                     </div>
                                 </td>
@@ -779,6 +803,7 @@ export default function AllBookings() {
     const { user } = useAuth()
     const canView = hasPermission(user, "view_bookings")
     const canSeeProfitLoss = hasPermission(user, "can_see_profit_loss")
+    const canUseActions = hasPermission(user, "bookings_action_buttons")
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [bookings, setBookings] = useState<Booking[]>([])
@@ -796,6 +821,21 @@ export default function AllBookings() {
     const [uniqueAirlines, setUniqueAirlines] = useState<string[]>([])
     // const [timers, setTimers] = useState<{ [key: string]: { hours: number; minutes: number; seconds: number; expired: boolean } }>({})
     const [timers, setTimers] = useState<Record<string, Timer>>({})
+    const [togglingLockId, setTogglingLockId] = useState<string | null>(null)
+
+    const handleTogglePassengersLock = async (bookingId: string, nextLocked: boolean) => {
+        if (!canUseActions) { toast.error("No permission"); return }
+        try {
+            setTogglingLockId(bookingId)
+            const res = await axiosInstance.patch(`/bookings/${bookingId}/passengers-lock`, { locked: nextLocked })
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, passengersLocked: res.data.data.passengersLocked } : b))
+            toast.success(nextLocked ? "Passenger edits locked" : "Passenger edits unlocked")
+        } catch (error) {
+            toast.error((error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to update lock")
+        } finally {
+            setTogglingLockId(null)
+        }
+    }
 
 
     // Get status from URL params
@@ -1090,6 +1130,9 @@ export default function AllBookings() {
                         navigate={navigate}
                         timers={timers}
                         canSeeProfitLoss={canSeeProfitLoss}
+                        canUseActions={canUseActions}
+                        togglingLockId={togglingLockId}
+                        onTogglePassengersLock={handleTogglePassengersLock}
                     />
                 </div>
             </div>

@@ -308,6 +308,13 @@ const bookingSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Admin-controlled lock for agent-side passenger detail edits.
+    // false (default) = agent can edit passenger details; true = locked, agent cannot edit.
+    passengersLocked: {
+      type: Boolean,
+      default: false,
+    },
+
     // ZIP Accounts journal voucher ID (created on confirmation)
     zipVoucherId: {
       type: String,

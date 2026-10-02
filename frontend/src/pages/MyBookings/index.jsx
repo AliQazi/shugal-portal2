@@ -819,15 +819,24 @@ export default function MyBookings() {
                                   </svg>
                                 </button>
                                 {/* Passenger details edit - any status except cancelled */}
-                                {canEditPassengers(booking) && (
-                                  <button
-                                    onClick={() => setEditPassengersBooking(booking)}
-                                    className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
-                                    title="Edit Passenger Details"
-                                  >
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
-                                )}
+                                {canEditPassengers(booking) &&
+                                  (booking.passengersLocked ? (
+                                    <button
+                                      disabled
+                                      className="p-2.5 text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed"
+                                      title="Passenger editing is locked by admin"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditPassengersBooking(booking)}
+                                      className="p-2.5 text-slate-600 hover:bg-slate-200 border border-slate-300 transition-colors"
+                                      title="Edit Passenger Details"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                  ))}
                                 {/* Edit and Delete only for on hold/pending */}
                                 {(booking.status === "on hold" ||
                                   booking.status === "pending") && (

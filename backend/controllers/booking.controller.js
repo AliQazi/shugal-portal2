@@ -23,6 +23,10 @@ import {
   createAmaarShoaibBooking,
   formatBookingForAmaarShoaib,
 } from "../utils/Amaar-Shoaib.js";
+import {
+  acquireGroupSeatLock,
+  assertGroupSeatsAvailable,
+} from "../utils/groupSeatLock.js";
 
 // const HOLD_DURATION = 2 * 60 * 60 * 1000;
 // -------------------------
@@ -215,6 +219,7 @@ const adjustSeatsIfLocalGroup = async (
 export const createBooking = async (req, res) => {
   let seatCount = 0;
   let booking = null;
+  let releaseSeatLock = null;
 
   try {
     const {
@@ -257,6 +262,20 @@ export const createBooking = async (req, res) => {
     seatCount = adultsCount + childrenCount;
 
     const groupId = normalizeGroupId(incomingGroupId);
+
+    // Own group tickets share their seats with Umrah Package bookings. Hold the
+    // group's lock from the seat check until the booking exists, so two
+    // simultaneous requests can't both pass the check for the same last seats.
+    // The second one waits, then fails the check below.
+    if (isLocalGroup(groupId)) {
+      releaseSeatLock = await acquireGroupSeatLock(groupId);
+      await assertGroupSeatsAvailable({
+        groupId,
+        seats: Number(seatCount) || 0,
+        product: "Group Ticket",
+      });
+    }
+
     const requestedSource =
       source || (isLocalGroup(groupId) ? "admin" : "sabaoon");
     const bookingSource =
@@ -924,6 +943,15 @@ export const createBooking = async (req, res) => {
       message: "Booking created successfully",
     });
   } catch (err) {
+    // Seats were never taken (rejected before the booking was created), so
+    // there is nothing to roll back.
+    if (err.code === "SEATS_UNAVAILABLE" || err.code === "SEAT_LOCK_BUSY") {
+      return res.status(err.status || 409).json({
+        success: false,
+        message: err.message,
+      });
+    }
+
     console.error("❌ Booking creation failed:", err.message);
     console.error("Stack:", err.stack);
 
@@ -954,6 +982,8 @@ export const createBooking = async (req, res) => {
       message: err.message,
       details: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
+  } finally {
+    if (releaseSeatLock) await releaseSeatLock();
   }
 };
 
@@ -2061,6 +2091,8 @@ export const extendBookingHold = async (req, res) => {
 // UPDATE BOOKING DETAILS
 // -------------------------
 export const updateBooking = async (req, res) => {
+  let releaseSeatLock = null;
+
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) throw new Error("Booking not found");
@@ -2068,6 +2100,7 @@ export const updateBooking = async (req, res) => {
       throw new Error("Only on-hold bookings can be edited");
 
     const oldSeats = booking.adultsCount + booking.childrenCount;
+    const oldGroupId = normalizeGroupId(booking.groupId);
 
     // Update fields from body
     Object.assign(booking, req.body);
@@ -2077,6 +2110,25 @@ export const updateBooking = async (req, res) => {
 
     const newSeats = booking.adultsCount + booking.childrenCount;
     const diff = newSeats - oldSeats;
+
+    // Taking extra seats on an own group ticket must go through the same
+    // locked seat check as a new booking. This booking's current seats are
+    // already counted, so only the extra seats (or all of them, if the booking
+    // moved to another group) need to fit.
+    const extraSeats =
+      normalizeGroupId(booking.groupId) === oldGroupId ? diff : newSeats;
+    if (
+      extraSeats > 0 &&
+      !booking.inventoryDeducted &&
+      isLocalGroup(booking.groupId)
+    ) {
+      releaseSeatLock = await acquireGroupSeatLock(booking.groupId);
+      await assertGroupSeatsAvailable({
+        groupId: booking.groupId,
+        seats: extraSeats,
+        product: "Group Ticket",
+      });
+    }
 
     if (booking.inventoryDeducted && diff > 0) {
       const reserved = await GroupTicketing.updateOne(
@@ -2112,7 +2164,9 @@ export const updateBooking = async (req, res) => {
 
     res.json({ success: true, data: booking });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(err.status || 400).json({ success: false, message: err.message });
+  } finally {
+    if (releaseSeatLock) await releaseSeatLock();
   }
 };
 

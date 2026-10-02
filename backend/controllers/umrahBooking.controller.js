@@ -15,6 +15,10 @@ import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import BookingCounter from "../models/BookingCounter.js";
 import ActivityLog from "../models/activitylogs.js";
+import {
+  acquireGroupSeatLock,
+  assertGroupSeatsAvailable,
+} from "../utils/groupSeatLock.js";
 
 /* ===========================
    HELPER: Parse FormData fields with bracket notation
@@ -96,6 +100,8 @@ const getPaxTypeLabel = (pax) =>
    Status updates work with booking data only, not package lookups.
 =========================== */
 export const createUmrahBooking = async (req, res) => {
+  let releaseSeatLock = null;
+
   try {
     const parsedData = parseFormData(req.body);
     const passengers = parsePassengers(req.body);
@@ -116,6 +122,32 @@ export const createUmrahBooking = async (req, res) => {
         packageData = JSON.parse(packageData);
       } catch (e) {
         console.error("Error parsing packageData:", e);
+      }
+    }
+
+    // A local package linked to a group ticket draws its seats from that ticket,
+    // shared with Group Ticket bookings. Hold the group's lock from the seat
+    // check until the booking exists, so a Group Ticket booking and this one
+    // (or two Umrah bookings) arriving together can't both take the last seats.
+    // The later one waits, then fails the check. Done before the booking number
+    // is generated so a rejected attempt doesn't burn a number.
+    if (
+      !["travel-network", "upsky"].includes(parsedData.packageSource) &&
+      mongoose.isValidObjectId(parsedData.packageId)
+    ) {
+      const linkedPackage = await GroupTicketing.findById(parsedData.packageId)
+        .select("selectedGroupTicketId")
+        .lean();
+      const linkedGroupId = linkedPackage?.selectedGroupTicketId;
+
+      if (linkedGroupId && mongoose.isValidObjectId(linkedGroupId)) {
+        releaseSeatLock = await acquireGroupSeatLock(linkedGroupId);
+        await assertGroupSeatsAvailable({
+          groupId: linkedGroupId,
+          // Infants don't occupy seats
+          seats: passengers.filter((p) => p.type !== "Infant").length,
+          product: "Umrah Package",
+        });
       }
     }
 
@@ -368,10 +400,12 @@ export const createUmrahBooking = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Umrah Booking Error:", error);
-    res.status(400).json({
+    res.status(error.status || 400).json({
       success: false,
       message: error.message,
     });
+  } finally {
+    if (releaseSeatLock) await releaseSeatLock();
   }
 };
 

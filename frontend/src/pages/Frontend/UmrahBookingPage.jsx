@@ -380,7 +380,10 @@ export default function UmrahBookingPage({ user }) {
       );
       return;
     }
-    if (formData.adults.length >= maxAdults) {
+    if (
+      formData.adults.length >= maxAdults ||
+      formData.adults.length + formData.children.length >= availableRooms
+    ) {
       toast.warning(
         `Maximum ${maxAdults} seat${maxAdults > 1 ? "s" : ""} available based on ${availableRooms} available room${availableRooms > 1 ? "s" : ""}`,
       );
@@ -406,7 +409,20 @@ export default function UmrahBookingPage({ user }) {
       }));
   };
 
+  // Adults and children share the available packages (infants don't count),
+  // so children are only allowed in whatever is left after the adults.
+  const maxChildren = Math.max(0, availableRooms - formData.adults.length);
+  const childLimitReached = formData.children.length >= maxChildren;
+
   const addChild = (childType = "withoutBed") => {
+    if (childLimitReached) {
+      toast.warning(
+        maxChildren === 0
+          ? `Only ${availableRooms} package${availableRooms > 1 ? "s" : ""} available — no seat left for a child.`
+          : `Maximum ${maxChildren} child${maxChildren > 1 ? "ren" : ""} allowed based on ${availableRooms} available package${availableRooms > 1 ? "s" : ""}.`,
+      );
+      return;
+    }
     setFormData((f) => ({
       ...f,
       children: [...f.children, { ...defaultChild, childType }],
@@ -1031,7 +1047,7 @@ export default function UmrahBookingPage({ user }) {
                   letterSpacing: "0.4px",
                 }}
               >
-                Available Packages
+                Available Seats
               </div>
             </div>
 
@@ -1655,7 +1671,8 @@ export default function UmrahBookingPage({ user }) {
                 <button
                   type="button"
                   onClick={() => addChild("withoutBed")}
-                  style={s.btn("#3B82F6")}
+                  style={s.btn("#3B82F6", childLimitReached)}
+                  disabled={childLimitReached}
                 >
                   <Plus size={13} /> Child w/o Bed (PKR {childPrice.toLocaleString()})
                 </button>
@@ -1663,7 +1680,8 @@ export default function UmrahBookingPage({ user }) {
                   <button
                     type="button"
                     onClick={() => addChild("withBed")}
-                    style={s.btn("#2563EB")}
+                    style={s.btn("#2563EB", childLimitReached)}
+                    disabled={childLimitReached}
                   >
                     <Plus size={13} /> Child w/ Bed (PKR {childWithBedPrice.toLocaleString()})
                   </button>

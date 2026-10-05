@@ -7,6 +7,8 @@ import UmrahPackageBooking from "../models/UmrahPackageBooking.js";
 import BookingCounter from "../models/BookingCounter.js";
 import ActivityLog from "../models/activitylogs.js";
 import { calculateBookingExpiresAt } from "../utils/bookingHoldDuration.js";
+import { acquireGroupSeatLock, assertGroupSeatsAvailable } from "../utils/groupSeatLock.js";
+import { REFUND_COUNTS_STAGE, ACTIVE_SEATS } from "../utils/bookingSeatStats.js";
 
 const startOfToday = () => {
   const today = new Date();
@@ -32,10 +34,8 @@ const getGroupBookedSeats = async (groups) => {
   const [directBookings, linkedPackages] = await Promise.all([
     Booking.aggregate([
       { $match: { groupId: { $in: groupIds }, status: { $nin: ["cancelled"] } } },
-      { $group: {
-        _id: "$groupId",
-        seats: { $sum: { $add: [{ $ifNull: ["$adultsCount", 0] }, { $ifNull: ["$childrenCount", 0] }] } },
-      } },
+      REFUND_COUNTS_STAGE,
+      { $group: { _id: "$groupId", seats: { $sum: ACTIVE_SEATS } } },
     ]),
     UmrahPackage.find({ selectedGroupTicketId: { $in: groupIds } })
       .select("_id selectedGroupTicketId")
@@ -70,7 +70,7 @@ const withAvailableGroupSeats = async (groups) => {
   return groups
     .map((group) => ({
       ...group,
-      availableSeats: Math.max(0, (Number(group.totalSeats) || 0) - (bookedByGroup.get(String(group._id)) || 0)),
+      availableSeats: Math.max(0, (Number(group.totalSeatsAfterPartial) || 0) - (bookedByGroup.get(String(group._id)) || 0)),
     }))
     .filter((group) => group.availableSeats > 0);
 };
@@ -319,7 +319,7 @@ export const checkExternalAvailability = async (req, res, next) => {
 };
 
 export const createExternalBooking = async (req, res, next) => {
-  let reservedGroupId = null;
+  let releaseSeatLock = null;
   let reservedPackageId = null;
   let seats = 0;
   let packageUnits = 0;
@@ -419,13 +419,10 @@ export const createExternalBooking = async (req, res, next) => {
       return res.status(201).json({ success: true, data: presentUmrahBooking(booking) });
     }
 
-    const group = await GroupTicketing.findOneAndUpdate(
-      { _id: inventoryId, internalStatus: "Public", totalSeats: { $gte: seats }, "flights.0.depDate": { $gte: startOfToday() } },
-      { $inc: { totalSeats: -seats } },
-      { new: true },
-    );
+    releaseSeatLock = await acquireGroupSeatLock(inventoryId);
+    const group = await GroupTicketing.findOne({ _id: inventoryId, ...publicGroupQuery() });
     if (!group) return apiError(res, 409, "INSUFFICIENT_INVENTORY", "The group is unavailable or does not have enough seats.");
-    reservedGroupId = group._id;
+    await assertGroupSeatsAvailable({ groupId: inventoryId, seats, product: "Group Ticket" });
 
     const fares = {
       adult: group.price?.sellingAdultPriceB2B || 0,
@@ -450,14 +447,15 @@ export const createExternalBooking = async (req, res, next) => {
       departureDate: firstFlight?.depDate || new Date(), arrivalDate: lastFlight?.arrDate,
       userId: req.user._id, status: "on hold", expiresAt: await calculateBookingExpiresAt(new Date(), "admin"), source: "admin",
       bookingChannel: "external_api", externalApiClientId: req.apiClient._id,
-      inventoryDeducted: true,
+      inventoryDeducted: false,
     });
     await ActivityLog.create({ user: req.user._id, type: "External API Booking", refModel: "Booking", refId: booking._id, description: `External API client ${req.apiClient.name} created booking "${booking.bookingReference}"` }).catch(() => {});
     res.status(201).json({ success: true, data: presentBooking(booking) });
   } catch (error) {
-    if (reservedGroupId) await GroupTicketing.updateOne({ _id: reservedGroupId }, { $inc: { totalSeats: seats } }).catch(() => {});
     if (reservedPackageId) await UmrahPackage.updateOne({ _id: reservedPackageId }, { $inc: { availableRooms: packageUnits } }).catch(() => {});
     next(error);
+  } finally {
+    if (releaseSeatLock) await releaseSeatLock();
   }
 };
 

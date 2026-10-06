@@ -7,7 +7,7 @@ import UmrahPackageBooking from "../models/UmrahPackageBooking.js";
 import BookingCounter from "../models/BookingCounter.js";
 import ActivityLog from "../models/activitylogs.js";
 import { calculateBookingExpiresAt } from "../utils/bookingHoldDuration.js";
-import { acquireGroupSeatLock, assertGroupSeatsAvailable } from "../utils/groupSeatLock.js";
+import { acquireGroupSeatLock, assertGroupSeatsAvailable, getGroupBookedSeats as getBookedGroupSeats } from "../utils/groupSeatLock.js";
 import { REFUND_COUNTS_STAGE, ACTIVE_SEATS } from "../utils/bookingSeatStats.js";
 
 const startOfToday = () => {
@@ -73,6 +73,14 @@ const withAvailableGroupSeats = async (groups) => {
       availableSeats: Math.max(0, (Number(group.totalSeatsAfterPartial) || 0) - (bookedByGroup.get(String(group._id)) || 0)),
     }))
     .filter((group) => group.availableSeats > 0);
+};
+
+const getPackageFlightSeats = async (pkg) => {
+  const groupId = pkg.selectedGroupTicketId;
+  if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) return null;
+  const group = await GroupTicketing.findById(groupId).select("totalSeats").lean();
+  if (!group) return 0;
+  return Math.max(0, (Number(group.totalSeats) || 0) - await getBookedGroupSeats(groupId));
 };
 
 const passengerTypes = ["Adult", "Child", "Infant"];
@@ -308,7 +316,9 @@ export const checkExternalAvailability = async (req, res, next) => {
     if (requestedUnits < 1) return apiError(res, 422, "VALIDATION_ERROR", "At least one reservable passenger is required.");
     const [availableGroup] = group ? await withAvailableGroupSeats([group]) : [];
     const availableUnits = pkg ? pkg.availableRooms : (availableGroup?.availableSeats || 0);
-    const available = availableUnits >= requestedUnits;
+    const flightSeats = pkg ? await getPackageFlightSeats(pkg) : null;
+    const available = availableUnits >= requestedUnits &&
+      (flightSeats === null || flightSeats >= counts.adults + counts.children);
     const expiresAt = Date.now() + AVAILABILITY_TOKEN_TTL_MS;
     const availabilityToken = available ? signAvailabilityPayload({
       inventoryId: String(inventoryId), clientId: String(req.apiClient._id),
@@ -375,6 +385,15 @@ export const createExternalBooking = async (req, res, next) => {
         });
       });
       if (umrahRequiredDates.length) return apiError(res, 422, "VALIDATION_ERROR", "The payload is invalid.", umrahRequiredDates);
+
+      const linkedGroupId = packageInventory.selectedGroupTicketId;
+      if (linkedGroupId && mongoose.Types.ObjectId.isValid(linkedGroupId)) {
+        releaseSeatLock = await acquireGroupSeatLock(linkedGroupId);
+        const remainingFlightSeats = await getPackageFlightSeats(packageInventory);
+        if (remainingFlightSeats < seats) {
+          return apiError(res, 409, "INSUFFICIENT_INVENTORY", "The Umrah package does not have enough remaining flight seats.");
+        }
+      }
 
       packageUnits = passengers.length;
       const reservedPackage = await UmrahPackage.findOneAndUpdate(
